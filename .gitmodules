@@ -1,0 +1,9 @@
+[submodule "benchmarks/py-tpcc"]
+	path = benchmarks/py-tpcc
+	url = https://github.com/apavlo/py-tpcc.git
+[submodule "filesystems/strata"]
+	path = filesystems/strata
+	url = https://github.com/Dahca/strata.git
+[submodule "filesystems/linux-nova"]
+	path = filesystems/linux-nova
+	url = https://github.com/efeslab/linux-nova.git
