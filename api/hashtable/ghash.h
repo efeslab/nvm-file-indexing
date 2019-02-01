@@ -35,6 +35,7 @@ extern "C" {
 
 // from common
 #include "global.h"
+#include "util.h"
 
 // local includes
 #include "hash_functions.h"
@@ -252,6 +253,7 @@ nvram_read(GHashTable *ht, paddr_t offset, hash_entry_t **buf, bool force) {
  */
 static void
 nvram_read_entry(GHashTable *ht, paddr_t idx, hash_entry_t *ret, bool force) {
+#if 0
 #ifdef HASHCACHE
   paddr_t offset = NV_IDX(idx);
   hash_entry_t *buf;
@@ -286,6 +288,7 @@ nvram_read_entry(GHashTable *ht, paddr_t idx, hash_entry_t *ret, bool force) {
 #endif
 
 #endif
+#endif
 }
 
 /*
@@ -297,6 +300,9 @@ nvram_read_entry(GHashTable *ht, paddr_t idx, hash_entry_t *ret, bool force) {
  */
 static int
 nvram_read_metadata(GHashTable *hash, paddr_t location) {
+#if 1
+    return 0;
+#else
   struct buffer_head *bh;
   struct dhashtable_meta metadata;
   int err, ret = 0;
@@ -334,6 +340,7 @@ nvram_read_metadata(GHashTable *hash, paddr_t location) {
   //bh_release(bh);
 
   return ret;
+#endif
 }
 
 #ifdef HASHCACHE
@@ -369,6 +376,9 @@ static inline void nvram_flush(GHashTable *ht) {
 
 static int
 nvram_write_metadata(GHashTable *hash, paddr_t location) {
+#if 1
+    return 0;
+#else
   struct buffer_head *bh;
   struct super_block *super = sb[g_root_dev];
   int ret;
@@ -403,10 +413,14 @@ nvram_write_metadata(GHashTable *hash, paddr_t location) {
   super->used_blocks += 1;
   */
   hash->callbacks->cb_write(
+#endif
 }
 
 static paddr_t
 nvram_alloc_range(size_t count) {
+#if 1
+    return 0;
+#else
   int err = 1;
   // TODO: maybe generalize this for other devices.
   struct super_block *super = sb[g_root_dev];
@@ -439,6 +453,7 @@ nvram_alloc_range(size_t count) {
   printf("-- Allocated blkno %llu - %llu\n", block, last);
 
   return block;
+#endif
 }
 
 /*

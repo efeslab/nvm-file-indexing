@@ -1,6 +1,7 @@
 #ifndef __NVMIDX_GLOBAL_H__
 #define __NVMIDX_GLOBAL_H__
 
+#include <stdlib.h>
 #include <stdint.h>
 
 /*

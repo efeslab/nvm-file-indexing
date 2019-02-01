@@ -239,7 +239,7 @@ g_hash_table_lookup_node (GHashTable    *hash_table,
   hash_entry_t *buffer;
   hash_entry_t cur;
 
-  hash_value = hash_table->hash_func((void*)key);
+  hash_value = hash_table->hash_func(key);
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
   }
@@ -390,6 +390,9 @@ g_hash_table_new (hash_func_t  hash_func,
                   size_t       max_entries,
                   size_t       range_size,
                   paddr_t metadata_location) {
+#if 1
+    return NULL;
+#else
   GHashTable *hash_table;
 
   hash_table = malloc(sizeof(*hash_table));
@@ -488,6 +491,7 @@ g_hash_table_new (hash_func_t  hash_func,
 
 
   return hash_table;
+#endif
 }
 
 /*
@@ -653,7 +657,7 @@ g_hash_table_insert_internal (GHashTable     *hash_table,
 
   assert (hash_table->ref_count > 0);
 
-  hash_value = hash_table->hash_func((void*)key);
+  hash_value = hash_table->hash_func(key);
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
   }
@@ -806,7 +810,7 @@ g_hash_table_remove_internal (GHashTable    *hash_table,
 
   assert (hash_table->ref_count > 0);
 
-  hash_value = hash_table->hash_func((void*)key);
+  hash_value = hash_table->hash_func(key);
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
   }
