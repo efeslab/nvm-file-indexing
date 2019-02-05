@@ -6,5 +6,10 @@ set (VERSION_MINOR 1)
 add_subdirectory(common)
 add_subdirectory(hashtable)
 
-add_library(NVMIndexingAPI SHARED foo.c)
+file(GLOB api_src
+    "*.h"
+    "*.c"
+)
+
+add_library(NVMIndexingAPI SHARED ${api_src})
 target_link_libraries(NVMIndexingAPI HashTable Common)

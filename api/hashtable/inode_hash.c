@@ -16,11 +16,43 @@ static GHashTable *ghash = NULL;
 // (iangneal): Second level hash table.
 static GHashTable *gsuper = NULL;
 
-static pthread_mutex_t alloc_tex = PTHREAD_MUTEX_INITIALIZER;
 /*
  *
  */
-void init_hash(struct super_block *sb) {
+void init_hash(idx_struct_t *idx_struct) {
+    GHashTable *ht = (GHashTable*)idx_struct->idx_metadata;
+
+    if (ht) return;
+
+    ht = MALLOC(idx_struct, sizeof(*ht));
+
+    device_info_t devinfo;
+    int ret = CB(idx_struct, cb_get_device_info, &devinfo);
+
+    // Allocate space on device.
+    if_then_panic(devinfo->di_block_size % sizeof(hash_entry_t) != 0,
+                  "bad hesh_entry_t size");
+
+    size_t entries_per_block = devinfo->di_block_size / sizeof(hash_entry_t);
+
+    size_t nblocks = devinfo->di_size_blocks / entries_per_block;
+    size_t remain  = devinfo->di_size_blocks % entries_per_block;
+    if (remain > 0) {
+        nblocks += 1;
+    }
+
+    paddr_t metadata_loc;
+    ssize_t nalloc = CB(idx_struct, cb_alloc_metadata,
+                        devinfo->di_size_blocks, &metadata_loc);
+
+    if_then_panic(nalloc != devinfo->di_size_blocks, "no contiguous region");
+
+
+    ret = g_hash_table_new(hash6432shift, devinfo.di_size_blocks,
+                           devinfo.di_block_size, 1, metadata_loc, ht);
+    if_then_panic(ret != 0, "could not allocate hash table");
+
+    idx_struct->idx_metadata = (void*)ht;
 #if 0
   if (ghash) return;
 

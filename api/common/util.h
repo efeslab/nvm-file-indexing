@@ -22,4 +22,6 @@ void _panic(void);
         _panic(); \
     } while (0)
 
+#define if_then_panic(a, str) if (1 == (a)) panic(str)
+
 #endif

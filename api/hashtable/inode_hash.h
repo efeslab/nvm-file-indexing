@@ -65,7 +65,7 @@ extern mlfs_fsblk_t id_map_meta_loc;
  * Generic hash table functions.
  */
 
-void init_hash(struct super_block *sb);
+void init_hash(idx_struct_t *idx_struct);
 
 int insert_hash(GHashTable *hash, struct inode *inode, hash_key_t key,
     hash_value_t value, hash_value_t size);

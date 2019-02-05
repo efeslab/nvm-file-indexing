@@ -42,7 +42,7 @@ uint64_t reads;
 uint64_t writes;
 uint64_t blocks;
 
-#ifdef LIBFS
+#if 1
 #define pthread_rwlock_rdlock(x) 0
 #define pthread_rwlock_wrlock(x) 0
 #define pthread_rwlock_unlock(x) 0
@@ -55,69 +55,6 @@ uint64_t blocks;
 #define pthread_rwlock_wrlock(x) if (0 != pthread_rwlock_trywrlock(x)) printf("WUT\n")
 #endif
 
-/**
- * SECTION:hash_tables
- * @title: Hash Tables
- * @short_description: associations between keys and values so that
- *     given a key the value can be found quickly
- *
- * A #GHashTable provides associations between keys and values which is
- * optimized so that given a key, the associated value can be found
- * very quickly.
- *
- * Note that neither keys nor values are copied when inserted into the
- * #GHashTable, so they must exist for the lifetime of the #GHashTable.
- * This means that the use of static strings is OK, but temporary
- * strings (i.e. those created in buffers and those returned by GTK+
- * widgets) should be copied with g_strdup() before being inserted.
- *
- * If keys or values are dynamically allocated, you must be careful to
- * ensure that they are freed when they are removed from the
- * #GHashTable, and also when they are overwritten by new insertions
- * into the #GHashTable. It is also not advisable to mix static strings
- * and dynamically-allocated strings in a #GHashTable, because it then
- * becomes difficult to determine whether the string should be freed.
- *
- * To create a #GHashTable, use g_hash_table_new().
- *
- * To insert a key and value into a #GHashTable, use
- * g_hash_table_insert().
- *
- * To lookup a value corresponding to a given key, use
- * g_hash_table_lookup() and g_hash_table_lookup_extended().
- *
- * g_hash_table_lookup_extended() can also be used to simply
- * check if a key is present in the hash table.
- *
- * To remove a key and value, use g_hash_table_remove().
- *
- * To call a function for each key and value pair use
- * g_hash_table_foreach() or use a iterator to iterate over the
- * key/value pairs in the hash table, see #GHashTableIter.
- *
- * To destroy a #GHashTable use g_hash_table_destroy().
- *
- * A common use-case for hash tables is to store information about a
- * set of keys, without associating any particular value with each
- * key. GHashTable optimizes one way of doing so: If you store only
- * key-value pairs where key == value, then GHashTable does not
- * allocate memory to store the values, which can be a considerable
- * space saving, if your set is large. The functions
- * g_hash_table_add() and g_hash_table_contains() are designed to be
- * used when using #GHashTable this way.
- *
- * #GHashTable is not designed to be statically initialised with keys and
- * values known at compile time. To build a static hash table, use a tool such
- * as [gperf](https://www.gnu.org/software/gperf/).
- */
-
-/**
- * GHashTable:
- *
- * The #GHashTable struct is an opaque data structure to represent a
- * [Hash Table][glib-Hash-Tables]. It should only be accessed via the
- * following functions.
- */
 
 
 #define HASH_TABLE_MIN_SHIFT 3  /* 1 << 3 == 8 buckets */
@@ -227,7 +164,7 @@ g_hash_table_set_shift_from_size (GHashTable *hash_table, int size) {
  */
 static inline uint32_t
 g_hash_table_lookup_node (GHashTable    *hash_table,
-                          paddr_t   key,
+                          paddr_t        key,
                           hash_entry_t  *ent_return,
                           uint32_t      *hash_return,
                           bool           force) {
@@ -386,68 +323,70 @@ g_hash_table_maybe_resize (GHashTable *hash_table) {
  * Returns: a new #GHashTable
  */
 GHashTable *
-g_hash_table_new (hash_func_t  hash_func,
-                  size_t       max_entries,
-                  size_t       range_size,
-                  paddr_t metadata_location) {
-#if 1
-    return NULL;
-#else
-  GHashTable *hash_table;
+g_hash_table_new (hash_func_t   hash_func,
+                  size_t        max_entries,
+                  size_t        block_size,
+                  size_t        range_size,
+                  paddr_t       metadata_location,
+                  mem_man_fns_t *mem_fns) {
+  GHashTable *ht;
 
-  hash_table = malloc(sizeof(*hash_table));
+  ht = mem_fns->mm_malloc(sizeof(*ht));
 
-  hash_table->hash_func          = hash_func ? hash_func : g_direct_hash;
-  hash_table->ref_count          = 1;
-  hash_table->nnodes             = 0;
-  hash_table->noccupied          = 0;
+  if_then_panic(ht == NULL, "malloc callback failed!");
+
+  ht->hash_func          = hash_func ? hash_func : g_direct_hash;
+  ht->ref_count          = 1;
+  ht->nnodes             = 0;
+  ht->noccupied          = 0;
+  ht->blksz              = block_size;
   // Number of entries in nvram.
-  hash_table->nvram_size         = max_entries / range_size;
-  hash_table->range_size         = range_size;
+  ht->nvram_size         = max_entries / range_size;
+  ht->range_size         = range_size;
 
   if (max_entries % range_size) {
     // If there's a partial range, need to not under-allocate.
-    hash_table->nvram_size++;
+    ht->nvram_size++;
   }
 
-  g_hash_table_set_shift_from_size(hash_table, hash_table->nvram_size);
-  printf("mod = %d, mask = %d\n", hash_table->mod, hash_table->mask);
+  g_hash_table_set_shift_from_size(ht, ht->nvram_size);
+  printf("mod = %d, mask = %d\n", ht->mod, ht->mask);
   // Make sure the mod size doesn't go out of range.
-  hash_table->nvram_size = max(hash_table->nvram_size, hash_table->size);
-  size_t scaled_size = hash_table->nvram_size;
+  ht->nvram_size = max(ht->nvram_size, ht->size);
+  size_t scaled_size = ht->nvram_size;
 
   if (max_entries < scaled_size) {
     printf("updating max_entries from %lu to %lu\n", max_entries, scaled_size);
     max_entries = scaled_size;
   }
 
-  size_t nblocks = NV_IDX(scaled_size);
-  if (BUF_IDX(scaled_size)) {
+  size_t nblocks = NV_IDX(ht, scaled_size);
+  if (BUF_IDX(ht, scaled_size)) {
     // Partial block.
     nblocks++;
   }
-  hash_table->nblocks = nblocks;
+  ht->nblocks = nblocks;
 
   // initialize read-writer locks
-  hash_table->locks = malloc(max_entries * sizeof(pthread_rwlock_t));
-  assert(hash_table->locks);
+  ht->locks = mem_fns->mm_malloc(max_entries * sizeof(pthread_rwlock_t));
+  assert(ht->locks);
   for (size_t i = 0; i < max_entries; ++i) {
-    int err = pthread_rwlock_init(hash_table->locks + i, NULL);
+    int err = pthread_rwlock_init(ht->locks + i, NULL);
     if (err) {
       panic("Could not init rwlock!");
     }
   }
 
   // init metadata lock
-  hash_table->metalock = malloc(sizeof(pthread_mutex_t));
-  assert(hash_table->metalock);
-  pthread_mutex_init(hash_table->metalock, NULL);
+  ht->metalock = mem_fns->mm_malloc(sizeof(pthread_mutex_t));
+  assert(ht->metalock);
+  pthread_mutex_init(ht->metalock, NULL);
 
-  if (!nvram_read_metadata(hash_table, metadata_location)) {
+  if (!nvram_read_metadata(ht, metadata_location)) {
     printf("Metadata not set up. Allocating hashtable on NVRAM...\n");
-    hash_table->data = nvram_alloc_range(nblocks);
+    ht->data = nvram_alloc_range(nblocks);
 
-    nvram_write_metadata(hash_table, metadata_location);
+    nvram_write_metadata(ht, metadata_location);
     printf("max_entries: %lu, sizeof %lu, nblocks: %lu\n", scaled_size,
         sizeof(hash_entry_t), nblocks);
   } else {
@@ -457,41 +396,31 @@ g_hash_table_new (hash_func_t  hash_func,
   // cache
 #ifdef HASHCACHE
   // cache lock
-  hash_table->cache_lock = malloc(sizeof(pthread_rwlock_t));
-  assert(hash_table->cache_lock);
-  int err = pthread_rwlock_init(hash_table->cache_lock, NULL);
+  ht->cache_lock = mem_fns->mm_malloc(sizeof(pthread_rwlock_t));
+  assert(ht->cache_lock);
+  int err = pthread_rwlock_init(ht->cache_lock, NULL);
   if (err) {
     panic("Could not init rwlock!");
   }
 
-  hash_table->cache = calloc(nblocks, sizeof(hash_entry_t*));
-  assert(hash_table->cache);
-
-#if 1
-  hash_entry_t *unused;
+  ht->cache = mem_fns->mm_malloc(nblocks * sizeof(hash_entry_t*));
+  assert(ht->cache);
 
   // allocate cache bitmap -- unset for valid, set for invalid
-  hash_table->cache_bitmap = calloc(nblocks / BITS_PER_LONG, sizeof(unsigned long));
-  assert(hash_table->cache_bitmap);
+  size_t cache_bitmap_size = (nblocks / BITS_PER_LONG) * sizeof(unsigned long);
+  ht->cache_bitmap = mem_fns->mm_malloc(cache_bitmap_size);
+  assert(ht->cache_bitmap);
 
   for (int i = 0; i < nblocks; ++i) {
-    hash_table->cache[i] = calloc(g_block_size_bytes / sizeof(hash_entry_t),
-        sizeof(hash_entry_t));
+    hash_entry_t *unused;
+    ht->cache[i] = mem_fns->mm_malloc(block_size);
     // load from NVRAM (force flag)
-    nvram_read(hash_table, i, &unused, 1);
+    nvram_read(ht, i, &unused, 1);
   }
 
 #endif
 
-  hash_table->bh_cache = calloc(nblocks, sizeof(*hash_table->bh_cache));
-  assert(hash_table->bh_cache);
-
-  hash_table->bh_cache_head = NULL;
-#endif
-
-
-  return hash_table;
-#endif
+  return ht;
 }
 
 /*
@@ -526,6 +455,7 @@ g_hash_table_insert_node (GHashTable    *hash_table,
   nvram_read_entry(hash_table, node_index, &ent, false);
   already_exists = HASH_ENTRY_IS_VALID(ent);
 
+  // TODO consider bookkeeping (nnodes, noccupied?)
   if (unlikely(already_exists)) {
     printf("Already exists: %lx %lx (trying to insert: %lx %lx)\n",
         ent.key, HASH_ENTRY_VAL(ent), new_key, new_value);
@@ -536,22 +466,6 @@ g_hash_table_insert_node (GHashTable    *hash_table,
     nvram_update(hash_table, node_index, &ent);
   }
 
-  /*
-  pthread_mutex_lock(hash_table->metalock);
-  // Now, the bookkeeping...
-  if (!already_exists) {
-    hash_table->nnodes++;
-
-    if (HASH_IS_UNUSED (old_hash)) {
-      // We replaced an empty node, and not a tombstone
-      hash_table->noccupied++;
-    }
-  }
-
-  //nvram_write_metadata(hash_table, hash_table->size);
-
-  pthread_mutex_unlock(hash_table->metalock);
-  */
   return !already_exists;
 }
 
@@ -625,23 +539,12 @@ void g_hash_table_lookup(GHashTable *hash_table, paddr_t key,
  * Returns: %TRUE if the key did not exist yet
  */
 static inline int
-g_hash_table_insert_internal (GHashTable     *hash_table,
+g_hash_table_insert_internal (GHashTable *hash_table,
                               paddr_t    key,
                               paddr_t    value,
                               paddr_t    size)
 {
   assert(hash_table != NULL);
-#if 0
-  hash_entry_t ent;
-  uint32_t node_index;
-  uint32_t hash;
-
-
-  node_index = g_hash_table_lookup_node (hash_table, key, &ent, &hash);
-
-  return g_hash_table_insert_node (hash_table, node_index, hash, key,
-      value, size);
-#else
   /*
    * iangneal: for concurrency reasons, we can't do lookup -> insert, as another
    * thread may come in and use the slot we just looked for.
@@ -710,7 +613,6 @@ g_hash_table_insert_internal (GHashTable     *hash_table,
 
   //pthread_rwlock_unlock(hash_table->cache_lock);
   return res;
-#endif
 }
 
 /**
@@ -731,10 +633,10 @@ g_hash_table_insert_internal (GHashTable     *hash_table,
  * Returns: %TRUE if the key did not exist yet
  */
 int
-g_hash_table_insert (GHashTable     *hash_table,
-                     paddr_t    key,
-                     paddr_t    value,
-                     paddr_t    size)
+g_hash_table_insert (GHashTable *hash_table,
+                     paddr_t     key,
+                     paddr_t     value,
+                     paddr_t     size)
 {
   return g_hash_table_insert_internal (hash_table, key, value, size);
 }

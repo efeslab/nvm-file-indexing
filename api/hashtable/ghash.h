@@ -1,6 +1,4 @@
 /* GLIB - Library of useful routines for C programming
- * Copyright (C) 1995-1997  Peter Mattis, Spencer Kimball and Josh MacDonald
- *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -34,14 +32,15 @@ extern "C" {
 #include <stdbool.h>
 
 // from common
-#include "global.h"
+#include "common.h"
 #include "util.h"
+#include "bitops.h"
 
 // local includes
 #include "hash_functions.h"
 
 // For the big hash table, mapping (inode, lblk) -> single block
-typedef struct  _hash_entry {
+typedef struct hash_entry {
   paddr_t      key;
   uint16_t     size;
   uint16_t     value_hi16;
@@ -84,13 +83,11 @@ typedef struct  _hash_entry {
 #define HASH_IS_REAL(value) (!(HASH_IS_UNUSED(value) || HASH_IS_TOMBESTON(value)))
 */
 
-#define BUF_SIZE (g_block_size_bytes / sizeof(hash_entry_t))
-#define BUF_IDX(x) (x % (g_block_size_bytes / sizeof(hash_entry_t)))
-#define NV_IDX(x) (x / (g_block_size_bytes / sizeof(hash_entry_t)))
+#define BUF_SIZE(ht) (ht->blksz / sizeof(hash_entry_t))
+#define BUF_IDX(ht, x) (x % (ht->blksz / sizeof(hash_entry_t)))
+#define NV_IDX(ht, x) (x / (ht->blksz / sizeof(hash_entry_t)))
 
 //#define HASHCACHE
-
-#define DISABLE_BH_CACHING
 
 // This is the hash table meta-data that is persisted to NVRAM, that we may read
 // it and know everything we need to know in order to reconstruct it in memory.
@@ -102,15 +99,11 @@ struct dhashtable_meta {
   uint32_t nnodes;
   uint32_t noccupied;
   // Metadata about the on-disk state.
+  size_t  blksz;
   paddr_t nvram_size;
   paddr_t range_size;
   paddr_t data_start;
 };
-
-typedef struct _bh_cache_node {
-  uint64_t cache_index;
-  struct _bh_cache_node *next;
-} bh_cache_node_t;
 
 
 typedef struct _GHashTable {
@@ -122,6 +115,7 @@ typedef struct _GHashTable {
 
     paddr_t         data;
     paddr_t         nvram_size;
+    size_t          blksz;
     size_t          range_size;
     size_t          nblocks;
 
@@ -129,31 +123,32 @@ typedef struct _GHashTable {
     int              ref_count;
 
     // callbacks
-    callback_methods_t *callbacks;
+    callback_fns_t *callbacks;
+
+    // device infomation
+    device_info_t  *devinfo;
 
     // concurrency
     pthread_rwlock_t *locks;
     pthread_mutex_t *metalock;
 
     // caching
-#ifdef HASHCACHE
+#if 0 && defined(HASHCACHE)
     pthread_rwlock_t *cache_lock;
     unsigned long* cache_bitmap;
     // array of blocks
     hash_entry_t **cache;
-    // cache of buffer heads to reduce search time
-    // struct buffer_head == bh_t
-    bh_t **bh_cache;
-    // list of cache locations to override on flush
-    bh_cache_node_t *bh_cache_head;
 #endif
 } GHashTable;
 
 
-GHashTable* g_hash_table_new(hash_func_t  hash_func,
-                             size_t       max_entries,
-                             size_t       range_size,
-                             paddr_t      metadata_location);
+GHashTable *
+g_hash_table_new (hash_func_t   hash_func,
+                  size_t        max_entries,
+                  size_t        block_size,
+                  size_t        range_size,
+                  paddr_t       metadata_location,
+                  mem_man_fns_t *mem_fns);
 
 void g_hash_table_destroy(GHashTable     *hash_table);
 
@@ -169,8 +164,6 @@ int g_hash_table_replace(GHashTable *hash_table,
 int g_hash_table_remove(GHashTable *hash_table,
                         paddr_t key);
 
-void g_hash_table_steal_all(GHashTable *hash_table);
-
 void g_hash_table_lookup(GHashTable *hash_table, paddr_t key,
     paddr_t *val, paddr_t *size, bool force);
 
@@ -184,7 +177,10 @@ extern uint64_t reads;
 extern uint64_t writes;
 extern uint64_t blocks;
 
-#ifdef HASHCACHE
+static inline paddr_t nv_idx(GHashTable* ht, paddr_t paddr) {
+}
+
+#if 0 && defined(HASHCACHE)
 /*
  * Read a NVRAM block and give the users a reference to our cache (saves a
  * memcpy).
@@ -220,28 +216,8 @@ nvram_read(GHashTable *ht, paddr_t offset, hash_entry_t **buf, bool force) {
 
   *buf = ht->cache[offset];
 
-#ifdef STORAGE_PERF
-  uint64_t tsc_begin = asm_rdtscp();
-#endif
-  /*
-  bh = bh_get_sync_IO(g_root_dev, ht->data + offset, BH_NO_DATA_ALLOC);
-  bh->b_offset = 0;
-  bh->b_size = g_block_size_bytes;
-  bh->b_data = (uint8_t*)ht->cache[offset];
-  bh_submit_read_sync_IO(bh);
-
-  // uint8_t dev, int read (enables read)
-  err = mlfs_io_wait(g_root_dev, 1);
-  assert(!err);
-
-  bh_release(bh);
-  */
   ht->callbacks->cb_read(ht->data + offset, 0, (char*)ht->cache[offset]);
   reads++;
-#ifdef STORAGE_PERF
-  g_perf_stats.path_storage_tsc += asm_rdtscp() - tsc_begin;
-  g_perf_stats.path_storage_nr++;
-#endif
 
 }
 
@@ -253,41 +229,18 @@ nvram_read(GHashTable *ht, paddr_t offset, hash_entry_t **buf, bool force) {
  */
 static void
 nvram_read_entry(GHashTable *ht, paddr_t idx, hash_entry_t *ret, bool force) {
-#if 0
-#ifdef HASHCACHE
+#if 0 && defined(HASHCACHE)
   paddr_t offset = NV_IDX(idx);
   hash_entry_t *buf;
   nvram_read(ht, offset, &buf, force);
   *ret = buf[BUF_IDX(idx)];
 #else
+  paddr_t block  = ht->data + NV_IDX(ht, idx);
+  off_t   offset = BUF_IDX(ht, idx) * sizeof(*ret);
 
-#ifdef STORAGE_PERF
-  uint64_t tsc_begin = asm_rdtscp();
-#endif
-
-  /*
-  struct buffer_head *bh;
-
-  bh = bh_get_sync_IO(g_root_dev, ht->data + NV_IDX(idx), BH_NO_DATA_ALLOC);
-  bh->b_offset = BUF_IDX(idx) * sizeof(*ret);
-  bh->b_size = sizeof(*ret);
-  bh->b_data = (uint8_t*)ret;
-  bh_submit_read_sync_IO(bh);
-
-  // uint8_t dev, int read (enables read)
-  int err = mlfs_io_wait(g_root_dev, 1);
-  assert(!err);
-
-  bh_release(bh);
-  */
-  ht->callbacks->cb_read(ht->data + NV_IDX(idx), BUF_IDX(idx) * sizeof(*ret), (char*)ret);
+  ht->callbacks->cb_read(block, offset, sizeof(*ret), (char*)ret);
   reads++;
-#ifdef STORAGE_PERF
-  g_perf_stats.path_storage_tsc += asm_rdtscp() - tsc_begin;
-  g_perf_stats.path_storage_nr++;
-#endif
 
-#endif
 #endif
 }
 
@@ -343,37 +296,6 @@ nvram_read_metadata(GHashTable *hash, paddr_t location) {
 #endif
 }
 
-#ifdef HASHCACHE
-/**
- * Assumes aync_all_buffers has been called!
- * Assumes lock is held!
- */
-static inline void nvram_flush(GHashTable *ht) {
-#ifdef DISABLE_BH_CACHING
-  return;
-#else
-  if (ht->bh_cache_head) writes++;
-
-  while(ht->bh_cache_head) {
-    /*
-     * The bitmap is zeroed as cachelines are written back (in mlfs_write),
-     * so by this point the bitmap is completely zeroed out.
-     */
-    bh_cache_node *tmp = ht->bh_cache_head;
-    bh_t *buf = ht->bh_cache[tmp->cache_index];
-
-    sync_dirty_buffer(buf);
-
-    buf->b_use_bitmap = 0;
-    ht->bh_cache[tmp->cache_index] = NULL;
-    ht->bh_cache_head = tmp->next;
-    free(tmp);
-    blocks++;
-  }
-#endif
-}
-#endif
-
 static int
 nvram_write_metadata(GHashTable *hash, paddr_t location) {
 #if 1
@@ -416,8 +338,7 @@ nvram_write_metadata(GHashTable *hash, paddr_t location) {
 #endif
 }
 
-static paddr_t
-nvram_alloc_range(size_t count) {
+static paddr_t nvram_alloc_range(size_t count) {
 #if 1
     return 0;
 #else
