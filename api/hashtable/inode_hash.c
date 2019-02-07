@@ -34,22 +34,28 @@ void init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct) {
     idx_struct->idx_metadata = (void*)ht;
 }
 
-inline int insert_hash(GHashTable *hash, struct inode *inode, hash_key_t key,
-    hash_value_t value, hash_value_t size) {
-  // if not exists, then the value was not already in the table, therefore
-  // success.
-#if 0
-  return g_hash_table_insert(hash, key, value, size);
-#endif
+// if not exists, then the value was not already in the table, therefore
+// success.
+// returns 1 on success, 0 if key already existed
+int insert_hash(idx_struct_t *idx_struct, inum_t inum,
+                laddr_t laddr, paddr_t paddr, size_t size) {
+    GHASH(idx_struct, ht);
+    hash_key_t k = MAKEKEY(inum, laddr);
+    return g_hash_table_insert(ht, k, paddr, size);
 }
 
 /*
  * Returns 0 if not found (value == 0 means no associated value).
  */
-int lookup_hash(struct inode *inode, laddr_t key, hash_value_t* value,
-    hash_value_t *size, hash_value_t *index, bool force) {
+int lookup_hash(idx_struct_t *idx_struct, inum_t inum,
+                laddr_t laddr, paddr_t* paddr, size_t *size, bool force) {
 #if 1
-    return 0;
+    GHASH(idx_struct, ht);
+
+    hash_key_t k = MAKEKEY(inum, laddr);
+    g_hash_table_lookup(ht, k, paddr, size, force);
+    return *paddr != 0;
+
 #else
   int ret = 0;
   hash_key_t k = MAKEKEY(inode, key);

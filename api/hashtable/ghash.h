@@ -363,7 +363,15 @@ static paddr_t nvram_alloc_range(size_t count) {
  * index: byte index into range.
  */
 static inline void
-nvram_update(GHashTable *ht, paddr_t index, hash_entry_t* val) {
+nvram_update(GHashTable *ht, paddr_t idx, hash_entry_t* val) {
+    paddr_t paddr  = ht->data + NV_IDX(ht, idx);
+    size_t size     = sizeof(*val);
+    off_t   offset = BUF_IDX(ht, idx) * size;
+
+    ssize_t ret = ht->callbacks->cb_write(paddr, offset, size, (char*)val);
+
+    if_then_panic(ret != size, "did not write full entry!");
+
 #if 0
 #ifndef KERNFS
   panic("LibFS should never update");

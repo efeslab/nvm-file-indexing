@@ -33,7 +33,7 @@ typedef paddr_t hash_value_t;
 
 
 #define MASK_32 ((1lu << 32) - 1)
-#define MAKEKEY(inode, key) (((uint64_t)inode->inum << 32) | key)
+#define MAKEKEY(inum, key) (((uint64_t)inum << 32) | key)
 #define GET_INUM(hk) (hk >> 32)
 #define GET_LBLK(hk) (hk & MASK_32)
 #define GKEY2PTR(hk) ((void*)(hk))
@@ -56,13 +56,15 @@ struct inode { int x; };
  * Generic hash table functions.
  */
 
+#define GHASH(i, n) GHashTable *(n) = (GHashTable*)(i)->idx_metadata
+
 void init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct);
 
-int insert_hash(GHashTable *hash, struct inode *inode, hash_key_t key,
-    hash_value_t value, hash_value_t size);
+int insert_hash(idx_struct_t *idx_struct, inum_t inum,
+                laddr_t laddr, paddr_t paddr, size_t size);
 
-int lookup_hash(struct inode *inode, laddr_t key, hash_value_t* value,
-    hash_value_t *size, hash_value_t *index, bool force);
+int lookup_hash(idx_struct_t *idx_struct, inum_t inum,
+                laddr_t laddr, paddr_t* paddr, size_t *size, bool force);
 
 /*
  * Emulated mlfs_ext functions.
