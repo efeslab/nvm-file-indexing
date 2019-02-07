@@ -323,15 +323,15 @@ g_hash_table_maybe_resize (GHashTable *hash_table) {
  * Returns: a new #GHashTable
  */
 GHashTable *
-g_hash_table_new (hash_func_t   hash_func,
-                  size_t        max_entries,
-                  size_t        block_size,
-                  size_t        range_size,
-                  paddr_t       metadata_location,
-                  mem_man_fns_t *mem_fns) {
+g_hash_table_new (hash_func_t       hash_func,
+                  size_t            max_entries,
+                  size_t            block_size,
+                  size_t            range_size,
+                  paddr_t           metadata_location,
+                  const idx_spec_t *idx_spec) {
   GHashTable *ht;
 
-  ht = mem_fns->mm_malloc(sizeof(*ht));
+  ht = MALLOC(idx_spec, sizeof(*ht));
 
   if_then_panic(ht == NULL, "malloc callback failed!");
 
@@ -343,6 +343,7 @@ g_hash_table_new (hash_func_t   hash_func,
   // Number of entries in nvram.
   ht->nvram_size         = max_entries / range_size;
   ht->range_size         = range_size;
+  ht->callbacks          = idx_spec->idx_callbacks;
 
   if (max_entries % range_size) {
     // If there's a partial range, need to not under-allocate.
@@ -350,13 +351,11 @@ g_hash_table_new (hash_func_t   hash_func,
   }
 
   g_hash_table_set_shift_from_size(ht, ht->nvram_size);
-  printf("mod = %d, mask = %d\n", ht->mod, ht->mask);
   // Make sure the mod size doesn't go out of range.
   ht->nvram_size = max(ht->nvram_size, ht->size);
   size_t scaled_size = ht->nvram_size;
 
   if (max_entries < scaled_size) {
-    printf("updating max_entries from %lu to %lu\n", max_entries, scaled_size);
     max_entries = scaled_size;
   }
 
@@ -368,29 +367,24 @@ g_hash_table_new (hash_func_t   hash_func,
   ht->nblocks = nblocks;
 
   // initialize read-writer locks
-  ht->locks = mem_fns->mm_malloc(max_entries * sizeof(pthread_rwlock_t));
+  ht->locks = MALLOC(idx_spec, max_entries * sizeof(pthread_rwlock_t));
   assert(ht->locks);
   for (size_t i = 0; i < max_entries; ++i) {
     int err = pthread_rwlock_init(ht->locks + i, NULL);
-    if (err) {
-      panic("Could not init rwlock!");
-    }
+    if_then_panic(err, "Could not init rwlock!");
   }
 
   // init metadata lock
-  ht->metalock = mem_fns->mm_malloc(sizeof(pthread_mutex_t));
+  ht->metalock = MALLOC(idx_spec, sizeof(pthread_mutex_t));
   assert(ht->metalock);
   pthread_mutex_init(ht->metalock, NULL);
 
   if (!nvram_read_metadata(ht, metadata_location)) {
-    printf("Metadata not set up. Allocating hashtable on NVRAM...\n");
-    ht->data = nvram_alloc_range(nblocks);
+    ssize_t nalloc = CB(idx_spec, cb_alloc_metadata, nblocks * block_size, &(ht->data));
+
+    if_then_panic(nalloc < nblocks * block_size, "no large contiguous region!");
 
     nvram_write_metadata(ht, metadata_location);
-    printf("max_entries: %lu, sizeof %lu, nblocks: %lu\n", scaled_size,
-        sizeof(hash_entry_t), nblocks);
-  } else {
-    printf("Metadata found!\n");
   }
 
   // cache
@@ -399,9 +393,7 @@ g_hash_table_new (hash_func_t   hash_func,
   ht->cache_lock = mem_fns->mm_malloc(sizeof(pthread_rwlock_t));
   assert(ht->cache_lock);
   int err = pthread_rwlock_init(ht->cache_lock, NULL);
-  if (err) {
-    panic("Could not init rwlock!");
-  }
+  if_then_panic(err, "Could not init rwlock!");
 
   ht->cache = mem_fns->mm_malloc(nblocks * sizeof(hash_entry_t*));
   assert(ht->cache);

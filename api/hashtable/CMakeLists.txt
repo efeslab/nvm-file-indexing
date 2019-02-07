@@ -10,4 +10,6 @@ file(GLOB hashtable_src
     "*.c"
 )
 
+message(${hashtable_src})
+
 add_library(HashTable SHARED ${hashtable_src})

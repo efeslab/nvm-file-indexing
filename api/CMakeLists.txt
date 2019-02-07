@@ -5,6 +5,7 @@ set (VERSION_MINOR 1)
 
 add_subdirectory(common)
 add_subdirectory(hashtable)
+add_subdirectory(test)
 
 file(GLOB api_src
     "*.h"

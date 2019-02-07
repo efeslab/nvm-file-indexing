@@ -1,89 +1,37 @@
-#ifdef HASHTABLE
-
 #include <stdbool.h>
 #include "inode_hash.h"
 
-
-#define HASHPERF
-
-mlfs_fsblk_t single_hash_meta_loc = 0;
-mlfs_fsblk_t chunk_hash_meta_loc = 0;
-mlfs_fsblk_t id_map_meta_loc = 0;
-
-// (iangneal): Global hash table for all of NVRAM. Each inode has a point to
-// this one hash table just for abstraction of the inode interface.
-static GHashTable *ghash = NULL;
-// (iangneal): Second level hash table.
-static GHashTable *gsuper = NULL;
-
-/*
- *
- */
-void init_hash(idx_struct_t *idx_struct) {
+void init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct) {
     GHashTable *ht = (GHashTable*)idx_struct->idx_metadata;
 
     if (ht) return;
 
-    ht = MALLOC(idx_struct, sizeof(*ht));
+    idx_struct->idx_mem_man   = idx_spec->idx_mem_man;
+    idx_struct->idx_callbacks = idx_spec->idx_callbacks;
 
     device_info_t devinfo;
-    int ret = CB(idx_struct, cb_get_device_info, &devinfo);
+    int ret = CB(idx_struct, cb_get_dev_info, &devinfo);
 
     // Allocate space on device.
-    if_then_panic(devinfo->di_block_size % sizeof(hash_entry_t) != 0,
+    if_then_panic(devinfo.di_block_size % sizeof(hash_entry_t) != 0,
                   "bad hesh_entry_t size");
 
-    size_t entries_per_block = devinfo->di_block_size / sizeof(hash_entry_t);
+    size_t entries_per_block = devinfo.di_block_size / sizeof(hash_entry_t);
 
-    size_t nblocks = devinfo->di_size_blocks / entries_per_block;
-    size_t remain  = devinfo->di_size_blocks % entries_per_block;
-    if (remain > 0) {
-        nblocks += 1;
-    }
+    size_t nbytes = devinfo.di_size_blocks * sizeof(hash_entry_t);
 
     paddr_t metadata_loc;
     ssize_t nalloc = CB(idx_struct, cb_alloc_metadata,
-                        devinfo->di_size_blocks, &metadata_loc);
+                        devinfo.di_block_size, &metadata_loc);
 
-    if_then_panic(nalloc != devinfo->di_size_blocks, "no contiguous region");
+    if_then_panic(nalloc < devinfo.di_block_size, "no room for metadata!");
 
-
-    ret = g_hash_table_new(hash6432shift, devinfo.di_size_blocks,
-                           devinfo.di_block_size, 1, metadata_loc, ht);
-    if_then_panic(ret != 0, "could not allocate hash table");
+    ht = g_hash_table_new(hash6432shift, devinfo.di_size_blocks,
+                          devinfo.di_block_size, 1, metadata_loc,
+                          idx_spec);
+    if_then_panic(ht == NULL, "could not allocate hash table");
 
     idx_struct->idx_metadata = (void*)ht;
-#if 0
-  if (ghash) return;
-
-  assert(sb);
-
-  printf("Initializing NVM hash table structures...\n");
-
-  // Calculate the locations of all the data structure metadata.
-  single_hash_meta_loc = sb->ondisk->ndatablocks - 1;
-  chunk_hash_meta_loc = single_hash_meta_loc - 1;
-  id_map_meta_loc = chunk_hash_meta_loc - 1;
-
-  // single block table
-  ghash = g_hash_table_new(g_direct_hash, sb->ondisk->ndatablocks, 1,
-      single_hash_meta_loc);
-  if (!ghash) {
-    panic("Failed to initialize the single-block hash table.\n");
-  }
-
-  printf("Finished initializing the single-block hash table.\n");
-
-  // chunk (maps a range of blocks) hash table
-  gsuper = g_hash_table_new(g_direct_hash, sb->ondisk->ndatablocks,
-      RANGE_SIZE, chunk_hash_meta_loc);
-  if (!gsuper) {
-    panic("Failed to initialize multi-block hash table\n");
-  }
-
-  printf("Finished initializing the multi-block hash table.\n");
-  printf("Finished initializing NVM hash table structures.\n");
-#endif
 }
 
 inline int insert_hash(GHashTable *hash, struct inode *inode, hash_key_t key,
@@ -388,5 +336,3 @@ int mlfs_hash_cache_invalidate() {
 #endif
   return 0;
 }
-
-#endif

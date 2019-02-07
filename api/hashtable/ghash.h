@@ -91,7 +91,7 @@ typedef struct hash_entry {
 
 // This is the hash table meta-data that is persisted to NVRAM, that we may read
 // it and know everything we need to know in order to reconstruct it in memory.
-struct dhashtable_meta {
+typedef struct dhashtable_meta {
   // Metadata for the in-memory state.
   uint32_t size;
   uint32_t mod;
@@ -103,7 +103,7 @@ struct dhashtable_meta {
   paddr_t nvram_size;
   paddr_t range_size;
   paddr_t data_start;
-};
+} dhashtable_metadata_t;
 
 
 typedef struct _GHashTable {
@@ -143,12 +143,12 @@ typedef struct _GHashTable {
 
 
 GHashTable *
-g_hash_table_new (hash_func_t   hash_func,
-                  size_t        max_entries,
-                  size_t        block_size,
-                  size_t        range_size,
-                  paddr_t       metadata_location,
-                  mem_man_fns_t *mem_fns);
+g_hash_table_new (hash_func_t       hash_func,
+                  size_t            max_entries,
+                  size_t            block_size,
+                  size_t            range_size,
+                  paddr_t           metadata_location,
+                  const idx_spec_t *idx_spec);
 
 void g_hash_table_destroy(GHashTable     *hash_table);
 
@@ -176,9 +176,6 @@ unsigned g_hash_table_size(GHashTable *hash_table);
 extern uint64_t reads;
 extern uint64_t writes;
 extern uint64_t blocks;
-
-static inline paddr_t nv_idx(GHashTable* ht, paddr_t paddr) {
-}
 
 #if 0 && defined(HASHCACHE)
 /*
@@ -229,19 +226,15 @@ nvram_read(GHashTable *ht, paddr_t offset, hash_entry_t **buf, bool force) {
  */
 static void
 nvram_read_entry(GHashTable *ht, paddr_t idx, hash_entry_t *ret, bool force) {
-#if 0 && defined(HASHCACHE)
-  paddr_t offset = NV_IDX(idx);
-  hash_entry_t *buf;
-  nvram_read(ht, offset, &buf, force);
-  *ret = buf[BUF_IDX(idx)];
-#else
-  paddr_t block  = ht->data + NV_IDX(ht, idx);
-  off_t   offset = BUF_IDX(ht, idx) * sizeof(*ret);
+    paddr_t block  = ht->data + NV_IDX(ht, idx);
+    off_t   offset = BUF_IDX(ht, idx) * sizeof(*ret);
 
-  ht->callbacks->cb_read(block, offset, sizeof(*ret), (char*)ret);
-  reads++;
+    ssize_t err = ht->callbacks->cb_read(block, offset,
+                                         sizeof(*ret), (char*)ret);
 
-#endif
+    if_then_panic(sizeof(*ret) != err, "Did not read enough bytes!");
+
+    reads++;
 }
 
 /*
@@ -252,48 +245,32 @@ nvram_read_entry(GHashTable *ht, paddr_t idx, hash_entry_t *ret, bool force) {
  * Returns 1 on success, 0 on failure.
  */
 static int
-nvram_read_metadata(GHashTable *hash, paddr_t location) {
-#if 1
-    return 0;
-#else
-  struct buffer_head *bh;
-  struct dhashtable_meta metadata;
-  int err, ret = 0;
+nvram_read_metadata(GHashTable *ht, paddr_t location) {
 
-  // TODO: maybe generalize this.
-  // size - 1 for the last block (where we will allocate the hashtable)
-  /*
-  bh = bh_get_sync_IO(g_root_dev, location, BH_NO_DATA_ALLOC);
-  bh->b_size = sizeof(metadata);
-  bh->b_data = (uint8_t*)&metadata;
-  bh->b_offset = 0;
-  bh_submit_read_sync_IO(bh);
+    dhashtable_metadata_t metadata;
+    ssize_t err = ht->callbacks->cb_read(location, 0,
+                                         sizeof(metadata), (char*)&metadata);
 
-  // uint8_t dev, int read (enables read)
-  err = mlfs_io_wait(g_root_dev, 1);
-  */
-  err = hash->callbacks->cb_read(location, 0, (char*)&metadata);
-  assert(!err);
+    if_then_panic(err != sizeof(metadata), "Could not read metadata!");
 
-  // now check the actual metadata
-  if (metadata.size > 0) {
-    ret = 1;
-    assert(hash->nvram_size == metadata.nvram_size);
-    assert(hash->range_size == metadata.range_size);
-    // reconsititute the rest of the hashtable from
-    hash->size = metadata.size;
-    hash->range_size = metadata.range_size;
-    hash->mod = metadata.mod;
-    hash->mask = metadata.mask;
-    hash->nnodes = metadata.nnodes;
-    hash->noccupied = metadata.noccupied;
-    hash->data = metadata.data_start;
-  }
+    // now check the actual metadata
+    if (metadata.nvram_size == 0) {
+        return 0;
+    }
 
-  //bh_release(bh);
+    assert(ht->nvram_size == metadata.nvram_size);
+    assert(ht->range_size == metadata.range_size);
+    // reconsititute the rest of the httable from
+    ht->size = metadata.size;
+    ht->blksz = metadata.blksz;
+    ht->range_size = metadata.range_size;
+    ht->mod = metadata.mod;
+    ht->mask = metadata.mask;
+    ht->nnodes = metadata.nnodes;
+    ht->noccupied = metadata.noccupied;
+    ht->data = metadata.data_start;
 
-  return ret;
-#endif
+    return 1;
 }
 
 static int

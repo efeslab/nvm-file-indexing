@@ -4,14 +4,8 @@
 #include <malloc.h>
 #include <memory.h>
 #include <string.h>
-#include "fs.h"
-#include "extents.h"
-#include "global/util.h"
+
 #include "ghash.h"
-#ifdef KERNFS
-#include "balloc.h"
-#include "migrate.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,11 +13,11 @@ extern "C" {
 
 #define CONTINUITY_BITS 4
 #define MAX_CONTIGUOUS_BLOCKS (2 << 4)
-#define REMAINING_BITS ((CHAR_BIT * sizeof(mlfs_fsblk_t)) - CONTINUITY_BITS - 1)
+#define REMAINING_BITS ((CHAR_BIT * sizeof(paddr_t)) - CONTINUITY_BITS - 1)
 
 #define TO_64(hk) (*((uint64_t*)&hk))
 
-typedef mlfs_fsblk_t hash_value_t;
+typedef paddr_t hash_value_t;
 
 #define SPECIAL(hv) !(!(hv & (1UL << 63UL)))
 #define INDEX(hv) ((hv >> REMAINING_BITS) & ((1lu << CONTINUITY_BITS) - 1lu))
@@ -52,36 +46,34 @@ typedef paddr_t hash_key_t;
  * TODO
  */
 
-/*
- * Globals for where the hash tables and other bookkeeping structures are kept
- * on disk. They are calculated as an offset based on the size of the NVM
- * device.
- */
-extern mlfs_fsblk_t single_hash_meta_loc;
-extern mlfs_fsblk_t chunk_hash_meta_loc;
-extern mlfs_fsblk_t id_map_meta_loc;
+
+// TODO: just to fix compile issues.
+struct mlfs_map_blocks { int whatever; };
+typedef paddr_t handle_t;
+struct inode { int x; };
 
 /*
  * Generic hash table functions.
  */
 
-void init_hash(idx_struct_t *idx_struct);
+void init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct);
 
 int insert_hash(GHashTable *hash, struct inode *inode, hash_key_t key,
     hash_value_t value, hash_value_t size);
 
-int lookup_hash(struct inode *inode, mlfs_lblk_t key, hash_value_t* value,
+int lookup_hash(struct inode *inode, laddr_t key, hash_value_t* value,
     hash_value_t *size, hash_value_t *index, bool force);
 
 /*
  * Emulated mlfs_ext functions.
  */
 
+
 int mlfs_hash_get_blocks(handle_t *handle, struct inode *inode,
 			struct mlfs_map_blocks *map, int flags, bool force);
 
 int mlfs_hash_truncate(handle_t *handle, struct inode *inode,
-		mlfs_lblk_t start, mlfs_lblk_t end);
+		laddr_t start, laddr_t end);
 
 /*
  * Helper functions.
