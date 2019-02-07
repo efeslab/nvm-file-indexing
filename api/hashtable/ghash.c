@@ -344,6 +344,7 @@ g_hash_table_new (hash_func_t       hash_func,
   ht->nvram_size         = max_entries / range_size;
   ht->range_size         = range_size;
   ht->callbacks          = idx_spec->idx_callbacks;
+  ht->metadata           = metadata_location;
 
   if (max_entries % range_size) {
     // If there's a partial range, need to not under-allocate.
@@ -379,12 +380,12 @@ g_hash_table_new (hash_func_t       hash_func,
   assert(ht->metalock);
   pthread_mutex_init(ht->metalock, NULL);
 
-  if (!nvram_read_metadata(ht, metadata_location)) {
+  if (!nvram_read_metadata(ht)) {
     ssize_t nalloc = CB(idx_spec, cb_alloc_metadata, nblocks * block_size, &(ht->data));
 
     if_then_panic(nalloc < nblocks * block_size, "no large contiguous region!");
 
-    nvram_write_metadata(ht, metadata_location);
+    nvram_write_metadata(ht);
   }
 
   // cache

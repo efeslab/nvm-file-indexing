@@ -113,6 +113,7 @@ typedef struct _GHashTable {
     int             nnodes;
     int             noccupied;  /* nnodes + tombstones */
 
+    paddr_t         metadata;
     paddr_t         data;
     paddr_t         nvram_size;
     size_t          blksz;
@@ -245,10 +246,10 @@ nvram_read_entry(GHashTable *ht, paddr_t idx, hash_entry_t *ret, bool force) {
  * Returns 1 on success, 0 on failure.
  */
 static int
-nvram_read_metadata(GHashTable *ht, paddr_t location) {
+nvram_read_metadata(GHashTable *ht) {
 
     dhashtable_metadata_t metadata;
-    ssize_t err = ht->callbacks->cb_read(location, 0,
+    ssize_t err = ht->callbacks->cb_read(ht->metadata, 0,
                                          sizeof(metadata), (char*)&metadata);
 
     if_then_panic(err != sizeof(metadata), "Could not read metadata!");
@@ -263,7 +264,6 @@ nvram_read_metadata(GHashTable *ht, paddr_t location) {
     // reconsititute the rest of the httable from
     ht->size = metadata.size;
     ht->blksz = metadata.blksz;
-    ht->range_size = metadata.range_size;
     ht->mod = metadata.mod;
     ht->mask = metadata.mask;
     ht->nnodes = metadata.nnodes;
@@ -274,23 +274,32 @@ nvram_read_metadata(GHashTable *ht, paddr_t location) {
 }
 
 static int
-nvram_write_metadata(GHashTable *hash, paddr_t location) {
+nvram_write_metadata(GHashTable *ht) {
 #if 1
-    return 0;
+    dhashtable_metadata_t metadata;
+
+    // reconsititute the rest of the httable from
+    metadata.nvram_size = ht->nvram_size;
+    metadata.size = ht->size;
+    metadata.range_size = ht->range_size;
+    metadata.mod = ht->mod;
+    metadata.mask = ht->mask;
+    metadata.nnodes = ht->nnodes;
+    metadata.noccupied = ht->noccupied;
+    metadata.data_start = ht->data;
+
+    ssize_t err = ht->callbacks->cb_write(ht->metadata, 0,
+                                          sizeof(metadata), (char*)&metadata);
+
+    if_then_panic(err != sizeof(metadata), "Could not write metadata!");
+
+    return 1;
 #else
   struct buffer_head *bh;
   struct super_block *super = sb[g_root_dev];
   int ret;
   // Set up the hash table metadata
   struct dhashtable_meta metadata;
-  metadata.nvram_size = hash->nvram_size;
-  metadata.size = hash->size;
-  metadata.range_size = hash->range_size;
-  metadata.mod = hash->mod;
-  metadata.mask = hash->mask;
-  metadata.nnodes = hash->nnodes;
-  metadata.noccupied = hash->noccupied;
-  metadata.data_start = hash->data;
 
 
   // TODO: maybe generalize for other devices.
@@ -315,45 +324,6 @@ nvram_write_metadata(GHashTable *hash, paddr_t location) {
 #endif
 }
 
-static paddr_t nvram_alloc_range(size_t count) {
-#if 1
-    return 0;
-#else
-  int err = 1;
-  // TODO: maybe generalize this for other devices.
-  struct super_block *super = sb[g_root_dev];
-  paddr_t block;
-  paddr_t last;
-
-  // TODO: remove--this is due to a hack
-  size_t total_blocks = 0;
-  while (err > 0 && total_blocks < count) {
-    paddr_t blk;
-    err = mlfs_new_blocks(super, &blk, count - total_blocks, 0, 0, DATA, 0);
-    if (err < 0) {
-      fprintf(stderr, "Total: %lu\n", total_blocks);
-      fprintf(stderr, "Error: could not allocate new blocks: %s (%d)\n",
-          strerror(-err), err);
-      panic("Could not allocate range for hash table");
-    }
-
-    // Mark superblock bits
-    bitmap_bits_set_range(super->s_blk_bitmap, blk, err);
-    super->used_blocks += err;
-    assert(err >= 0);
-    if (total_blocks == 0) block = blk;
-    total_blocks += err;
-    last = blk + err;
-  }
-
-  assert(total_blocks == count);
-
-  printf("-- Allocated blkno %llu - %llu\n", block, last);
-
-  return block;
-#endif
-}
-
 /*
  * Update a single slot in NVRAM.
  * Used to insert or update a key -- since we'll never need to modify keys
@@ -364,97 +334,13 @@ static paddr_t nvram_alloc_range(size_t count) {
  */
 static inline void
 nvram_update(GHashTable *ht, paddr_t idx, hash_entry_t* val) {
-    paddr_t paddr  = ht->data + NV_IDX(ht, idx);
-    size_t size     = sizeof(*val);
-    off_t   offset = BUF_IDX(ht, idx) * size;
+    paddr_t paddr = ht->data + NV_IDX(ht, idx);
+    size_t size   = sizeof(*val);
+    off_t offset  = BUF_IDX(ht, idx) * size;
 
     ssize_t ret = ht->callbacks->cb_write(paddr, offset, size, (char*)val);
 
     if_then_panic(ret != size, "did not write full entry!");
-
-#if 0
-#ifndef KERNFS
-  panic("LibFS should never update");
-#endif
-
-#ifdef HASHCACHE
-  struct buffer_head *bh;
-  int ret;
-
-  paddr_t block_addr = ht->data + NV_IDX(index);
-  paddr_t block_offset = BUF_IDX(index) * sizeof(hash_entry_t);
-
-  //pthread_mutex_lock(ht->metalock);
-  mlfs_assert(ht->cache[NV_IDX(index)]);
-  ht->cache[NV_IDX(index)][BUF_IDX(index)] = *val;
-
-  // check if we've seen this buffer head before. if not, we need to fetch
-  // it and point to our cache page.
-#ifndef DISABLE_BH_CACHING
-  if (!ht->bh_cache[NV_IDX(index)]) {
-#endif
-    // Set up the buffer head -- once we point it to a cache page, we don't
-    // need to do this again, just manipulate the page.
-    bh = sb_getblk(g_root_dev, block_addr);
-
-    bh->b_data = (uint8_t*)ht->cache[NV_IDX(index)];
-    bh->b_size = g_block_size_bytes;
-    bh->b_offset = 0;
-
-    //mlfs_assert(bh->b_dirty_bitmap);
-
-    set_buffer_dirty(bh);
-    //brelse(bh);
-
-#ifndef DISABLE_BH_CACHING
-    // Now we need to set up book-keeping.
-    ht->bh_cache[NV_IDX(index)] = bh;
-
-    bh_cache_node *tmp = (bh_cache_node*)malloc(sizeof(*tmp));
-
-    if (unlikely(!tmp)) panic("ENOMEM");
-
-    tmp->cache_index = NV_IDX(index);
-    tmp->next = ht->bh_cache_head;
-    ht->bh_cache_head = tmp;
-  } else {
-    bh = ht->bh_cache[NV_IDX(index)];
-  }
-#endif
-#if 0
-  // Set up the buffer head -- once we point it to a cache page, we don't
-  // need to do this again, just manipulate the page.
-  bh = sb_getblk(g_root_dev, block_addr);
-
-  bh->b_data = (uint8_t*)ht->cache[NV_IDX(index)];
-  //bh->b_size = g_block_size_bytes;
-  bh->b_offset = 0;
-  // Set bitmap cachelines.
-  bh->b_use_bitmap = 1;
-
-  mlfs_assert(bh->b_dirty_bitmap);
-
-  set_buffer_dirty(bh);
-
-  uint64_t size = sizeof(hash_entry_t);
-  uint64_t bit_start = (BUF_IDX(index) * size);
-
-  size_t bit = bit_start / bh->b_cacheline_size;
-
-  /*
-   * Tracking to make sure we write back the same number of dirty regions.
-   * Test and set so we don't double count.
-   */
-  bh->b_size += !__test_and_set_bit(bit, bh->b_dirty_bitmap);
-#endif
-  brelse(bh);
-
-  //pthread_mutex_unlock(ht->metalock);
-#else
-  panic("Never should reach here!");
-#endif
-
-#endif
 }
 
 #ifdef __cplusplus
