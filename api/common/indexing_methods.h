@@ -16,7 +16,9 @@
  *
  ******************************************************************************/
 
-typedef int (*init_structure_fn_t)(const callback_fns_t*, const mem_man_fns_t*, idx_struct_t*);
+typedef struct indexing_structure_specification idx_spec_t;
+
+typedef int (*init_structure_fn_t)(const idx_spec_t*, idx_struct_t*);
 
 /*******************************************************************************
  * Section: General operations
@@ -31,11 +33,11 @@ typedef int (*init_structure_fn_t)(const callback_fns_t*, const mem_man_fns_t*, 
  * Returns -ERRNO on failure, and the number of contiguous blocks found with
  * paddr on success.
  */
-typedef int (*lookup_index_fn_t)(idx_struct_t*, inum_t, laddr_t, paddr_t*);
+typedef ssize_t (*lookup_index_fn_t)(idx_struct_t*, inum_t, laddr_t, paddr_t*);
 
-typedef int (*create_index_fn_t)(idx_struct_t*, inum_t, laddr_t, size_t);
+typedef ssize_t (*create_index_fn_t)(idx_struct_t*, inum_t, laddr_t, size_t, paddr_t*);
 
-typedef int (*remove_index_fn_t)(idx_struct_t*, inum_t, laddr_t, size_t);
+typedef ssize_t (*remove_index_fn_t)(idx_struct_t*, inum_t, laddr_t, size_t);
 
 /*
  * Section: Persistence (and caching)

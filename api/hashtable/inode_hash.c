@@ -1,13 +1,21 @@
 #include <stdbool.h>
 #include "inode_hash.h"
 
-void init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct) {
+idx_fns_t hash_fns = {
+    .im_init   = init_hash,
+    .im_lookup = lookup_hash,
+    .im_create = insert_hash,
+    .im_remove = erase_hash
+};
+
+int init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct) {
     GHashTable *ht = (GHashTable*)idx_struct->idx_metadata;
 
-    if (ht) return;
+    if (ht) return -EEXIST;
 
     idx_struct->idx_mem_man   = idx_spec->idx_mem_man;
     idx_struct->idx_callbacks = idx_spec->idx_callbacks;
+    idx_struct->idx_fns       = &hash_fns;
 
     device_info_t devinfo;
     int ret = CB(idx_struct, cb_get_dev_info, &devinfo);
@@ -21,10 +29,9 @@ void init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct) {
     size_t nbytes = devinfo.di_size_blocks * sizeof(hash_entry_t);
 
     paddr_t metadata_loc;
-    ssize_t nalloc = CB(idx_struct, cb_alloc_metadata,
-                        devinfo.di_block_size, &metadata_loc);
+    ssize_t nalloc = CB(idx_struct, cb_alloc_metadata, 1, &metadata_loc);
 
-    if_then_panic(nalloc < devinfo.di_block_size, "no room for metadata!");
+    if_then_panic(nalloc < 1, "no room for metadata!");
 
     ht = g_hash_table_new(hash6432shift, devinfo.di_size_blocks,
                           devinfo.di_block_size, 1, metadata_loc,
@@ -32,73 +39,68 @@ void init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct) {
     if_then_panic(ht == NULL, "could not allocate hash table");
 
     idx_struct->idx_metadata = (void*)ht;
+
+    return 0;
 }
 
 // if not exists, then the value was not already in the table, therefore
 // success.
 // returns 1 on success, 0 if key already existed
-int insert_hash(idx_struct_t *idx_struct, inum_t inum,
-                laddr_t laddr, paddr_t paddr, size_t size) {
+ssize_t insert_hash(idx_struct_t *idx_struct, inum_t inum,
+                    laddr_t laddr, size_t size, paddr_t *paddr) {
     GHASH(idx_struct, ht);
-    hash_key_t k = MAKEKEY(inum, laddr);
-    return g_hash_table_insert(ht, k, paddr, size);
+
+    ssize_t nalloc = CB(idx_struct, cb_alloc_data, size, paddr);
+
+    if (nalloc < 0) {
+        return -EINVAL;
+    } else if (nalloc < size) {
+        CB(idx_struct, cb_dealloc_data, nalloc, *paddr);
+        return -ENOMEM;
+    }
+
+    for (size_t blkno = 0; blkno < nalloc; ++blkno) {
+        hash_key_t k = MAKEKEY(inum, laddr + blkno);
+        int err = g_hash_table_insert(ht, k, (*paddr) + blkno, size - blkno);
+        if (!err) return -EEXIST;
+    }
+
+    return nalloc;
 }
 
 /*
- * Returns 0 if not found (value == 0 means no associated value).
+ * Returns 0 if found, or -errno otherwise.
  */
-int lookup_hash(idx_struct_t *idx_struct, inum_t inum,
-                laddr_t laddr, paddr_t* paddr, size_t *size, bool force) {
-#if 1
+ssize_t lookup_hash(idx_struct_t *idx_struct, inum_t inum,
+                laddr_t laddr, paddr_t* paddr) {
     GHASH(idx_struct, ht);
 
     hash_key_t k = MAKEKEY(inum, laddr);
-    g_hash_table_lookup(ht, k, paddr, size, force);
-    return *paddr != 0;
-
-#else
-  int ret = 0;
-  hash_key_t k = MAKEKEY(inode, key);
-  hash_key_t r = RANGE_KEY(inode->inum, key);
-
-  *index = 0;
-  // Two-level lookup
-  //if (force) printf("FORCEFUL LOOKUP\n");
-  g_hash_table_lookup(gsuper, r, value, size, force);
-  //if (force) printf("searched high\n");
-  //printf("%u -> %lu, %lu %lu\n", key, r, *value, *size);
-  bool present = (*value) && ((key & RANGE_BITS) < *size);
-  //printf("--- %lu & %lu (%lu) < %lu\n", key, RANGE_BITS, key & RANGE_BITS, *size);
-  if (!present) {
-    //if (force) printf("Not in big.\n");
-    g_hash_table_lookup(ghash, k, value, size, force);
-    //if (force) printf("searched low\n");
-    present = (*value) != 0;
-    //if (!present && force) printf("Not in small.\n");
-  } else {
-    *index = (key & RANGE_BITS);
-  }
-  //if (force) printf("FORCEFUL RETURN\n");
-
-  return (int) present;
-#endif
+    size_t size;
+    g_hash_table_lookup(ht, k, paddr, &size, false);
+    if (*paddr != 0) return (ssize_t)size;
+    return -ENOENT;
 }
 
 /*
  * Returns FALSE if the requested logical block was not present in any of the
  * two hash tables.
  */
-int erase_hash(struct inode *inode, laddr_t key) {
-#if 0
-  int ret = 0;
-  hash_key_t k = MAKEKEY(inode, key);
-  hash_key_t r = RANGE_KEY(inode->inum, key);
+ssize_t erase_hash(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
+                   size_t size) {
+    GHASH(idx_struct, ht);
 
-  if (!g_hash_table_remove(gsuper, r)) {
-    return g_hash_table_remove(ghash, k);
-  }
-#endif
-  return true;
+    if (size == 0) return -EINVAL;
+
+    ssize_t ret = 0;
+    for (laddr_t lblk = laddr; lblk < laddr + size; ++lblk) {
+        hash_key_t k = MAKEKEY(inum, lblk);
+        ret += g_hash_table_remove(ht, k);
+    }
+
+    if (ret == 0) return -ENOENT;
+
+    return ret;
 }
 
 int mlfs_hash_get_blocks(handle_t *handle, struct inode *inode,

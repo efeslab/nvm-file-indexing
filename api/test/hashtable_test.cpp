@@ -42,7 +42,7 @@ TEST_F(HashTableFixture, Init) {
     ASSERT_NE(hashtable.idx_metadata, nullptr);
 }
 
-TEST_F(HashTableFixture, Insert) {
+TEST_F(HashTableFixture, InsertSingle) {
     idx_struct_t hashtable = {0,};
     init_hash(&idx_spec, &hashtable);
 
@@ -52,14 +52,27 @@ TEST_F(HashTableFixture, Insert) {
     size_t npages = 1;
     size_t blk_sz = BLK_SZ;
 
-    ssize_t err = mock_alloc_data(blk_sz, &pblk);
-    ASSERT_EQ(err, blk_sz);
-
-    int ret = insert_hash(&hashtable, inum, lblk, pblk, npages);
-    ASSERT_TRUE(ret);
+    ssize_t ret = insert_hash(&hashtable, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
 }
 
-TEST_F(HashTableFixture, Lookup) {
+TEST_F(HashTableFixture, InsertMulti) {
+    idx_struct_t hashtable = {0,};
+    init_hash(&idx_spec, &hashtable);
+
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 20;
+    size_t blk_sz = BLK_SZ;
+
+    ssize_t ret = insert_hash(&hashtable, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+}
+
+TEST_F(HashTableFixture, LookupSingle) {
     idx_struct_t hashtable = {0,};
     init_hash(&idx_spec, &hashtable);
 
@@ -69,21 +82,82 @@ TEST_F(HashTableFixture, Lookup) {
     size_t npages = 1;
     size_t blk_sz = BLK_SZ;
 
-    ssize_t err = mock_alloc_data(blk_sz, &pblk);
-    ASSERT_EQ(err, blk_sz);
-
-    int ret = insert_hash(&hashtable, inum, lblk, pblk, npages);
-    ASSERT_TRUE(ret);
+    ssize_t ret = insert_hash(&hashtable, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
 
     paddr_t check_paddr;
-    size_t check_size;
-    ret = lookup_hash(&hashtable, inum, lblk, &check_paddr, &check_size, false);
-    ASSERT_TRUE(ret) << "lookup failed (not forced)!";
+    ssize_t check_size = lookup_hash(&hashtable, inum, lblk, &check_paddr);
     ASSERT_EQ(pblk, check_paddr);
+    ASSERT_EQ(npages, check_size);
+}
+
+TEST_F(HashTableFixture, LookupMulti) {
+    idx_struct_t hashtable = {0,};
+    init_hash(&idx_spec, &hashtable);
+
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 20;
+    size_t blk_sz = BLK_SZ;
+
+    ssize_t ret = insert_hash(&hashtable, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    for (size_t p = 0; p < npages; ++p) {
+        paddr_t check_paddr;
+        ssize_t check_size = lookup_hash(&hashtable, inum, lblk + p, &check_paddr);
+        ASSERT_EQ(pblk + p, check_paddr);
+        ASSERT_EQ(npages - p, check_size);
+    }
+}
+
+TEST_F(HashTableFixture, EraseSingle) {
+    idx_struct_t hashtable = {0,};
+    init_hash(&idx_spec, &hashtable);
+
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+    size_t blk_sz = BLK_SZ;
+
+    ssize_t ret = insert_hash(&hashtable, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    ssize_t check_size = erase_hash(&hashtable, inum, lblk, npages);
     ASSERT_EQ(npages, check_size);
 
-    ret = lookup_hash(&hashtable, inum, lblk, &check_paddr, &check_size, true);
-    ASSERT_TRUE(ret) << "lookup failed (forced)!";
-    ASSERT_EQ(pblk, check_paddr);
+    paddr_t check_paddr = 0;
+    check_size = lookup_hash(&hashtable, inum, lblk, &check_paddr);
+    ASSERT_NE(pblk, check_paddr);
+    ASSERT_NE(npages, check_size);
+    ASSERT_LE(check_size, 0);
+}
+
+TEST_F(HashTableFixture, EraseMulti) {
+    idx_struct_t hashtable = {0,};
+    init_hash(&idx_spec, &hashtable);
+
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 20;
+    size_t blk_sz = BLK_SZ;
+
+    ssize_t ret = insert_hash(&hashtable, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    ssize_t check_size = erase_hash(&hashtable, inum, lblk, npages);
     ASSERT_EQ(npages, check_size);
+
+    paddr_t check_paddr = 0;
+    check_size = lookup_hash(&hashtable, inum, lblk, &check_paddr);
+    ASSERT_NE(pblk, check_paddr);
+    ASSERT_NE(npages, check_size);
+    ASSERT_LE(check_size, 0);
 }

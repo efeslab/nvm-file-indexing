@@ -36,6 +36,8 @@ typedef ssize_t (*writeback_fn_t)(paddr_t, off_t, size_t, const char*);
 typedef ssize_t (*read_fn_t)(paddr_t, off_t, size_t, char*);
 typedef ssize_t (*alloc_metadata_t)(size_t, paddr_t*);
 typedef ssize_t (*alloc_data_t)(size_t, paddr_t*);
+typedef ssize_t (*dealloc_metadata_t)(size_t, paddr_t);
+typedef ssize_t (*dealloc_data_t)(size_t, paddr_t);
 
 typedef struct device_info {
     size_t di_size_blocks;
@@ -45,10 +47,12 @@ typedef struct device_info {
 typedef int (*get_dev_info_fn_t)(device_info_t*);
 
 typedef struct callback_functions {
-    writeback_fn_t    cb_write;
-    read_fn_t         cb_read;
-    alloc_metadata_t  cb_alloc_metadata;
-    alloc_data_t      cb_alloc_data;
+    writeback_fn_t      cb_write;
+    read_fn_t           cb_read;
+    alloc_metadata_t    cb_alloc_metadata;
+    alloc_data_t        cb_alloc_data;
+    dealloc_metadata_t  cb_dealloc_metadata;
+    dealloc_data_t      cb_dealloc_data;
     get_dev_info_fn_t cb_get_dev_info;
 } callback_fns_t;
 

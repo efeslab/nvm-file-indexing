@@ -58,14 +58,15 @@ struct inode { int x; };
 
 #define GHASH(i, n) GHashTable *(n) = (GHashTable*)(i)->idx_metadata
 
-void init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct);
+int init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct);
 
-int insert_hash(idx_struct_t *idx_struct, inum_t inum,
-                laddr_t laddr, paddr_t paddr, size_t size);
+ssize_t insert_hash(idx_struct_t *idx_struct, inum_t inum,
+                    laddr_t laddr, size_t size, paddr_t *new_paddr);
 
-int lookup_hash(idx_struct_t *idx_struct, inum_t inum,
-                laddr_t laddr, paddr_t* paddr, size_t *size, bool force);
+ssize_t lookup_hash(idx_struct_t *idx_struct, inum_t inum,
+                laddr_t laddr, paddr_t* paddr);
 
+ssize_t erase_hash(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, size_t size);
 /*
  * Emulated mlfs_ext functions.
  */

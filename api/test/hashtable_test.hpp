@@ -23,16 +23,22 @@ class HashTableFixture : public ::testing::Test {
             return 0;
         }
 
-        static ssize_t mock_alloc_metadata(size_t nbytes, paddr_t *blk) {
-            size_t nblocks = nbytes / BLK_SZ;
-            size_t remain  = nbytes % BLK_SZ;
-            if (remain > 0) ++nblocks;
+        static ssize_t mock_alloc_metadata(size_t nblocks, paddr_t *blk) {
             *blk = device.allocate(nblocks);
-            return (ssize_t)(nblocks * BLK_SZ);
+            return (ssize_t)(nblocks);
         }
 
-        static ssize_t mock_alloc_data(size_t nbytes, paddr_t *blk) {
-            return mock_alloc_metadata(nbytes, blk);
+        static ssize_t mock_dealloc_metadata(size_t nblocks, paddr_t blk) {
+            device.deallocate(blk, nblocks);
+            return (ssize_t)(nblocks);
+        }
+
+        static ssize_t mock_alloc_data(size_t nblocks, paddr_t *blk) {
+            return mock_alloc_metadata(nblocks, blk);
+        }
+
+        static ssize_t mock_dealloc_data(size_t nblocks, paddr_t blk) {
+            return mock_dealloc_metadata(nblocks, blk);
         }
 
         static ssize_t mock_read(paddr_t blk, off_t off, size_t nbytes, char* buf) {
@@ -49,12 +55,14 @@ class HashTableFixture : public ::testing::Test {
            idx_spec.idx_mem_man->mm_malloc = malloc;
            idx_spec.idx_mem_man->mm_free   = free;
 
-           idx_spec.idx_callbacks                    = new callback_fns_t;
-           idx_spec.idx_callbacks->cb_write          = mock_write;
-           idx_spec.idx_callbacks->cb_read           = mock_read;
-           idx_spec.idx_callbacks->cb_alloc_metadata = mock_alloc_metadata;
-           idx_spec.idx_callbacks->cb_alloc_data     = mock_alloc_data;
-           idx_spec.idx_callbacks->cb_get_dev_info   = mock_get_dev_info;
+           idx_spec.idx_callbacks                      = new callback_fns_t;
+           idx_spec.idx_callbacks->cb_write            = mock_write;
+           idx_spec.idx_callbacks->cb_read             = mock_read;
+           idx_spec.idx_callbacks->cb_alloc_metadata   = mock_alloc_metadata;
+           idx_spec.idx_callbacks->cb_alloc_data       = mock_alloc_data;
+           idx_spec.idx_callbacks->cb_dealloc_metadata = mock_dealloc_metadata;
+           idx_spec.idx_callbacks->cb_dealloc_data     = mock_dealloc_data;
+           idx_spec.idx_callbacks->cb_get_dev_info     = mock_get_dev_info;
         }
 
         void TearDown() override {

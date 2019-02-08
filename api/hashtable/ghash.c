@@ -367,6 +367,8 @@ g_hash_table_new (hash_func_t       hash_func,
   }
   ht->nblocks = nblocks;
 
+  size_t entries_per_block = block_size / sizeof(hash_entry_t);
+
   // initialize read-writer locks
   ht->locks = MALLOC(idx_spec, max_entries * sizeof(pthread_rwlock_t));
   assert(ht->locks);
@@ -380,13 +382,13 @@ g_hash_table_new (hash_func_t       hash_func,
   assert(ht->metalock);
   pthread_mutex_init(ht->metalock, NULL);
 
-  if (!nvram_read_metadata(ht)) {
-    ssize_t nalloc = CB(idx_spec, cb_alloc_metadata, nblocks * block_size, &(ht->data));
+    if (!nvram_read_metadata(ht)) {
+        size_t blocks_needed = nblocks/entries_per_block;
+        ssize_t nalloc = CB(idx_spec, cb_alloc_metadata, blocks_needed, &(ht->data));
+        if_then_panic(nalloc < blocks_needed, "no large contiguous region!");
 
-    if_then_panic(nalloc < nblocks * block_size, "no large contiguous region!");
-
-    nvram_write_metadata(ht);
-  }
+        nvram_write_metadata(ht);
+    }
 
   // cache
 #ifdef HASHCACHE
