@@ -20,9 +20,10 @@ typedef struct indexing_structure {
  * Some convenience callbacks.
  */
 
-#define CB(i, c, ...) i->idx_callbacks->c(__VA_ARGS__)
-#define MALLOC(i, s) i->idx_mem_man->mm_malloc(s)
-#define FREE(i, p) i->idx_mem_man->mm_free(p)
+#define CB(i, c, ...) (i)->idx_callbacks->c(__VA_ARGS__)
+#define FN(i, c, ...) (i)->idx_fns->c(__VA_ARGS__)
+#define MALLOC(i, s)  (i)->idx_mem_man->mm_malloc(s)
+#define FREE(i, p)    (i)->idx_mem_man->mm_free(p)
 
 
 #endif  // __NVMIDX_GLOBAL_H__

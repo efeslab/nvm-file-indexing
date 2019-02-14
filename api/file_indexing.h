@@ -6,21 +6,7 @@
  * structures.
  */
 
-#include "hashtable.h"
-
-/*
- * Section: Initialization
- *
- * Here we specify the parameters for the indexing structures.
- */
-
-int init_structure(idx_struct_spec_t*, callback_methods_t*);
-int set_backing_structure(idx_struct_spec_t*, idx_struct_spec_t*);
-
-/*
- * Section: Function Macros
- *
- * For convenience.
- */
+#include "common/common.h"
+#include "hashtable/hashtable.h"
 
 #endif  // __NVMIDX_FILE_INDEXING_H__

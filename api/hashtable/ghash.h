@@ -32,9 +32,9 @@ extern "C" {
 #include <stdbool.h>
 
 // from common
-#include "common.h"
-#include "util.h"
-#include "bitops.h"
+#include "common/common.h"
+#include "common/util.h"
+#include "common/bitops.h"
 
 // local includes
 #include "hash_functions.h"
@@ -308,7 +308,7 @@ nvram_write_metadata(GHashTable *ht) {
   assert(bh);
 
   bh->b_size = sizeof(metadata);
-  bh->b_data = (uint8_t*)&metadata;
+  bh->b_data = (char*)&metadata;
   bh->b_offset = 0;
 
   ret = mlfs_write(bh);

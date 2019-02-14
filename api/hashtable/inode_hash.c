@@ -1,14 +1,12 @@
 #include <stdbool.h>
 #include "inode_hash.h"
 
-idx_fns_t hash_fns = {
-    .im_init   = init_hash,
-    .im_lookup = lookup_hash,
-    .im_create = insert_hash,
-    .im_remove = erase_hash
-};
 
-int init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct) {
+int init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct, paddr_t *location) {
+    if_then_panic(!idx_spec, "idx_spec cannot be null!");
+    if_then_panic(!idx_struct, "idx_struct cannot be null!");
+    if_then_panic(!location, "location ptr cannot be null!");
+
     GHashTable *ht = (GHashTable*)idx_struct->idx_metadata;
 
     if (ht) return -EEXIST;
@@ -28,13 +26,14 @@ int init_hash(const idx_spec_t *idx_spec, idx_struct_t *idx_struct) {
 
     size_t nbytes = devinfo.di_size_blocks * sizeof(hash_entry_t);
 
-    paddr_t metadata_loc;
-    ssize_t nalloc = CB(idx_struct, cb_alloc_metadata, 1, &metadata_loc);
+    if (!*location) {
+        ssize_t nalloc = CB(idx_struct, cb_alloc_metadata, 1, location);
 
-    if_then_panic(nalloc < 1, "no room for metadata!");
+        if_then_panic(nalloc < 1, "no room for metadata!");
+    }
 
     ht = g_hash_table_new(hash6432shift, devinfo.di_size_blocks,
-                          devinfo.di_block_size, 1, metadata_loc,
+                          devinfo.di_block_size, 1, *location,
                           idx_spec);
     if_then_panic(ht == NULL, "could not allocate hash table");
 
@@ -102,7 +101,7 @@ ssize_t erase_hash(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
     return ret;
 }
-
+#if 0
 int mlfs_hash_get_blocks(handle_t *handle, struct inode *inode,
 			struct mlfs_map_blocks *map, int flags, bool force) {
 #if 1
@@ -262,7 +261,8 @@ create:
   return ret;
 #endif
 }
-
+#endif
+#if 0
 int mlfs_hash_truncate(handle_t *handle, struct inode *inode,
 		laddr_t start, laddr_t end) {
 #if 0
@@ -293,6 +293,7 @@ double check_load_factor(struct inode *inode) {
   return 0.0;
 #endif
 }
+#endif
 
 int mlfs_hash_persist() {
 #if 1
@@ -344,3 +345,10 @@ int mlfs_hash_cache_invalidate() {
 #endif
   return 0;
 }
+
+idx_fns_t hash_fns = {
+    .im_init   = init_hash,
+    .im_lookup = lookup_hash,
+    .im_create = insert_hash,
+    .im_remove = erase_hash
+};

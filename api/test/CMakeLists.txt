@@ -6,12 +6,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory("googletest/googletest")
 include_directories("googletest/googletest/include")
 
-include_directories("../hashtable" "../common")
+include_directories("..")
 
 file(GLOB test_src
     "*.hpp"
     "*.cpp"
 )
 
-add_executable(TestSuite ${test_src})
-target_link_libraries(TestSuite gtest HashTable Common)
+add_executable(TestSuite
+               ${test_src}
+               $<TARGET_OBJECTS:Common>
+               $<TARGET_OBJECTS:HashTable>)
+target_link_libraries(TestSuite gtest)

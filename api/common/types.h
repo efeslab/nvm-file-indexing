@@ -53,7 +53,7 @@ typedef struct callback_functions {
     alloc_data_t        cb_alloc_data;
     dealloc_metadata_t  cb_dealloc_metadata;
     dealloc_data_t      cb_dealloc_data;
-    get_dev_info_fn_t cb_get_dev_info;
+    get_dev_info_fn_t   cb_get_dev_info;
 } callback_fns_t;
 
 #endif //__NVMIDX_COMMON_TYPES_H__

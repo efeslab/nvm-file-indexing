@@ -12,5 +12,7 @@ file(GLOB api_src
     "*.c"
 )
 
-add_library(NVMIndexingAPI SHARED ${api_src})
-target_link_libraries(NVMIndexingAPI HashTable Common)
+add_library(NVMIndexingAPI SHARED
+            ${api_src}
+            $<TARGET_OBJECTS:Common>
+            $<TARGET_OBJECTS:HashTable>)

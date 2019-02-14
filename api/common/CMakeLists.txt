@@ -8,4 +8,5 @@ file(GLOB common_src
     "*.c"
 )
 
-add_library(Common SHARED ${common_src})
+add_library(Common OBJECT ${common_src})
+set_property(TARGET Common PROPERTY POSITION_INDEPENDENT_CODE ON)

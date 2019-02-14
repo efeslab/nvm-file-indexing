@@ -18,7 +18,7 @@
 
 typedef struct indexing_structure_specification idx_spec_t;
 
-typedef int (*init_structure_fn_t)(const idx_spec_t*, idx_struct_t*);
+typedef int (*init_structure_fn_t)(const idx_spec_t*, idx_struct_t*, paddr_t*);
 
 /*******************************************************************************
  * Section: General operations

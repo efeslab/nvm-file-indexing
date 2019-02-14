@@ -8,30 +8,50 @@
 
 #include "gtest/gtest.h"
 
-#include "common.h"
+#include "common/common.h"
 
 struct MockMemPage {
-    MockMemPage(size_t size) : data(size) {}
+    MockMemPage(size_t size) :
+        data_(size, 0),
+        data_ptr_(data_.data()),
+        data_sz_(size) {}
+
+    MockMemPage(char *data_addr, size_t sz) :
+        data_ptr_(data_addr),
+        data_sz_(sz) {}
 
     ssize_t read(off_t offset, size_t bytes, char *buf) {
-        if (offset + bytes > data.size()) return -EINVAL;
-        memmove(buf, data.data() + offset, bytes);
+        if (offset + bytes > data_sz_) return -EINVAL;
+        memmove(buf, data_ptr_ + offset, bytes);
         return (ssize_t)bytes;
     }
 
     ssize_t write(off_t offset, size_t bytes, const char *buf) {
-        if (offset + bytes > data.size()) return -EINVAL;
-        memmove(data.data() + offset, buf, bytes);
+        if (offset + bytes > data_sz_) return -EINVAL;
+        memmove(data_ptr_ + offset, buf, bytes);
         return (ssize_t)bytes;
     }
 
-    std::vector<char> data;
+    size_t size() const { return data_sz_; }
+
+    char *data()  const { return data_ptr_; }
+
+    std::vector<char> data_;
+    char *data_ptr_;
+    size_t   data_sz_;
 };
 
 struct MockDevice {
     MockDevice(size_t nblocks, size_t block_sz)
-        : device(nblocks, MockMemPage(block_sz)),
-          allocated(nblocks, false) {}
+        : raw_device(nblocks * block_sz, 0),
+          allocated(nblocks, false) {
+
+        for (size_t blk = 0; blk < nblocks; ++blk) {
+            char* start_addr = raw_device.data() + (blk * block_sz);
+            device.emplace_back(start_addr, block_sz);
+        }
+
+    }
 
     void set_range(paddr_t block, size_t nblocks, bool is_allocated) {
         for (paddr_t i = block; i < block + nblocks; ++i) {
@@ -73,6 +93,7 @@ struct MockDevice {
         return device[i];
     }
 
+    std::vector<char> raw_device;
     std::vector<MockMemPage> device;
     std::vector<bool> allocated;
 

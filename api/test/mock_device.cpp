@@ -1,11 +1,9 @@
-#include "gtest/gtest.h"
-
 #include "mock_device.hpp"
 
 TEST(TestMockPage, Init) {
     size_t psize = 4096;
     MockMemPage mp(psize);
-    ASSERT_EQ(mp.data.size(), psize);
+    ASSERT_EQ(mp.size(), psize);
 }
 
 TEST(TestMockPage, ReadWriteAligned) {
@@ -50,8 +48,13 @@ TEST(TestMockDevice, Init) {
     MockDevice md(nblocks, blksz);
     ASSERT_EQ(nblocks, md.device.size());
     ASSERT_EQ(nblocks, md.allocated.size());
+
+    char* prev_end = md.raw_device.data();
     for (const auto& mp : md.device) {
-        ASSERT_EQ(blksz, mp.data.size());
+        ASSERT_EQ(blksz, mp.size());
+        ASSERT_EQ(prev_end, mp.data());
+        // Ensure they're also contiguous.
+        prev_end = mp.data() + mp.size();
     }
 }
 

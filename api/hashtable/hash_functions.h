@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "common.h"
+#include "common/common.h"
 
 typedef laddr_t (*hash_func_t)(paddr_t key);
 

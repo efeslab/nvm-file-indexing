@@ -6,15 +6,15 @@
 
 #include "gtest/gtest.h"
 
-#include "common.h"
-#include "hashtable.h"
+#include "common/common.h"
+#include "hashtable/hashtable.h"
 
 #include "mock_device.hpp"
 
 class HashTableFixture : public ::testing::Test {
     public:
-        static const size_t NBLK   = 1024 * 1024;
-        static const size_t BLK_SZ = 4096;
+        static const size_t NBLK;
+        static const size_t BLK_SZ;
         static MockDevice device;
 
         static int mock_get_dev_info(device_info_t* di) {
