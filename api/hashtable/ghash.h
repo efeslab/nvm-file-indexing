@@ -20,8 +20,8 @@
  * GLib at ftp://ftp.gtk.org/pub/gtk/.
  */
 
-#ifndef __G_HASH_MOD_H__
-#define __G_HASH_MOD_H__ 1
+#ifndef __NVM_IDX_G_HASH_MOD_H__
+#define __NVM_IDX_G_HASH_MOD_H__ 1
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,24 +40,21 @@ extern "C" {
 #include "hash_functions.h"
 
 // For the big hash table, mapping (inode, lblk) -> single block
-typedef struct hash_entry {
+typedef struct hash_index_entry {
   paddr_t      key;
   uint16_t     size;
   uint16_t     value_hi16;
   uint32_t     value_low32;
-} hash_entry_t;
+} hash_ent_t;
 
-#define HASH_ENTRY_VAL(x) (((paddr_t)x.value_hi16 << 32) | ((paddr_t)x.value_low32))
-#define HASH_ENTRY_IS_TOMBSTONE(x) (x.value_hi16 == ~0 && x.value_low32 == ~0)
-#define HASH_ENTRY_IS_EMPTY(x) (x.value_hi16 == 0 && x.value_low32 == 0)
-#define HASH_ENTRY_IS_VALID(x) (!HASH_ENTRY_IS_EMPTY(x) && !HASH_ENTRY_IS_TOMBSTONE(x))
+#define HASH_ENT_VAL(x) (((paddr_t)x.value_hi16 << 32) | ((paddr_t)x.value_low32))
+#define HASH_ENT_IS_TOMBSTONE(x) (x.value_hi16 == ~0 && x.value_low32 == ~0)
+#define HASH_ENT_IS_EMPTY(x) (x.value_hi16 == 0 && x.value_low32 == 0)
+#define HASH_ENT_IS_VALID(x) (!HASH_ENT_IS_EMPTY(x) && !HASH_ENT_IS_TOMBSTONE(x))
 
-#define HASH_ENTRY_SET_TOMBSTONE(x) do {x.value_hi16 = ~0; x.value_low32 = ~0;} while(0)
-#define HASH_ENTRY_SET_EMPTY(x) do {x.value_hi16 = 0; x.value_low32 = 0;} while(0)
-#define HASH_ENTRY_SET_VAL(x,v) do {x.value_hi16 = (uint16_t)(v >> 32); x.value_low32 = (uint32_t)(v);} while(0)
-
-#define KB(x)   ((size_t) (x) << 10)
-#define MB(x)   ((size_t) (x) << 20)
+#define HASH_ENT_SET_TOMBSTONE(x) do {x.value_hi16 = ~0; x.value_low32 = ~0;} while(0)
+#define HASH_ENT_SET_EMPTY(x) do {x.value_hi16 = 0; x.value_low32 = 0;} while(0)
+#define HASH_ENT_SET_VAL(x,v) do {x.value_hi16 = (uint16_t)(v >> 32); x.value_low32 = (uint32_t)(v);} while(0)
 
 //#define RANGE_SIZE (1 << 5) // 32
 #define RANGE_SIZE (1 << 9) // 512 -- 2MB
@@ -65,33 +62,16 @@ typedef struct hash_entry {
 #define RANGE_MASK (~RANGE_BITS)
 #define RANGE_KEY(i, l) ( (((uint64_t)(i)) << 32) | ((l) & RANGE_MASK))
 
-#define UNUSED_HASH_VALUE 0
-#define TOMBSTONE_HASH_VALUE 1
-#define HASH_IS_UNUSED(h_) ((h_) == UNUSED_HASH_VALUE)
-#define HASH_IS_TOMBSTONE(h_) ((h_) == TOMBSTONE_HASH_VALUE)
 #define HASH_IS_REAL(h_) ((h_) >= 2)
 
-#define VTOMB (~0UL)
-#define VEMPTY (0UL)
-#define IS_TOMBSTONE(v) ((v) == VTOMB)
-#define IS_EMPTY(v) ((v) == VEMPTY)
-#define IS_VALID(v) (!(IS_TOMBSTONE(v) || IS_EMPTY(v)))
-
-/*
-#define HASH_IS_UNUSED(value) ((value) == UNUSED_HASH_VALUE)
-#define HASH_IS_TOMBSTONE(value) ((value) == TOMBSTONE_HASH_VALUE)
-#define HASH_IS_REAL(value) (!(HASH_IS_UNUSED(value) || HASH_IS_TOMBESTON(value)))
-*/
-
-#define BUF_SIZE(ht) (ht->blksz / sizeof(hash_entry_t))
-#define BUF_IDX(ht, x) (x % (ht->blksz / sizeof(hash_entry_t)))
-#define NV_IDX(ht, x) (x / (ht->blksz / sizeof(hash_entry_t)))
+#define BLK_IDX(ht, x) (x % (ht->blksz / sizeof(hash_ent_t)))
+#define BLK_NUM(ht, x) (x / (ht->blksz / sizeof(hash_ent_t)))
 
 //#define HASHCACHE
 
 // This is the hash table meta-data that is persisted to NVRAM, that we may read
 // it and know everything we need to know in order to reconstruct it in memory.
-typedef struct dhashtable_meta {
+typedef struct device_hashtable_metadata {
   // Metadata for the in-memory state.
   uint32_t size;
   uint32_t mod;
@@ -103,10 +83,10 @@ typedef struct dhashtable_meta {
   paddr_t nvram_size;
   paddr_t range_size;
   paddr_t data_start;
-} dhashtable_metadata_t;
+} dev_hash_metadata_t;
 
 
-typedef struct _GHashTable {
+typedef struct nvm_hashtable_index {
     int             size;
     int             mod;
     unsigned        mask;
@@ -138,40 +118,42 @@ typedef struct _GHashTable {
     pthread_rwlock_t *cache_lock;
     unsigned long* cache_bitmap;
     // array of blocks
-    hash_entry_t **cache;
+    hash_ent_t **cache;
 #endif
-} GHashTable;
+} nvm_hash_idx_t;
 
 
-GHashTable *
-g_hash_table_new (hash_func_t       hash_func,
+nvm_hash_idx_t *
+nvm_hash_table_new (hash_func_t       hash_func,
                   size_t            max_entries,
                   size_t            block_size,
                   size_t            range_size,
                   paddr_t           metadata_location,
                   const idx_spec_t *idx_spec);
 
-void g_hash_table_destroy(GHashTable     *hash_table);
+void nvm_hash_table_destroy(nvm_hash_idx_t     *hash_table);
 
-int g_hash_table_insert(GHashTable *hash_table,
-                        paddr_t     key,
-                        paddr_t     value,
-                        paddr_t     range);
+int nvm_hash_table_insert(nvm_hash_idx_t *hash_table,
+                          paddr_t     key,
+                          paddr_t     value,
+                          paddr_t     range);
 
-int g_hash_table_replace(GHashTable *hash_table,
-                         paddr_t key,
-                         paddr_t value);
+int nvm_hash_table_replace(nvm_hash_idx_t *hash_table,
+                           paddr_t key,
+                           paddr_t value);
 
-int g_hash_table_remove(GHashTable *hash_table,
-                        paddr_t key);
+int nvm_hash_table_remove(nvm_hash_idx_t *hash_table,
+                          paddr_t key,
+                          paddr_t *value,
+                          size_t  *nblocks);
 
-void g_hash_table_lookup(GHashTable *hash_table, paddr_t key,
+void nvm_hash_table_lookup(nvm_hash_idx_t *hash_table, paddr_t key,
     paddr_t *val, paddr_t *size, bool force);
 
-int g_hash_table_contains(GHashTable *hash_table,
+int nvm_hash_table_contains(nvm_hash_idx_t *hash_table,
                           paddr_t key);
 
-unsigned g_hash_table_size(GHashTable *hash_table);
+unsigned nvm_hash_table_size(nvm_hash_idx_t *hash_table);
 
 
 extern uint64_t reads;
@@ -189,7 +171,7 @@ extern uint64_t blocks;
  * force -- refresh the cache from NVRAM.
  */
 static void
-nvram_read(GHashTable *ht, paddr_t offset, hash_entry_t **buf, bool force) {
+nvram_read(nvm_hash_idx_t *ht, paddr_t offset, hash_ent_t **buf, bool force) {
   struct buffer_head *bh;
   int err;
 
@@ -208,7 +190,7 @@ nvram_read(GHashTable *ht, paddr_t offset, hash_entry_t **buf, bool force) {
   }
 
   if (unlikely(ht->cache[offset] == NULL)) {
-    ht->cache[offset] = (hash_entry_t*)mlfs_zalloc(g_block_size_bytes);
+    ht->cache[offset] = (hash_ent_t*)mlfs_zalloc(g_block_size_bytes);
     mlfs_assert(ht->cache[offset]);
   }
 
@@ -226,9 +208,9 @@ nvram_read(GHashTable *ht, paddr_t offset, hash_entry_t **buf, bool force) {
  * the block and nothing else. Index is offset from start (bytes).
  */
 static void
-nvram_read_entry(GHashTable *ht, paddr_t idx, hash_entry_t *ret, bool force) {
-    paddr_t block  = ht->data + NV_IDX(ht, idx);
-    off_t   offset = BUF_IDX(ht, idx) * sizeof(*ret);
+nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t *ret, bool force) {
+    paddr_t block  = ht->data + BLK_NUM(ht, idx);
+    off_t   offset = BLK_IDX(ht, idx) * sizeof(*ret);
 
     ssize_t err = ht->callbacks->cb_read(block, offset,
                                          sizeof(*ret), (char*)ret);
@@ -246,9 +228,9 @@ nvram_read_entry(GHashTable *ht, paddr_t idx, hash_entry_t *ret, bool force) {
  * Returns 1 on success, 0 on failure.
  */
 static int
-nvram_read_metadata(GHashTable *ht) {
+nvm_read_metadata(nvm_hash_idx_t *ht) {
 
-    dhashtable_metadata_t metadata;
+    dev_hash_metadata_t metadata;
     ssize_t err = ht->callbacks->cb_read(ht->metadata, 0,
                                          sizeof(metadata), (char*)&metadata);
 
@@ -274,9 +256,8 @@ nvram_read_metadata(GHashTable *ht) {
 }
 
 static int
-nvram_write_metadata(GHashTable *ht) {
-#if 1
-    dhashtable_metadata_t metadata;
+nvm_write_metadata(nvm_hash_idx_t *ht) {
+    dev_hash_metadata_t metadata;
 
     // reconsititute the rest of the httable from
     metadata.nvram_size = ht->nvram_size;
@@ -294,34 +275,6 @@ nvram_write_metadata(GHashTable *ht) {
     if_then_panic(err != sizeof(metadata), "Could not write metadata!");
 
     return 1;
-#else
-  struct buffer_head *bh;
-  struct super_block *super = sb[g_root_dev];
-  int ret;
-  // Set up the hash table metadata
-  struct dhashtable_meta metadata;
-
-
-  // TODO: maybe generalize for other devices.
-  /*
-  bh = bh_get_sync_IO(g_root_dev, location, BH_NO_DATA_ALLOC);
-  assert(bh);
-
-  bh->b_size = sizeof(metadata);
-  bh->b_data = (char*)&metadata;
-  bh->b_offset = 0;
-
-  ret = mlfs_write(bh);
-
-  assert(!ret);
-  bh_release(bh);
-
-  // Actually mark block as allocated.
-  bitmap_bits_set_range(super->s_blk_bitmap, location, 1);
-  super->used_blocks += 1;
-  */
-  hash->callbacks->cb_write(
-#endif
 }
 
 /*
@@ -333,10 +286,10 @@ nvram_write_metadata(GHashTable *ht) {
  * index: byte index into range.
  */
 static inline void
-nvram_update(GHashTable *ht, paddr_t idx, hash_entry_t* val) {
-    paddr_t paddr = ht->data + NV_IDX(ht, idx);
+nvm_update(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t* val) {
+    paddr_t paddr = ht->data + BLK_NUM(ht, idx);
     size_t size   = sizeof(*val);
-    off_t offset  = BUF_IDX(ht, idx) * size;
+    off_t offset  = BLK_IDX(ht, idx) * size;
 
     ssize_t ret = ht->callbacks->cb_write(paddr, offset, size, (char*)val);
 
@@ -347,4 +300,4 @@ nvram_update(GHashTable *ht, paddr_t idx, hash_entry_t* val) {
 }
 #endif
 
-#endif /* __G_HASH_MOD_H__ */
+#endif /* __NVM_IDX_G_HASH_MOD_H__ */

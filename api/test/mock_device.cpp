@@ -67,6 +67,8 @@ TEST(TestMockDevice, Alloc) {
         ASSERT_EQ(i, md.allocate(1));
         ASSERT_TRUE(md.allocated[i]);
     }
+
+    ASSERT_EQ(nblocks, md.num_allocated());
 }
 
 TEST(TestMockDevice, Dealloc) {
@@ -83,4 +85,6 @@ TEST(TestMockDevice, Dealloc) {
         md.deallocate(i, 1);
         ASSERT_FALSE(md.allocated[i]);
     }
+
+    ASSERT_EQ(0, md.num_allocated());
 }

@@ -89,6 +89,15 @@ struct MockDevice {
         set_range(block, nblocks, false);
     }
 
+    size_t num_allocated() const {
+        size_t num = 0;
+        for (bool is_alloc : allocated) {
+            num += is_alloc ? 1 : 0;
+        }
+
+        return num;
+    }
+
     MockMemPage& operator[](int i) {
         return device[i];
     }

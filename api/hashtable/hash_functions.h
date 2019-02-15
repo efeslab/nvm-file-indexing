@@ -18,7 +18,7 @@ static inline laddr_t hash6432shift(paddr_t key) {
   return (laddr_t) key;
 }
 
-static inline laddr_t g_direct_hash (paddr_t v) {
+static inline laddr_t direct_hash (paddr_t v) {
   return (laddr_t)(v & 0xFFFFFFFF);
 }
 

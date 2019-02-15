@@ -103,7 +103,7 @@ static const int prime_mod [] = {
 };
 
 static void
-g_hash_table_set_shift (GHashTable *hash_table, int shift) {
+nvm_hash_table_set_shift (nvm_hash_idx_t *hash_table, int shift) {
   int i;
   uint32_t mask = 0;
 
@@ -119,7 +119,7 @@ g_hash_table_set_shift (GHashTable *hash_table, int shift) {
 }
 
 static int
-g_hash_table_find_closest_shift (int n) {
+nvm_hash_table_find_closest_shift (int n) {
   int i;
 
   for (i = 0; n; i++) {
@@ -130,18 +130,18 @@ g_hash_table_find_closest_shift (int n) {
 }
 
 static void
-g_hash_table_set_shift_from_size (GHashTable *hash_table, int size) {
+nvm_hash_table_set_shift_from_size (nvm_hash_idx_t *hash_table, int size) {
   int shift;
 
-  shift = g_hash_table_find_closest_shift(size);
+  shift = nvm_hash_table_find_closest_shift(size);
   shift = MAX(shift, HASH_TABLE_MIN_SHIFT);
 
-  g_hash_table_set_shift(hash_table, shift);
+  nvm_hash_table_set_shift(hash_table, shift);
 }
 
 /*
- * g_hash_table_lookup_node:
- * @hash_table: our #GHashTable
+ * nvm_hash_table_lookup_node:
+ * @hash_table: our #nvm_hash_idx_t
  * @key: the key to lookup against
  * @hash_return: key hash return location
  *
@@ -163,9 +163,9 @@ g_hash_table_set_shift_from_size (GHashTable *hash_table, int size) {
  * Returns: index of the described node
  */
 static inline uint32_t
-g_hash_table_lookup_node (GHashTable    *hash_table,
+nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
                           paddr_t        key,
-                          hash_entry_t  *ent_return,
+                          hash_ent_t  *ent_return,
                           uint32_t      *hash_return,
                           bool           force) {
   uint32_t node_index;
@@ -173,8 +173,8 @@ g_hash_table_lookup_node (GHashTable    *hash_table,
   uint32_t first_tombstone = 0;
   int have_tombstone = FALSE;
   uint32_t step = 0;
-  hash_entry_t *buffer;
-  hash_entry_t cur;
+  hash_ent_t *buffer;
+  hash_ent_t cur;
 
   hash_value = hash_table->hash_func(key);
   if (unlikely (!HASH_IS_REAL (hash_value))) {
@@ -189,20 +189,16 @@ g_hash_table_lookup_node (GHashTable    *hash_table,
   node_index = hash_value & hash_table->mask;
   pthread_rwlock_rdlock(hash_table->locks + node_index);
 
-  /*
-  nvram_read(hash_table, NV_IDX(node_index), &buffer, force);
-  cur = buffer[BUF_IDX(node_index)];
-  */
-  nvram_read_entry(hash_table, node_index, &cur, force);
-  //cur = hash_table->cache[NV_IDX(node_index)][BUF_IDX(node_index)];
+  nvm_read_entry(hash_table, node_index, &cur, force);
+  //cur = hash_table->cache[BLK_NUM(node_index)][BLK_IDX(node_index)];
 
-  while (!HASH_ENTRY_IS_EMPTY(cur)) {
-    if (cur.key == key && HASH_ENTRY_IS_VALID(cur)) {
+  while (!HASH_ENT_IS_EMPTY(cur)) {
+    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
       *ent_return = cur;
       pthread_rwlock_unlock(hash_table->locks + node_index);
       //pthread_rwlock_unlock(hash_table->cache_lock);
       return node_index;
-    } else if (HASH_ENTRY_IS_TOMBSTONE(cur) && !have_tombstone) {
+    } else if (HASH_ENT_IS_TOMBSTONE(cur) && !have_tombstone) {
       first_tombstone = node_index;
       have_tombstone = TRUE;
     }
@@ -214,24 +210,16 @@ g_hash_table_lookup_node (GHashTable    *hash_table,
     pthread_rwlock_rdlock(hash_table->locks + new_idx);
 
     node_index = new_idx;
-    /*
-    nvram_read(hash_table, NV_IDX(node_index), &buffer, force);
-    cur = buffer[BUF_IDX(node_index)];
-    */
-    nvram_read_entry(hash_table, node_index, &cur, force);
+    nvm_read_entry(hash_table, node_index, &cur, force);
   }
 
   if (have_tombstone) {
-    //*ent_return = hash_table->cache[NV_IDX(first_tombstone)][BUF_IDX(first_tombstone)];
-    nvram_read_entry(hash_table, first_tombstone, ent_return, false);
+    nvm_read_entry(hash_table, first_tombstone, ent_return, false);
     pthread_rwlock_unlock(hash_table->locks + node_index);
-    //pthread_rwlock_unlock(hash_table->cache_lock);
     return first_tombstone;
   }
 
-  //*ent_return = buffer[BUF_IDX(node_index)];
-  //*ent_return = hash_table->cache[NV_IDX(node_index)][BUF_IDX(node_index)];
-  nvram_read_entry(hash_table, node_index, ent_return, false);
+  nvm_read_entry(hash_table, node_index, ent_return, false);
   pthread_rwlock_unlock(hash_table->locks + node_index);
 
   //pthread_rwlock_unlock(hash_table->cache_lock);
@@ -239,8 +227,8 @@ g_hash_table_lookup_node (GHashTable    *hash_table,
 }
 
 /*
- * g_hash_table_remove_node:
- * @hash_table: our #GHashTable
+ * nvm_hash_table_remove_node:
+ * @hash_table: our #nvm_hash_idx_t
  * @node: pointer to node to remove
  * @notify: %TRUE if the destroy notify handlers are to be called
  *
@@ -250,42 +238,42 @@ g_hash_table_lookup_node (GHashTable    *hash_table,
  * If @notify is %TRUE then the destroy notify functions are called
  * for the key and value of the hash node.
  */
-static void g_hash_table_remove_node (GHashTable  *hash_table,
-                                      int          i,
-                                      int          notify) {
-  hash_entry_t ent;
-  UNUSED(notify);
+static void nvm_hash_table_remove_node (nvm_hash_idx_t  *hash_table,
+                                        int              i,
+                                        paddr_t         *pblk,
+                                        size_t          *old_size) {
+  hash_ent_t ent;
 
   //pthread_rwlock_wrlock(hash_table->locks + i);
 
-  //nvram_read_entry(hash_table, i, &ent);
-  HASH_ENTRY_SET_TOMBSTONE(ent);
+  nvm_read_entry(hash_table, i, &ent, true);
+  *pblk = HASH_ENT_VAL(ent);
+  *old_size = (size_t)ent.size;
+
+  HASH_ENT_SET_TOMBSTONE(ent);
   ent.size = 0;
 
   /* Erect tombstone */
-  nvram_update(hash_table, i, &ent);
+  nvm_update(hash_table, i, &ent);
 
   hash_table->nnodes--;
-  // update metadata on disk
-  //nvram_write_metadata(hash_table, hash_table->size);
 
   //pthread_rwlock_unlock(hash_table->locks + i);
-
 }
 
 /*
- * g_hash_table_maybe_resize:
- * @hash_table: our #GHashTable
+ * nvm_hash_table_maybe_resize:
+ * @hash_table: our #nvm_hash_idx_t
  *
  * Resizes the hash table, if needed.
  *
- * Essentially, calls g_hash_table_resize() if the table has strayed
+ * Essentially, calls nvm_hash_table_resize() if the table has strayed
  * too far from its ideal size for its number of nodes.
  *
  * iangneal: Hijacking this function to assure that we haven't over-committed.
  */
 static inline void
-g_hash_table_maybe_resize (GHashTable *hash_table) {
+nvm_hash_table_maybe_resize (nvm_hash_idx_t *hash_table) {
   int noccupied = hash_table->noccupied;
   int size = hash_table->size;
 
@@ -293,25 +281,25 @@ g_hash_table_maybe_resize (GHashTable *hash_table) {
 #if 0
   if ((size > hash_table->nnodes * 4 && size > 1 << HASH_TABLE_MIN_SHIFT) ||
       (size <= noccupied + (noccupied / 16))) {
-    g_hash_table_resize (hash_table);
+    nvm_hash_table_resize (hash_table);
   }
 #endif
 }
 
 /**
- * g_hash_table_new:
+ * nvm_hash_table_new:
  * @hash_func: a function to create a hash value from a key
  * @key_equal_func: a function to check two keys for equality
  *
- * Creates a new #GHashTable with a reference count of 1.
+ * Creates a new #nvm_hash_idx_t with a reference count of 1.
  *
  * Hash values returned by @hash_func are used to determine where keys
- * are stored within the #GHashTable data structure. The g_direct_hash(),
+ * are stored within the #nvm_hash_idx_t data structure. The direct_hash(),
  * g_int_hash(), g_int64_hash(), g_double_hash() and g_str_hash()
  * functions are provided for some common types of keys.
- * If @hash_func is %NULL, g_direct_hash() is used.
+ * If @hash_func is %NULL, direct_hash() is used.
  *
- * @key_equal_func is used when looking up keys in the #GHashTable.
+ * @key_equal_func is used when looking up keys in the #nvm_hash_idx_t.
  * The g_direct_equal(), g_int_equal(), g_int64_equal(), g_double_equal()
  * and g_str_equal() functions are provided for the most common types
  * of keys. If @key_equal_func is %NULL, keys are compared directly in
@@ -320,22 +308,27 @@ g_hash_table_maybe_resize (GHashTable *hash_table) {
  * as its first parameter, and the user-provided key to check against as
  * its second.
  *
- * Returns: a new #GHashTable
+ * Returns: a new #nvm_hash_idx_t
  */
-GHashTable *
-g_hash_table_new (hash_func_t       hash_func,
-                  size_t            max_entries,
-                  size_t            block_size,
-                  size_t            range_size,
-                  paddr_t           metadata_location,
-                  const idx_spec_t *idx_spec) {
-  GHashTable *ht;
+nvm_hash_idx_t *
+nvm_hash_table_new (hash_func_t       hash_func,
+                    size_t            max_entries,
+                    size_t            block_size,
+                    size_t            range_size,
+                    paddr_t           metadata_location,
+                    const idx_spec_t *idx_spec) {
+  nvm_hash_idx_t *ht;
 
   ht = MALLOC(idx_spec, sizeof(*ht));
 
   if_then_panic(ht == NULL, "malloc callback failed!");
+#if 0
+  printf("max_entries %llu, block size %llu, range_size %llu, "
+         "metadata block %llu\n", max_entries, block_size, range_size,
+         metadata_location);
+#endif
 
-  ht->hash_func          = hash_func ? hash_func : g_direct_hash;
+  ht->hash_func          = hash_func ? hash_func : direct_hash;
   ht->ref_count          = 1;
   ht->nnodes             = 0;
   ht->noccupied          = 0;
@@ -351,7 +344,7 @@ g_hash_table_new (hash_func_t       hash_func,
     ht->nvram_size++;
   }
 
-  g_hash_table_set_shift_from_size(ht, ht->nvram_size);
+  nvm_hash_table_set_shift_from_size(ht, ht->nvram_size);
   // Make sure the mod size doesn't go out of range.
   ht->nvram_size = max(ht->nvram_size, ht->size);
   size_t scaled_size = ht->nvram_size;
@@ -360,14 +353,14 @@ g_hash_table_new (hash_func_t       hash_func,
     max_entries = scaled_size;
   }
 
-  size_t nblocks = NV_IDX(ht, scaled_size);
-  if (BUF_IDX(ht, scaled_size)) {
+  size_t nblocks = BLK_NUM(ht, scaled_size);
+  if (BLK_IDX(ht, scaled_size)) {
     // Partial block.
     nblocks++;
   }
   ht->nblocks = nblocks;
 
-  size_t entries_per_block = block_size / sizeof(hash_entry_t);
+  size_t entries_per_block = block_size / sizeof(hash_ent_t);
 
   // initialize read-writer locks
   ht->locks = MALLOC(idx_spec, max_entries * sizeof(pthread_rwlock_t));
@@ -382,12 +375,11 @@ g_hash_table_new (hash_func_t       hash_func,
   assert(ht->metalock);
   pthread_mutex_init(ht->metalock, NULL);
 
-    if (!nvram_read_metadata(ht)) {
-        size_t blocks_needed = nblocks/entries_per_block;
-        ssize_t nalloc = CB(idx_spec, cb_alloc_metadata, blocks_needed, &(ht->data));
-        if_then_panic(nalloc < blocks_needed, "no large contiguous region!");
+    if (!nvm_read_metadata(ht)) {
+        ssize_t nalloc = CB(idx_spec, cb_alloc_metadata, nblocks, &(ht->data));
+        if_then_panic(nalloc < nblocks, "no large contiguous region!");
 
-        nvram_write_metadata(ht);
+        nvm_write_metadata(ht);
     }
 
   // cache
@@ -398,7 +390,7 @@ g_hash_table_new (hash_func_t       hash_func,
   int err = pthread_rwlock_init(ht->cache_lock, NULL);
   if_then_panic(err, "Could not init rwlock!");
 
-  ht->cache = mem_fns->mm_malloc(nblocks * sizeof(hash_entry_t*));
+  ht->cache = mem_fns->mm_malloc(nblocks * sizeof(hash_ent_t*));
   assert(ht->cache);
 
   // allocate cache bitmap -- unset for valid, set for invalid
@@ -407,10 +399,10 @@ g_hash_table_new (hash_func_t       hash_func,
   assert(ht->cache_bitmap);
 
   for (int i = 0; i < nblocks; ++i) {
-    hash_entry_t *unused;
+    hash_ent_t *unused;
     ht->cache[i] = mem_fns->mm_malloc(block_size);
     // load from NVRAM (force flag)
-    nvram_read(ht, i, &unused, 1);
+    nvm_read(ht, i, &unused, 1);
   }
 
 #endif
@@ -419,8 +411,8 @@ g_hash_table_new (hash_func_t       hash_func,
 }
 
 /*
- * g_hash_table_insert_node:
- * @hash_table: our #GHashTable
+ * nvm_hash_table_insert_node:
+ * @hash_table: our #nvm_hash_idx_t
  * @node_index: pointer to node to insert/replace
  * @key_hash: key hash
  * @key: (nullable): key to replace with, or %NULL
@@ -431,13 +423,13 @@ g_hash_table_new (hash_func_t       hash_func,
  * Inserts a value at @node_index in the hash table and updates it.
  *
  * If @key has been taken out of the existing node (ie it is not
- * passed in via a g_hash_table_insert/replace) call, then @reusing_key
+ * passed in via a nvm_hash_table_insert/replace) call, then @reusing_key
  * should be %TRUE.
  *
  * Returns: %TRUE if the key did not exist yet
  */
 static int
-g_hash_table_insert_node (GHashTable    *hash_table,
+nvm_hash_table_insert_node (nvm_hash_idx_t    *hash_table,
                           uint32_t       node_index,
                           uint32_t       key_hash,
                           paddr_t   new_key,
@@ -445,36 +437,36 @@ g_hash_table_insert_node (GHashTable    *hash_table,
                           paddr_t   new_range)
 {
   int already_exists;
-  hash_entry_t ent;
+  hash_ent_t ent;
 
-  nvram_read_entry(hash_table, node_index, &ent, false);
-  already_exists = HASH_ENTRY_IS_VALID(ent);
+  nvm_read_entry(hash_table, node_index, &ent, false);
+  already_exists = HASH_ENT_IS_VALID(ent);
 
   // TODO consider bookkeeping (nnodes, noccupied?)
   if (unlikely(already_exists)) {
     printf("Already exists: %lx %lx (trying to insert: %lx %lx)\n",
-        ent.key, HASH_ENTRY_VAL(ent), new_key, new_value);
+        ent.key, HASH_ENT_VAL(ent), new_key, new_value);
   } else {
     ent.key = new_key;
-    HASH_ENTRY_SET_VAL(ent, new_value);
+    HASH_ENT_SET_VAL(ent, new_value);
     ent.size = new_range;
-    nvram_update(hash_table, node_index, &ent);
+    nvm_update(hash_table, node_index, &ent);
   }
 
   return !already_exists;
 }
 
 /**
- * g_hash_table_destroy:
- * @hash_table: a #GHashTable
+ * nvm_hash_table_destroy:
+ * @hash_table: a #nvm_hash_idx_t
  *
- * Destroys all keys and values in the #GHashTable and decrements its
+ * Destroys all keys and values in the #nvm_hash_idx_t and decrements its
  * reference count by 1. If keys and/or values are dynamically allocated,
- * you should either free them first or create the #GHashTable with destroy
+ * you should either free them first or create the #nvm_hash_idx_t with destroy
  * destruction phase.
  */
 void
-g_hash_table_destroy (GHashTable *hash_table)
+nvm_hash_table_destroy (nvm_hash_idx_t *hash_table)
 {
   assert (hash_table != NULL);
 
@@ -485,47 +477,47 @@ g_hash_table_destroy (GHashTable *hash_table)
 }
 
 /**
- * g_hash_table_lookup:
- * @hash_table: a #GHashTable
+ * nvm_hash_table_lookup:
+ * @hash_table: a #nvm_hash_idx_t
  * @key: the key to look up
  *
- * Looks up a key in a #GHashTable. Note that this function cannot
+ * Looks up a key in a #nvm_hash_idx_t. Note that this function cannot
  * distinguish between a key that is not present and one which is present
  * and has the value %NULL. If you need this distinction, use
- * g_hash_table_lookup_extended().
+ * nvm_hash_table_lookup_extended().
  *
  * Returns: (nullable): the associated value, or %NULL if the key is not found
  */
-void g_hash_table_lookup(GHashTable *hash_table, paddr_t key,
+void nvm_hash_table_lookup(nvm_hash_idx_t *hash_table, paddr_t key,
     paddr_t *val, paddr_t *size, bool force) {
   uint32_t node_index;
   uint32_t hash_return;
-  hash_entry_t ent;
+  hash_ent_t ent;
 
   assert(hash_table != NULL);
 
-  node_index = g_hash_table_lookup_node(hash_table, key, &ent, &hash_return, force);
+  node_index = nvm_hash_table_lookup_node(hash_table, key, &ent, &hash_return, force);
 
   //pthread_rwlock_rdlock(hash_table->locks + node_index);
 
-  paddr_t ent_val = HASH_ENTRY_VAL(ent);
-  *val = !HASH_ENTRY_IS_TOMBSTONE(ent) ? ent_val : 0;
+  paddr_t ent_val = HASH_ENT_VAL(ent);
+  *val = !HASH_ENT_IS_TOMBSTONE(ent) ? ent_val : 0;
   *size = ent.size;
 
   //pthread_rwlock_unlock(hash_table->locks + node_index);
 }
 
 /*
- * g_hash_table_insert_internal:
- * @hash_table: our #GHashTable
+ * nvm_hash_table_insert_internal:
+ * @hash_table: our #nvm_hash_idx_t
  * @key: the key to insert
  * @value: the value to insert
  * @keep_new_key: if %TRUE and this key already exists in the table
  *   then call the destroy notify function on the old key.  If %FALSE
  *   then call the destroy notify function on the new key.
  *
- * Implements the common logic for the g_hash_table_insert() and
- * g_hash_table_replace() functions.
+ * Implements the common logic for the nvm_hash_table_insert() and
+ * nvm_hash_table_replace() functions.
  *
  * Do a lookup of @key. If it is found, replace it with the new
  * @value (and perhaps the new @key). If it is not found, create
@@ -534,7 +526,7 @@ void g_hash_table_lookup(GHashTable *hash_table, paddr_t key,
  * Returns: %TRUE if the key did not exist yet
  */
 static inline int
-g_hash_table_insert_internal (GHashTable *hash_table,
+nvm_hash_table_insert_internal (nvm_hash_idx_t *hash_table,
                               paddr_t    key,
                               paddr_t    value,
                               paddr_t    size)
@@ -550,8 +542,8 @@ g_hash_table_insert_internal (GHashTable *hash_table,
   uint32_t first_tombstone = 0;
   int have_tombstone = FALSE;
   uint32_t step = 0;
-  hash_entry_t *buffer;
-  hash_entry_t cur;
+  hash_ent_t *buffer;
+  hash_ent_t cur;
 
   assert (hash_table->ref_count > 0);
 
@@ -565,16 +557,12 @@ g_hash_table_insert_internal (GHashTable *hash_table,
   node_index = hash_value & hash_table->mask;
   pthread_rwlock_wrlock(hash_table->locks + node_index);
 
-  /*
-  nvram_read(hash_table, NV_IDX(node_index), &buffer, FALSE);
-  cur = buffer[BUF_IDX(node_index)];
-  */
-  nvram_read_entry(hash_table, node_index, &cur, false);
+  nvm_read_entry(hash_table, node_index, &cur, false);
 
-  while (!HASH_ENTRY_IS_EMPTY(cur)) {
-    if (cur.key == key && HASH_ENTRY_IS_VALID(cur)) {
+  while (!HASH_ENT_IS_EMPTY(cur)) {
+    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
       break;
-    } else if (HASH_ENTRY_IS_TOMBSTONE(cur) && !have_tombstone) {
+    } else if (HASH_ENT_IS_TOMBSTONE(cur) && !have_tombstone) {
       // keep lock until we decide we don't need it
       first_tombstone = node_index;
       have_tombstone = TRUE;
@@ -588,12 +576,7 @@ g_hash_table_insert_internal (GHashTable *hash_table,
     pthread_rwlock_wrlock(hash_table->locks + new_idx);
 
     node_index = new_idx;
-    //cur = hash_table->cache[NV_IDX(node_index)][BUF_IDX(node_index)];
-    /*
-    nvram_read(hash_table, NV_IDX(node_index), &buffer, FALSE);
-    cur = buffer[BUF_IDX(node_index)];
-    */
-    nvram_read_entry(hash_table, node_index, &cur, false);
+    nvm_read_entry(hash_table, node_index, &cur, false);
   }
 
   if (have_tombstone) {
@@ -601,7 +584,7 @@ g_hash_table_insert_internal (GHashTable *hash_table,
     node_index = first_tombstone;
   }
 
-  int res = g_hash_table_insert_node(
+  int res = nvm_hash_table_insert_node(
       hash_table, node_index, hash_value, key, value, size);
 
   pthread_rwlock_unlock(hash_table->locks + node_index);
@@ -611,89 +594,74 @@ g_hash_table_insert_internal (GHashTable *hash_table,
 }
 
 /**
- * g_hash_table_insert:
- * @hash_table: a #GHashTable
+ * nvm_hash_table_insert:
+ * @hash_table: a #nvm_hash_idx_t
  * @key: a key to insert
  * @value: the value to associate with the key
  *
- * Inserts a new key and value into a #GHashTable.
+ * Inserts a new key and value into a #nvm_hash_idx_t.
  *
- * If the key already exists in the #GHashTable its current
+ * If the key already exists in the #nvm_hash_idx_t its current
  * value is replaced with the new value. If you supplied a
- * @value_destroy_func when creating the #GHashTable, the old
+ * @value_destroy_func when creating the #nvm_hash_idx_t, the old
  * value is freed using that function. If you supplied a
- * @key_destroy_func when creating the #GHashTable, the passed
+ * @key_destroy_func when creating the #nvm_hash_idx_t, the passed
  * key is freed using that function.
  *
  * Returns: %TRUE if the key did not exist yet
  */
 int
-g_hash_table_insert (GHashTable *hash_table,
+nvm_hash_table_insert (nvm_hash_idx_t *hash_table,
                      paddr_t     key,
                      paddr_t     value,
                      paddr_t     size)
 {
-  return g_hash_table_insert_internal (hash_table, key, value, size);
+  return nvm_hash_table_insert_internal (hash_table, key, value, size);
 }
 
 /**
- * g_hash_table_replace:
- * @hash_table: a #GHashTable
+ * nvm_hash_table_replace:
+ * @hash_table: a #nvm_hash_idx_t
  * @key: a key to insert
  * @value: the value to associate with the key
  *
- * Inserts a new key and value into a #GHashTable similar to
- * g_hash_table_insert(). The difference is that if the key
- * already exists in the #GHashTable, it gets replaced by the
+ * Inserts a new key and value into a #nvm_hash_idx_t similar to
+ * nvm_hash_table_insert(). The difference is that if the key
+ * already exists in the #nvm_hash_idx_t, it gets replaced by the
  * new key. If you supplied a @value_destroy_func when creating
- * the #GHashTable, the old value is freed using that function.
+ * the #nvm_hash_idx_t, the old value is freed using that function.
  * If you supplied a @key_destroy_func when creating the
- * #GHashTable, the old key is freed using that function.
+ * #nvm_hash_idx_t, the old key is freed using that function.
  *
  * Returns: %TRUE if the key did not exist yet
  */
 int
-g_hash_table_replace (GHashTable *hash_table,
+nvm_hash_table_replace (nvm_hash_idx_t *hash_table,
                       paddr_t key,
                       paddr_t value)
 {
-  return g_hash_table_insert_internal (hash_table, key, value, TRUE);
+  return nvm_hash_table_insert_internal (hash_table, key, value, TRUE);
 }
 
 /*
- * g_hash_table_remove_internal:
- * @hash_table: our #GHashTable
+ * nvm_hash_table_remove_internal:
+ * @hash_table: our #nvm_hash_idx_t
  * @key: the key to remove
  * @notify: %TRUE if the destroy notify handlers are to be called
  * Returns: %TRUE if a node was found and removed, else %FALSE
  *
- * Implements the common logic for the g_hash_table_remove() and
- * g_hash_table_steal() functions.
+ * Implements the common logic for the nvm_hash_table_remove() and
+ * nvm_hash_table_steal() functions.
  *
  * Do a lookup of @key and remove it if it is found, calling the
  * destroy notify handlers only if @notify is %TRUE.
  */
 static int
-g_hash_table_remove_internal (GHashTable    *hash_table,
-                              paddr_t   key,
-                              int            notify)
+nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
+                                paddr_t         key,
+                                paddr_t        *old_pblk,
+                                size_t         *old_size)
 {
-#if 0
-  hash_entry_t ent;
-  uint32_t node_index;
-  uint32_t hash;
-
-  assert(hash_table != NULL);
-
-  node_index = g_hash_table_lookup_node (hash_table, key, &ent, &hash);
-
-  if (!IS_VALID(ent.value)) return FALSE;
-
-  g_hash_table_remove_node (hash_table, node_index, notify);
-
-  return TRUE;
-#else
-
   /*
    * iangneal: for concurrency reasons, we can't do lookup -> insert, as another
    * thread may come in and use the slot we just looked for.
@@ -702,8 +670,8 @@ g_hash_table_remove_internal (GHashTable    *hash_table,
   uint32_t node_index;
   uint32_t hash_value;
   uint32_t step = 0;
-  hash_entry_t *buffer;
-  hash_entry_t cur;
+  hash_ent_t *buffer;
+  hash_ent_t cur;
 
   assert (hash_table->ref_count > 0);
 
@@ -717,17 +685,10 @@ g_hash_table_remove_internal (GHashTable    *hash_table,
   node_index = hash_value & hash_table->mask;
   pthread_rwlock_wrlock(hash_table->locks + node_index);
 
-  /*
-  nvram_read(hash_table, NV_IDX(node_index), &buffer, FALSE);
-  cur = buffer[BUF_IDX(node_index)];
-  */
-  nvram_read_entry(hash_table, node_index, &cur, false);
-  /*
-  cur = hash_table->cache[NV_IDX(node_index)][BUF_IDX(node_index)];
-  */
+  nvm_read_entry(hash_table, node_index, &cur, false);
 
-  while (!HASH_ENTRY_IS_EMPTY(cur)) {
-    if (cur.key == key && HASH_ENTRY_IS_VALID(cur)) {
+  while (!HASH_ENT_IS_EMPTY(cur)) {
+    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
       break;
     }
 
@@ -738,56 +699,52 @@ g_hash_table_remove_internal (GHashTable    *hash_table,
     pthread_rwlock_wrlock(hash_table->locks + new_idx);
 
     node_index = new_idx;
-    //cur = hash_table->cache[NV_IDX(node_index)][BUF_IDX(node_index)];
-    /*
-    nvram_read(hash_table, NV_IDX(node_index), &buffer, FALSE);
-    cur = buffer[BUF_IDX(node_index)];
-    */
-    nvram_read_entry(hash_table, node_index, &cur, false);
+    nvm_read_entry(hash_table, node_index, &cur, false);
   }
 
-  if (HASH_ENTRY_IS_VALID(cur)) {
-    g_hash_table_remove_node(hash_table, node_index, notify);
+  if (HASH_ENT_IS_VALID(cur)) {
+    nvm_hash_table_remove_node(hash_table, node_index, old_pblk, old_size);
   }
 
   pthread_rwlock_unlock(hash_table->locks + node_index);
 
   //pthread_rwlock_unlock(hash_table->cache_lock);
-  return HASH_ENTRY_IS_VALID(cur);
-#endif
+  return HASH_ENT_IS_VALID(cur);
 }
 
 /**
- * g_hash_table_remove:
- * @hash_table: a #GHashTable
+ * nvm_hash_table_remove:
+ * @hash_table: a #nvm_hash_idx_t
  * @key: the key to remove
  *
- * Removes a key and its associated value from a #GHashTable.
+ * Removes a key and its associated value from a #nvm_hash_idx_t.
  *
- * If the #GHashTable was created using g_hash_table_new_full(), the
+ * If the #nvm_hash_idx_t was created using nvm_hash_table_new_full(), the
  * key and value are freed using the supplied destroy functions, otherwise
  * you have to make sure that any dynamically allocated values are freed
  * yourself.
  *
- * Returns: %TRUE if the key was found and removed from the #GHashTable
+ * Returns: %TRUE if the key was found and removed from the #nvm_hash_idx_t
  */
 int
-g_hash_table_remove (GHashTable    *hash_table,
-                     paddr_t  key)
+nvm_hash_table_remove (nvm_hash_idx_t *hash_table,
+                       paddr_t         key,
+                       paddr_t        *removed,
+                       size_t         *ncontiguous)
 {
-  return g_hash_table_remove_internal (hash_table, key, TRUE);
+  return nvm_hash_table_remove_internal (hash_table, key, removed, ncontiguous);
 }
 
 
 /**
- * g_hash_table_size:
- * @hash_table: a #GHashTable
+ * nvm_hash_table_size:
+ * @hash_table: a #nvm_hash_idx_t
  *
- * Returns the number of elements contained in the #GHashTable.
+ * Returns the number of elements contained in the #nvm_hash_idx_t.
  *
- * Returns: the number of key/value pairs in the #GHashTable.
+ * Returns: the number of key/value pairs in the #nvm_hash_idx_t.
  */
-uint32_t g_hash_table_size (GHashTable *hash_table) {
+uint32_t nvm_hash_table_size (nvm_hash_idx_t *hash_table) {
   assert (hash_table != NULL);
 
   return hash_table->nnodes;
