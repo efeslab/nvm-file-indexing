@@ -56,3 +56,28 @@ void TestFixture::TearDown() {
    delete idx_spec.idx_mem_man;
    delete idx_spec.idx_callbacks;
 }
+
+/*******************************************************************************
+ * Section: Fixture correctness tests.
+ *
+ * Sanity checks to make sure that the callback methods aren't buggy, etc.
+ ******************************************************************************/
+
+TEST_F(TestFixture, SetUpAndTearDown) {
+    ASSERT_NE(idx_spec.idx_mem_man, nullptr)   << "Allocation failed";
+    ASSERT_NE(idx_spec.idx_callbacks, nullptr) << "Allocation failed";
+}
+
+TEST_F(TestFixture, MockMemoryCallbacks) {
+    void* mem = idx_spec.idx_mem_man->mm_malloc(1024);
+    ASSERT_NE(mem, nullptr);
+    idx_spec.idx_mem_man->mm_free(mem);
+}
+
+TEST_F(TestFixture, MockPersistentCallbacks) {
+    void* mem = idx_spec.idx_mem_man->mm_malloc(1024);
+    ASSERT_NE(mem, nullptr);
+    idx_spec.idx_mem_man->mm_free(mem);
+}
+
+

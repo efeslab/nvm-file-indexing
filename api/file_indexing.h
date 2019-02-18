@@ -8,5 +8,6 @@
 
 #include "common/common.h"
 #include "hashtable/hashtable.h"
+#include "extents/extents.h"
 
 #endif  // __NVMIDX_FILE_INDEXING_H__

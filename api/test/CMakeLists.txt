@@ -16,5 +16,6 @@ file(GLOB test_src
 add_executable(TestSuite
                ${test_src}
                $<TARGET_OBJECTS:Common>
+               $<TARGET_OBJECTS:ExtentTree>
                $<TARGET_OBJECTS:HashTable>)
 target_link_libraries(TestSuite gtest)

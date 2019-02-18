@@ -5,6 +5,7 @@ set (VERSION_MINOR 1)
 
 add_subdirectory(common)
 add_subdirectory(hashtable)
+add_subdirectory(extents)
 add_subdirectory(test)
 
 file(GLOB api_src
@@ -15,4 +16,6 @@ file(GLOB api_src
 add_library(NVMIndexingAPI SHARED
             ${api_src}
             $<TARGET_OBJECTS:Common>
-            $<TARGET_OBJECTS:HashTable>)
+            $<TARGET_OBJECTS:HashTable>
+            $<TARGET_OBJECTS:ExtentTree>
+            )
