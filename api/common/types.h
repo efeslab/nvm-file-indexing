@@ -8,6 +8,12 @@ typedef uint32_t inum_t;
 typedef uint32_t laddr_t;
 typedef uint64_t paddr_t;
 
+typedef struct paddr_range_description {
+    paddr_t pr_start;
+    off_t   pr_blk_offset;
+    size_t  pr_nbytes;
+} paddr_range_t;
+
 /*
  * Section: Forward References
  */
@@ -45,6 +51,7 @@ typedef struct device_info {
 } device_info_t;
 
 typedef int (*get_dev_info_fn_t)(device_info_t*);
+
 
 typedef struct callback_functions {
     writeback_fn_t      cb_write;

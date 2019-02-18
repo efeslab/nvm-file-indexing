@@ -124,8 +124,9 @@ ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 }
 
 idx_fns_t hash_fns = {
-    .im_init   = hashtable_initialize,
-    .im_lookup = hashtable_lookup,
-    .im_create = hashtable_create,
-    .im_remove = hashtable_remove
+    .im_init          = hashtable_initialize,
+    .im_init_prealloc = NULL,
+    .im_lookup        = hashtable_lookup,
+    .im_create        = hashtable_create,
+    .im_remove        = hashtable_remove
 };
