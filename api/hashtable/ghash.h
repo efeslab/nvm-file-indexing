@@ -33,8 +33,6 @@ extern "C" {
 
 // from common
 #include "common/common.h"
-#include "common/util.h"
-#include "common/bitops.h"
 
 // local includes
 #include "hash_functions.h"

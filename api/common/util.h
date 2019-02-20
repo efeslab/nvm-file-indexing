@@ -1,5 +1,5 @@
-#ifndef __OPTIMIZATIONS_H__
-#define __OPTIMIZATIONS_H__
+#ifndef __NVM_IDX_COMMON_UTIL_H__
+#define __NVM_IDX_COMMON_UTIL_H__
 
 #include <stdlib.h>
 #include <stdio.h>

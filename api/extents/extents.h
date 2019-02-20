@@ -2,7 +2,6 @@
 #define __NVM_IDX_EXTENTS_H__
 
 #include "common/common.h"
-#include "common/kerncompat.h"
 
 #ifdef __cplusplus
 #define _Static_assert static_assert
@@ -41,7 +40,7 @@ struct mlfs_extent_tail {
  * This is the extent on-disk structure.
  * It's used at the bottom of the tree.
  */
-struct mlfs_extent {
+typedef struct mlfs_extent {
 	uint32_t ee_block;    /* first logical block extent covers */
 	uint16_t ee_len;      /* number of blocks covered by extent */
 	uint16_t ee_start_hi; /* high 16 bits of physical block */
@@ -52,7 +51,7 @@ struct mlfs_extent {
  * This is the index on-disk structure.
  * It's used at all the levels except for the bottom.
  */
-struct mlfs_extent_idx {
+typedef struct mlfs_extent_idx {
 	uint32_t ei_block;   /* index covers logical blocks from 'block' */
 	uint32_t ei_leaf_lo; /* pointer to the physical block of the next level.
 							leaf or next index could be there */
@@ -73,6 +72,21 @@ typedef struct mlfs_extent_header {
 	uint16_t eh_depth;      /* has tree real underlying blocks? */
 	uint32_t eh_generation; /* generation of the tree */
 } extent_header_t;
+
+/*
+ * API Data Structures
+ */
+
+typedef struct extent_tree_metadata {
+    paddr_range_t et_direct_range;
+    extent_header_t et_direct_header;
+    // could be extent leaf or branch node
+    void* et_direct_data;
+} ext_meta_t;
+
+#define EXTMETA(i, n) ext_meta_t *(n) = (ext_meta_t*)(i)->idx_metadata
+#define EXTHDR(m, n)  extent_header_t *(n) = &((m)->et_direct_header)
+
 
 #define MLFS_EXT_MAGIC (0xf30a)
 
@@ -98,15 +112,15 @@ find_mlfs_extent_tail(struct mlfs_extent_header *eh)
  * Creation/lookup routines use it for traversal/splitting/etc.
  * Truncate uses it to simulate recursive walking.
  */
-struct mlfs_ext_path {
+typedef struct mlfs_ext_path {
 	paddr_t p_block;
 	uint16_t p_depth;
 	uint16_t p_maxdepth;
 	struct mlfs_extent *p_ext;
 	struct mlfs_extent_idx *p_idx;
 	struct mlfs_extent_header *p_hdr;
-	struct buffer_head *p_bh;
-};
+    char *p_raw;
+} extent_path_t;
 
 /*
  * Flags used by ext4_map_blocks()
@@ -216,28 +230,29 @@ struct mlfs_map_blocks {
 	(EXT_FIRST_EXTENT((__hdr__)) + (__hdr__)->eh_max - 1)
 #define EXT_MAX_INDEX(__hdr__)                                    \
 	(EXT_FIRST_INDEX((__hdr__)) + (__hdr__)->eh_max - 1)
-#if 0
-static inline struct mlfs_extent_header *ext_inode_hdr(handle_t *handle,
-		struct inode *inode)
+
+static inline extent_header_t *ext_inode_hdr(const idx_struct_t *ext_idx)
 {
-	if (handle->dev == g_root_dev)
-		return (struct mlfs_extent_header *)inode->l1.i_data;
-	else if (handle->dev == g_ssd_dev)
-		return (struct mlfs_extent_header *)inode->l2.i_data;
-	else if (handle->dev == g_hdd_dev)
-		return (struct mlfs_extent_header *)inode->l3.i_data;
-	else
-		panic("invalid handle: dev is wrong\n");
+    EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, eh);
+    return eh;
 }
 
-static inline struct mlfs_extent_header *ext_block_hdr(struct buffer_head *bh)
+static inline extent_header_t *ext_block_hdr(char *buf)
 {
-	return (struct mlfs_extent_header *)bh->b_data;
+	return (extent_header_t*)buf;
 }
 
-static inline uint16_t ext_depth(handle_t *handle, struct inode *inode)
+static inline uint16_t ext_depth(const idx_struct_t *ext_idx)
 {
-	return le16_to_cpu(ext_inode_hdr(handle, inode)->eh_depth);
+	return le16_to_cpu(ext_inode_hdr(ext_idx)->eh_depth);
+}
+
+static inline size_t get_block_size(const idx_struct_t *ext_idx)
+{
+    device_info_t devinfo;
+    int err = CB(ext_idx, cb_get_dev_info, &devinfo);
+    if_then_panic(err, "Could not retrieve block size!");
+	return devinfo.di_block_size;
 }
 
 static inline uint16_t mlfs_ext_get_actual_len(struct mlfs_extent *ext)
@@ -348,14 +363,14 @@ static inline void mlfs_idx_store_pblock(struct mlfs_extent_idx *ix,
 	ix->ei_leaf_lo = (unsigned long)(pb & 0xffffffff);
 	ix->ei_leaf_hi = (unsigned long)((pb >> 31) >> 1) & 0xffff;
 }
-#endif
+
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
 #define in_range(b, first, len) \
 	((b) >= (first) && (b) <= (first) + (len) - 1)
 
-#define mlfs_ext_dirty(handle, inode, path)  \
-	__mlfs_ext_dirty(__func__, __LINE__, (handle), (inode), (path))
+#define mlfs_ext_dirty(ext_idx, path)  \
+	__mlfs_ext_dirty(__func__, __LINE__, (ext_idx), (path))
 
 int mlfs_ext_get_blocks(idx_struct_t *ext_idx,
                         struct mlfs_map_blocks *map, int flags);
@@ -363,31 +378,24 @@ int mlfs_ext_get_blocks(idx_struct_t *ext_idx,
 struct mlfs_ext_path *mlfs_find_extent(idx_struct_t *ext_idx,
 		laddr_t block, struct mlfs_ext_path **orig_path, int flags);
 
-/*
- * API Data Structures
- */
-
-typedef struct extent_tree_metadata {
-    paddr_range_t et_direct_range;
-    extent_header_t et_direct_header;
-    // could be extent leaf or branch node
-    void* et_direct_data;
-} ext_meta_t;
-
-#define EXTMETA(i, n) ext_meta_t *(n) = (ext_meta_t*)(i)->idx_metadata
-
-#define EXTHDR(m, n)  extent_header_t *(n) = &((m)->et_direct_header)
+int mlfs_ext_truncate(idx_struct_t *ext_idx, laddr_t from, laddr_t to);
 
 /*
  * API Functions
  */
 
-int extent_tree_init(const idx_spec_t *idx_spc, const paddr_range_t *direct_ents, idx_struct_t *ext_idx);
+int extent_tree_init(const idx_spec_t *idx_spc,
+                     const paddr_range_t *direct_ents,
+                     idx_struct_t *ext_idx);
 
-#if 0
-int mlfs_ext_truncate(handle_t *handle, struct inode *inode,
-		laddr_t from, laddr_t to);
-#endif
+ssize_t extent_tree_create(idx_struct_t *idx_struct, inum_t inum,
+                           laddr_t laddr, size_t size, paddr_t *new_paddr);
+
+ssize_t extent_tree_lookup(idx_struct_t *idx_struct, inum_t inum,
+                           laddr_t laddr, paddr_t* paddr);
+
+ssize_t extent_tree_remove(idx_struct_t *idx_struct,
+                           inum_t inum, laddr_t laddr, size_t size);
 
 
 #ifdef __cplusplus
