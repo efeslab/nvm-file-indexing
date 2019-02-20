@@ -48,50 +48,40 @@ TEST_F(ExtentTreeFixture, InsertMulti) {
     ASSERT_EQ(npages, ret);
 }
 
-#if 0
-TEST_F(HashTableFixture, LookupSingle) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
+TEST_F(ExtentTreeFixture, LookupSingle) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
     size_t blk_sz = BLK_SZ;
 
-    ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
-    ASSERT_GT(pblk, 0);
 
     paddr_t check_paddr;
-    ssize_t check_size = hashtable_lookup(&hashtable, inum, lblk, &check_paddr);
+    ssize_t check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
     ASSERT_EQ(pblk, check_paddr);
     ASSERT_EQ(npages, check_size);
 }
 
-TEST_F(HashTableFixture, LookupMulti) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
+TEST_F(ExtentTreeFixture, LookupMulti) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
     size_t blk_sz = BLK_SZ;
 
-    ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
-    ASSERT_GT(pblk, 0);
 
     for (size_t p = 0; p < npages; ++p) {
         paddr_t check_paddr;
-        ssize_t check_size = hashtable_lookup(&hashtable, inum, lblk + p, &check_paddr);
+        ssize_t check_size = extent_tree_lookup(&ext_idx, inum, lblk + p, &check_paddr);
         ASSERT_EQ(pblk + p, check_paddr);
         ASSERT_EQ(npages - p, check_size);
     }
 }
+#if 0
 
 TEST_F(HashTableFixture, EraseSingle) {
     idx_struct_t hashtable = {0,};

@@ -2574,8 +2574,6 @@ int mlfs_ext_truncate(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
     return ret;
 }
 
-//ssize_t mlfs_ext_get_blocks(handle_t *handle, struct inode *inode,
-//            struct mlfs_map_blocks *map, int flags)
 ssize_t extent_tree_create(idx_struct_t *ext_idx, inum_t inum,
                            laddr_t laddr, size_t size, paddr_t *new_paddr)
 {
@@ -2717,4 +2715,60 @@ out2:
     }
 
     return err ? err : allocated;
+}
+
+ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
+                           laddr_t laddr, paddr_t* paddr)
+{
+    extent_path_t *path = NULL;
+    struct mlfs_extent newex, *ex;
+    int goal, err = 0, depth;
+    paddr_t next, newblock;
+    ssize_t ret;
+
+    *paddr = 0;
+    ret = 0;
+
+    /* find extent for this block */
+    path = mlfs_find_extent(ext_idx, laddr, NULL, 0);
+    if (IS_ERR(path)) {
+        err = PTR_ERR(path);
+        path = NULL;
+        return err;
+    }
+
+    depth = ext_depth(ext_idx);
+
+    /*
+     * consistent leaf must not be empty
+     * this situations is possible, though, _during_ tree modification
+     * this is why assert can't be put in mlfs_ext_find_extent()
+     */
+    BUG_ON(path[depth].p_ext == NULL && depth != 0);
+
+    ex = path[depth].p_ext;
+    if (ex) {
+        laddr_t ee_block = le32_to_cpu(ex->ee_block);
+        paddr_t ee_start = mlfs_ext_pblock(ex);
+        unsigned short ee_len;
+
+        /*
+         * unwritten extents are treated as holes, except that
+         * we split out initialized portions during a write.
+         */
+        ee_len = mlfs_ext_get_actual_len(ex);
+
+        /* find extent covers block. simply return the extent */
+        if (in_range(laddr, ee_block, ee_len)) {
+            /* number of remain blocks in the extent */
+            size_t nblocks = ee_len + ee_block - laddr;
+
+            if (!mlfs_ext_is_unwritten(ex)) {
+                *paddr = laddr - ee_block + ee_start;
+                ret = nblocks;
+            }
+        }
+    }
+
+    return ret;
 }
