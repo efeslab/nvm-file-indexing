@@ -142,7 +142,7 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     ext_idx->idx_mem_man   = idx_spec->idx_mem_man;
     ext_idx->idx_callbacks = idx_spec->idx_callbacks;
     ext_idx->idx_fns       = NULL;
-    ext_meta               = MALLOC(idx_spec, sizeof(*ext_meta));
+    ext_meta               = ZALLOC(idx_spec, sizeof(*ext_meta));
 
     if (NULL == ext_meta) return -ENOMEM;
 
@@ -151,7 +151,7 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     ext_meta->et_direct_range = *direct_ents;
 
     size_t ents_root = mlfs_ext_space_root(ext_idx);
-    ext_meta->et_direct_data = MALLOC(idx_spec, ents_root * sizeof(extent_leaf_t));
+    ext_meta->et_direct_data = ZALLOC(idx_spec, ents_root * sizeof(extent_leaf_t));
 
     EXTHDR(ext_meta, eh);
 
@@ -177,7 +177,7 @@ static char *read_extent_tree_block(idx_struct_t *ext_idx,
     int err = CB(ext_idx, cb_get_dev_info, &devinfo);
     if (err) return (char*)ERR_PTR(err);
 
-    buf = (char*)MALLOC(ext_idx, devinfo.di_block_size);
+    buf = (char*)ZALLOC(ext_idx, devinfo.di_block_size);
 
     ssize_t nbytes = CB(ext_idx, cb_read,
                         pblk, 0, devinfo.di_block_size, buf);
@@ -457,7 +457,7 @@ extent_path_t *mlfs_find_extent(idx_struct_t *ext_idx, laddr_t block,
 
     if (!path) {
         /* account possible depth increase */
-        path = MALLOC(ext_idx, sizeof(extent_path_t) * (depth + 2));
+        path = ZALLOC(ext_idx, sizeof(extent_path_t) * (depth + 2));
         if (unlikely(!path)) {
             return (extent_path_t*)ERR_PTR(-ENOMEM);
         }
@@ -638,7 +638,7 @@ static int mlfs_ext_split(idx_struct_t *ext_idx,
      * We need this to handle errors and free blocks
      * upon them.
      */
-    ablocks = (paddr_t *)MALLOC(ext_idx, sizeof(paddr_t) * depth);
+    ablocks = (paddr_t *)ZALLOC(ext_idx, sizeof(paddr_t) * depth);
     if (!ablocks)
         return -ENOMEM;
 
@@ -674,7 +674,7 @@ static int mlfs_ext_split(idx_struct_t *ext_idx,
         goto cleanup;
     }
     */
-    buf = MALLOC(ext_idx, get_block_size(ext_idx));
+    buf = ZALLOC(ext_idx, get_block_size(ext_idx));
 
     if (NULL == buf) {
         err = -ENOMEM;
@@ -770,7 +770,7 @@ static int mlfs_ext_split(idx_struct_t *ext_idx,
             goto cleanup;
         }
         */
-        buf = MALLOC(ext_idx, get_block_size(ext_idx));
+        buf = ZALLOC(ext_idx, get_block_size(ext_idx));
 
         if (NULL == buf) {
             err = -ENOMEM;
@@ -898,7 +898,7 @@ static int mlfs_ext_grow_indepth(idx_struct_t *ext_idx, unsigned int flags)
     }
 
     //bh = fs_get_bh(handle->dev, newblock, &ret);
-    buf = MALLOC(ext_idx, get_block_size(ext_idx));
+    buf = ZALLOC(ext_idx, get_block_size(ext_idx));
     //bh = extents_bwrite(inode->i_sb, newblock);
     if (!buf) return -ENOMEM;
     //lock_buffer(bh);
@@ -1216,21 +1216,22 @@ laddr_t mlfs_ext_next_allocated_block(extent_path_t *path)
 
     depth = path->p_depth;
 
-    if (depth == 0 && path->p_ext == NULL)
+    if (depth == 0 && path->p_ext == NULL) {
         return EXT_MAX_BLOCKS;
+    }
 
     while (depth >= 0) {
         if (depth == path->p_depth) {
             /* extent (leaf) */
             if (path[depth].p_ext &&
-                    path[depth].p_ext != EXT_LAST_EXTENT(path[depth].p_hdr))
-
+                path[depth].p_ext != EXT_LAST_EXTENT(path[depth].p_hdr)) {
                 return mlfs_ext_lblock(&path[depth].p_ext[1]);
+            }
         } else {
             /* index */
-            if (path[depth].p_idx != EXT_LAST_INDEX(path[depth].p_hdr))
-
+            if (path[depth].p_idx != EXT_LAST_INDEX(path[depth].p_hdr)) {
                 return mlfs_idx_lblock(&path[depth].p_idx[1]);
+            }
         }
         depth--;
     }
@@ -2125,7 +2126,7 @@ int mlfs_ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
         while (--k > 0)
             path[k].p_block = le16_to_cpu(path[k].p_hdr->eh_entries)+1;
     } else {
-        path = (extent_path_t *)MALLOC(ext_idx,
+        path = (extent_path_t *)ZALLOC(ext_idx,
                 sizeof(extent_path_t) * (depth + 1));
 
         if (path == NULL)
@@ -2587,8 +2588,6 @@ ssize_t extent_tree_create(idx_struct_t *ext_idx, inum_t inum,
 
     if (NULL == ext_idx) return -EINVAL;
 
-find_ext_path:
-
     /* find extent for this block */
     path = mlfs_find_extent(ext_idx, laddr, NULL, 0);
     if (IS_ERR(path)) {
@@ -2651,8 +2650,8 @@ find_ext_path:
     }
     */
 
-    if (allocated > laddr)
-        allocated = laddr;
+    if (allocated > size)
+        allocated = size;
 
     ssize_t nalloc = CB(ext_idx, cb_alloc_data, allocated, &newblock);
 
