@@ -81,63 +81,48 @@ TEST_F(ExtentTreeFixture, LookupMulti) {
         ASSERT_EQ(npages - p, check_size);
     }
 }
-#if 0
 
-TEST_F(HashTableFixture, EraseSingle) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
+TEST_F(ExtentTreeFixture, RemoveSingle) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
     size_t blk_sz = BLK_SZ;
 
-    ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
-    ASSERT_GT(pblk, 0);
 
-    ssize_t check_size = hashtable_remove(&hashtable, inum, lblk, npages);
+    ssize_t check_size = extent_tree_remove(&ext_idx, inum, lblk, npages);
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = hashtable_lookup(&hashtable, inum, lblk, &check_paddr);
+    check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
 }
 
-TEST_F(HashTableFixture, EraseMulti) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
+TEST_F(ExtentTreeFixture, EraseMulti) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
     size_t blk_sz = BLK_SZ;
 
-    ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
-    ASSERT_GT(pblk, 0);
 
-    ssize_t check_size = hashtable_remove(&hashtable, inum, lblk, npages);
+    ssize_t check_size = extent_tree_remove(&ext_idx, inum, lblk, npages);
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = hashtable_lookup(&hashtable, inum, lblk, &check_paddr);
+    check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
 }
 
-TEST_F(HashTableFixture, EraseDeallocate) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
+TEST_F(ExtentTreeFixture, EraseDeallocate) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
@@ -146,18 +131,16 @@ TEST_F(HashTableFixture, EraseDeallocate) {
 
     size_t nalloced_meta_only = device.num_allocated();
 
-    ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
-    ASSERT_GT(pblk, 0);
 
-    ssize_t check_size = hashtable_remove(&hashtable, inum, lblk, npages);
+    ssize_t check_size = extent_tree_remove(&ext_idx, inum, lblk, npages);
     ASSERT_EQ(npages, check_size);
     ASSERT_EQ(nalloced_meta_only, device.num_allocated());
 
     paddr_t check_paddr = 0;
-    check_size = hashtable_lookup(&hashtable, inum, lblk, &check_paddr);
+    check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
 }
-#endif

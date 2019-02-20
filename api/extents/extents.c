@@ -2772,3 +2772,10 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
 
     return ret;
 }
+
+ssize_t extent_tree_remove(idx_struct_t *ext_idx,
+                           inum_t inum, laddr_t laddr, size_t size) {
+    int err = mlfs_ext_truncate(ext_idx, laddr, laddr + size - 1);
+    if (err) return err;
+    return size;
+}
