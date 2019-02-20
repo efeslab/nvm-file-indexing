@@ -62,7 +62,7 @@ struct MockDevice {
 
     paddr_t allocate(size_t nblocks) {
         paddr_t largest_region = -1;
-        size_t  largest_region_size = -1;
+        size_t  largest_region_size = 0;
 
         paddr_t i = 0;
         paddr_t cur = 0;
@@ -73,16 +73,26 @@ struct MockDevice {
                 cur_size = 1;
             } else if (!allocated[i]) {
                 ++cur_size;
-                if (cur_size == nblocks) break;
             } else {
+                if (cur_size > largest_region_size) {
+                    largest_region = cur;
+                    largest_region_size = cur_size;
+                }
+
                 cur_size = 0;
+            }
+
+            if (cur_size >= nblocks) {
+                largest_region = cur;
+                largest_region_size = cur_size;
+                break;
             }
 
             ++i;
         }
 
-        set_range(cur, nblocks, true);
-        return cur;
+        set_range(largest_region, largest_region_size, true);
+        return largest_region;
     }
 
     void deallocate(paddr_t block, size_t nblocks) {

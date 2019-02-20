@@ -328,7 +328,7 @@ nvm_hash_table_new (hash_func_t       hash_func,
          metadata_location);
 #endif
 
-  ht->hash_func          = hash_func ? hash_func : direct_hash;
+  ht->hash_func          = hash_func ? hash_func : nvm_idx_direct_hash;
   ht->ref_count          = 1;
   ht->nnodes             = 0;
   ht->noccupied          = 0;

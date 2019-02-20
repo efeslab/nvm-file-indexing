@@ -31,7 +31,6 @@ TEST_F(HashTableFixture, InsertSingle) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -43,7 +42,6 @@ TEST_F(HashTableFixture, InsertMulti) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -55,7 +53,6 @@ TEST_F(HashTableFixture, LookupSingle) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -72,7 +69,6 @@ TEST_F(HashTableFixture, LookupMulti) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -91,7 +87,6 @@ TEST_F(HashTableFixture, EraseSingle) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -112,7 +107,6 @@ TEST_F(HashTableFixture, EraseMulti) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -133,7 +127,6 @@ TEST_F(HashTableFixture, EraseDeallocate) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
-    size_t blk_sz = BLK_SZ;
 
     size_t nalloced_meta_only = device.num_allocated();
 

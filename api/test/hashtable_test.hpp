@@ -18,8 +18,8 @@ class HashTableFixture : public TestFixture {
             init_err = hashtable_initialize(&idx_spec, &hashtable, &metadata_loc);
         }
 
-        idx_struct_t hashtable = {0,};
+        idx_struct_t hashtable = {};
         paddr_t metadata_loc = 0;
-        int init_err;
+        int init_err = 0;
 };
 

@@ -31,7 +31,6 @@ TEST_F(ExtentTreeFixture, InsertSingle) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -69,12 +68,28 @@ TEST_F(ExtentTreeFixture, InsertFragmented) {
     ASSERT_NE(pblk1, pblk2);
 }
 
+TEST_F(ExtentTreeFixture, InsertDeep) {
+    inum_t inum   = 0;
+    size_t npages = 1000;
+
+    paddr_t prev_blk = -1;
+    for(size_t i = 0; i < npages; ++i) {
+        laddr_t lblk = (laddr_t)i;
+        paddr_t pblk;
+        ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, 1, &pblk);
+        ASSERT_EQ(1, ret);
+        ASSERT_NE(prev_blk, pblk);
+
+        prev_blk = pblk;
+        device.allocate(1);
+    }
+}
+
 TEST_F(ExtentTreeFixture, InsertRepeat) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -94,7 +109,6 @@ TEST_F(ExtentTreeFixture, LookupSingle) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -111,7 +125,6 @@ TEST_F(ExtentTreeFixture, LookupMulti) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -130,7 +143,6 @@ TEST_F(ExtentTreeFixture, RemoveSingle) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -151,7 +163,6 @@ TEST_F(ExtentTreeFixture, EraseMulti) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -172,7 +183,6 @@ TEST_F(ExtentTreeFixture, EraseDeallocate) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
-    size_t blk_sz = BLK_SZ;
 
     size_t nalloced_meta_only = device.num_allocated();
 

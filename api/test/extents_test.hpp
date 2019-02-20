@@ -7,6 +7,7 @@
 #include "gtest/gtest.h"
 
 #include "common/common.h"
+#include "extents/ext_util.h"
 #include "extents/extents.h"
 
 #include "mock_device.hpp"
@@ -29,8 +30,8 @@ class ExtentTreeFixture : public TestFixture {
             device.allocate(1);
         }
 
-        idx_struct_t ext_idx = {0,};
-        paddr_range_t inode_space;
-        int init_err;
+        idx_struct_t ext_idx = {};
+        paddr_range_t inode_space = {};
+        int init_err = 0;
 };
 
