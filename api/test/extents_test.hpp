@@ -22,6 +22,11 @@ class ExtentTreeFixture : public TestFixture {
                 .pr_nbytes     = 256
             };
             init_err = extent_tree_init(&idx_spec, &inode_space, &ext_idx);
+            // Since the per-inode extent trees don't initially allocate any
+            // space, the first data block allocated could be zero. Since this
+            // could also be an error condition, we will go ahead and allocate a
+            // dummy block here.
+            device.allocate(1);
         }
 
         idx_struct_t ext_idx = {0,};
