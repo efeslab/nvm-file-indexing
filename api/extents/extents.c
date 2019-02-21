@@ -158,14 +158,23 @@ int extent_tree_init(const idx_spec_t *idx_spec,
             (ents_root * sizeof(extent_leaf_t)) + sizeof(extent_header_t));
     if (NULL == ext_meta->et_direct_data) return -ENOMEM;
 
+    ssize_t nmeta = CB(ext_idx, cb_read,
+                       ext_meta->et_direct_range.pr_start,
+                       ext_meta->et_direct_range.pr_blk_offset,
+                       ext_meta->et_direct_range.pr_nbytes,
+                       ext_meta->et_direct_data);
+    if(nmeta != ext_meta->et_direct_range.pr_nbytes) return -EIO;
+
     EXTHDR(ext_meta, eh);
 
-    eh->eh_depth = 0;
-    eh->eh_entries = 0;
-    eh->eh_magic = cpu_to_le16(EXT_MAGIC);
-    eh->eh_max = cpu_to_le16(ents_root);
+    if (eh->eh_magic != cpu_to_le16(EXT_MAGIC)) {
+        eh->eh_depth = 0;
+        eh->eh_entries = 0;
+        eh->eh_magic = cpu_to_le16(EXT_MAGIC);
+        eh->eh_max = cpu_to_le16(ents_root);
 
-    if (write_ext_direct_data(ext_idx)) return -EIO;
+        if (write_ext_direct_data(ext_idx)) return -EIO;
+    }
 
     return 0;
 }
@@ -303,9 +312,17 @@ int __ext_dirty(const char *where, unsigned int line,
         /* path points to block */
         extent_block_csum_set(ext_idx, ext_header_from_block(path->p_raw));
         //fs_mark_buffer_dirty(path->p_bh);
+        //TODO: Optimize
+        ssize_t nwrite = CB(ext_idx, cb_write,
+                            path->p_block,
+                            0,
+                            device_block_size(ext_idx),
+                            path->p_raw);
+        if (nwrite != device_block_size(ext_idx)) err = -EIO;
     } else {
         /* path points to leaf/index in inode body */
         //err = mark_inode_dirty(ext_idx);
+        err = write_ext_direct_data(ext_idx);
     }
 
 #ifdef REUSE_PREVIOUS_PATH

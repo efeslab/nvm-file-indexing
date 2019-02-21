@@ -1,12 +1,13 @@
 #include "extents_test.hpp"
 
+#include <iostream>
+using namespace std;
 
 /*******************************************************************************
  * Section: Hashtable correctness tests.
  *
  * Here is where we make sure the hashtable functions properly.
  ******************************************************************************/
-
 /*
  * HashTable initialization tests.
  */
@@ -35,6 +36,26 @@ TEST_F(ExtentTreeFixture, InsertSingle) {
     ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
+}
+
+TEST_F(ExtentTreeFixture, InsertPersist) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    idx_struct_t new_ext = {};
+    int err = extent_tree_init(&idx_spec, &inode_space, &new_ext);
+
+    EXTMETA(&ext_idx, ext_meta);
+    EXTMETA(&new_ext, new_meta);
+    ASSERT_EQ(0, strncmp((char*)new_meta->et_direct_data,
+                         (char*)ext_meta->et_direct_data,
+                         inode_space.pr_nbytes));
 }
 
 TEST_F(ExtentTreeFixture, InsertMulti) {

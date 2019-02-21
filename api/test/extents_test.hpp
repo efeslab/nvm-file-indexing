@@ -22,6 +22,7 @@ class ExtentTreeFixture : public TestFixture {
                 .pr_blk_offset = 0,
                 .pr_nbytes     = 256
             };
+
             init_err = extent_tree_init(&idx_spec, &inode_space, &ext_idx);
             // Since the per-inode extent trees don't initially allocate any
             // space, the first data block allocated could be zero. Since this
@@ -30,8 +31,15 @@ class ExtentTreeFixture : public TestFixture {
             device.allocate(1);
         }
 
+        void TearDown() override {
+            TestFixture::TearDown();
+            // Deallocate all blocks to reset everything.
+            device.deallocate();
+        }
+
         idx_struct_t ext_idx = {};
         paddr_range_t inode_space = {};
         int init_err = 0;
 };
 
+bool operator== (const idx_struct_t& lhs, const idx_struct_t& rhs);

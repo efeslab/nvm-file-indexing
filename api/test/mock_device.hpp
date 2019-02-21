@@ -57,6 +57,9 @@ struct MockDevice {
         for (paddr_t i = block; i < block + nblocks; ++i) {
             ASSERT_NE(allocated[i], is_allocated);
             allocated[i] = is_allocated;
+            if (!is_allocated) {
+                memset(device[i].data(), 0, device[i].size());
+            }
         }
     }
 
@@ -97,6 +100,14 @@ struct MockDevice {
 
     void deallocate(paddr_t block, size_t nblocks) {
         set_range(block, nblocks, false);
+    }
+
+    void deallocate() {
+        for (int i = 0; i < device.size(); ++i) {
+            if (allocated[i]) {
+                deallocate(i, 1);
+            }
+        }
     }
 
     size_t num_allocated() const {
