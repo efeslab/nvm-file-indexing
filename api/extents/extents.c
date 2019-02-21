@@ -303,23 +303,25 @@ static paddr_t ext_find_goal(idx_struct_t *ext_idx,
 }
 
 int __ext_dirty(const char *where, unsigned int line,
-                     idx_struct_t *ext_idx,
-                     extent_path_t *path)
+                idx_struct_t *ext_idx,
+                extent_path_t *path)
 {
     int err = 0;
 
     if (path->p_raw) {
+        //printf("write block %lu\n", path->p_pblk);
         /* path points to block */
         extent_block_csum_set(ext_idx, ext_header_from_block(path->p_raw));
         //fs_mark_buffer_dirty(path->p_bh);
-        //TODO: Optimize
+
         ssize_t nwrite = CB(ext_idx, cb_write,
-                            path->p_block,
+                            path->p_pblk,
                             0,
                             device_block_size(ext_idx),
                             path->p_raw);
         if (nwrite != device_block_size(ext_idx)) err = -EIO;
     } else {
+        //printf("write direct\n");
         /* path points to leaf/index in inode body */
         //err = mark_inode_dirty(ext_idx);
         err = write_ext_direct_data(ext_idx);
@@ -520,6 +522,7 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
 
         //path[ppos].p_bh = bh;
         path[ppos].p_raw = buf;
+        path[ppos].p_pblk = path[ppos-1].p_block;
         path[ppos].p_hdr = eh;
     }
 
@@ -673,6 +676,7 @@ static int ext_split(idx_struct_t *ext_idx,
         if (newblock == 0 || nalloc < 1) {
             goto cleanup;
         }
+        //printf("block %lu is now metadata!\n", newblock);
 
         ablocks[a] = newblock;
     }
@@ -916,6 +920,7 @@ static int ext_grow_indepth(idx_struct_t *ext_idx, unsigned int flags)
     if (nalloc < count || newblock == 0) {
         return nalloc;
     }
+    //printf("block %lu is now metadata!\n", newblock);
 
     //bh = fs_get_bh(handle->dev, newblock, &ret);
     buf = ZALLOC(ext_idx, device_block_size(ext_idx));
@@ -2216,6 +2221,8 @@ int ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
                 break;
             }
             path[i + 1].p_raw = buf;
+            path[i + 1].p_pblk = idx_pblock(path[i].p_idx);
+
 
             /* put actual number of indexes to know is this
              * number got changed at the next iteration */

@@ -2,6 +2,7 @@
 #define __NVM_IDX_EXTENTS_H__
 
 #include "common/common.h"
+#include "ext_types.h"
 
 #ifdef __cplusplus
 extern "C" {

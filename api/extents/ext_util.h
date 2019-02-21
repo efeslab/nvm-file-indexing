@@ -8,6 +8,8 @@ extern "C" {
 
 #include "common/common.h"
 
+#include "ext_types.h"
+
 uint32_t crc32c(uint32_t crc, const void *buf, size_t size);
 
 /* ERRORs
@@ -77,11 +79,6 @@ typedef struct nvm_api_extent_header {
  * API Data Structures
  */
 
-typedef struct nvm_api_extent_tree_metadata {
-    paddr_range_t et_direct_range;
-    // could be extent leaf or branch node
-    void* et_direct_data;
-} ext_meta_t;
 
 #define EXTMETA(i, n) ext_meta_t *(n) = (ext_meta_t*)(i)->idx_metadata
 #define EXTHDR(m, n)  extent_header_t *(n) = (extent_header_t*)((m)->et_direct_data)
@@ -115,6 +112,7 @@ typedef struct ext_path {
     extent_branch_t *p_idx;
     extent_header_t *p_hdr;
     char *p_raw;
+    paddr_t p_pblk;
 } extent_path_t;
 
 /*
