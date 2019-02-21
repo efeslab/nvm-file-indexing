@@ -24,6 +24,6 @@ typedef struct indexing_structure {
 #define FN(i, c, ...) (i)->idx_fns->c(__VA_ARGS__)
 #define MALLOC(i, s)  (i)->idx_mem_man->mm_malloc(s)
 #define FREE(i, p)    (i)->idx_mem_man->mm_free(p)
-
+#define ZALLOC(i, s)  memset(MALLOC(i, s), 0, (s))
 
 #endif  // __NVMIDX_GLOBAL_H__

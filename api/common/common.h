@@ -1,7 +1,17 @@
 #ifndef __NVMIDX_COMMON_COMMON_H__
 #define __NVMIDX_COMMON_COMMON_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "indexing_structure.h"
+#include "util.h"
+#include "kerncompat.h"
+
+#ifdef __cplusplus
+}
+#endif
 
 /*
  * Function Macros (for convenience)

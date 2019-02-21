@@ -57,12 +57,15 @@ struct MockDevice {
         for (paddr_t i = block; i < block + nblocks; ++i) {
             ASSERT_NE(allocated[i], is_allocated);
             allocated[i] = is_allocated;
+            if (!is_allocated) {
+                memset(device[i].data(), 0, device[i].size());
+            }
         }
     }
 
     paddr_t allocate(size_t nblocks) {
         paddr_t largest_region = -1;
-        size_t  largest_region_size = -1;
+        size_t  largest_region_size = 0;
 
         paddr_t i = 0;
         paddr_t cur = 0;
@@ -73,20 +76,38 @@ struct MockDevice {
                 cur_size = 1;
             } else if (!allocated[i]) {
                 ++cur_size;
-                if (cur_size == nblocks) break;
             } else {
+                if (cur_size > largest_region_size) {
+                    largest_region = cur;
+                    largest_region_size = cur_size;
+                }
+
                 cur_size = 0;
+            }
+
+            if (cur_size >= nblocks) {
+                largest_region = cur;
+                largest_region_size = cur_size;
+                break;
             }
 
             ++i;
         }
 
-        set_range(cur, nblocks, true);
-        return cur;
+        set_range(largest_region, largest_region_size, true);
+        return largest_region;
     }
 
     void deallocate(paddr_t block, size_t nblocks) {
         set_range(block, nblocks, false);
+    }
+
+    void deallocate() {
+        for (int i = 0; i < device.size(); ++i) {
+            if (allocated[i]) {
+                deallocate(i, 1);
+            }
+        }
     }
 
     size_t num_allocated() const {

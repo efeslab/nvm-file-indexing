@@ -33,8 +33,6 @@ extern "C" {
 
 // from common
 #include "common/common.h"
-#include "common/util.h"
-#include "common/bitops.h"
 
 // local includes
 #include "hash_functions.h"
@@ -288,7 +286,7 @@ nvm_write_metadata(nvm_hash_idx_t *ht) {
 static inline void
 nvm_update(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t* val) {
     paddr_t paddr = ht->data + BLK_NUM(ht, idx);
-    size_t size   = sizeof(*val);
+    ssize_t size  = sizeof(*val);
     off_t offset  = BLK_IDX(ht, idx) * size;
 
     ssize_t ret = ht->callbacks->cb_write(paddr, offset, size, (char*)val);

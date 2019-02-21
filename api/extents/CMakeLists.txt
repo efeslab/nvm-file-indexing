@@ -5,10 +5,10 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 include_directories("..")
 
-file(GLOB hashtable_src
+file(GLOB extents_src
     "*.h"
     "*.c"
 )
 
-add_library(HashTable OBJECT ${hashtable_src})
-set_property(TARGET HashTable PROPERTY POSITION_INDEPENDENT_CODE ON)
+add_library(ExtentTree OBJECT ${extents_src})
+set_property(TARGET ExtentTree PROPERTY POSITION_INDEPENDENT_CODE ON)

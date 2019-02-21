@@ -20,6 +20,9 @@ typedef struct indexing_structure_specification idx_spec_t;
 
 typedef int (*init_structure_fn_t)(const idx_spec_t*, idx_struct_t*, paddr_t*);
 
+// Pre-alloc doesn't mean it can't grow, but rather this is where the metadata should live.
+typedef int (*init_struct_prealloc_fn_t)(const idx_spec_t*, const paddr_range_t*, idx_struct_t*);
+
 /*******************************************************************************
  * Section: General operations
  *
@@ -60,10 +63,11 @@ int clear_caches();
  ******************************************************************************/
 
 typedef struct indexing_functions {
-    init_structure_fn_t im_init;
-    lookup_index_fn_t im_lookup;
-    create_index_fn_t im_create;
-    remove_index_fn_t im_remove;
+    init_structure_fn_t       im_init;
+    init_struct_prealloc_fn_t im_init_prealloc;
+    lookup_index_fn_t         im_lookup;
+    create_index_fn_t         im_create;
+    remove_index_fn_t         im_remove;
 } idx_fns_t;
 
 #endif  // __INDEXING_METHODS_H__

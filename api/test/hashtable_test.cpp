@@ -2,35 +2,6 @@
 
 using namespace std;
 
-MockDevice HashTableFixture::device =
-            MockDevice(HashTableFixture::NBLK, HashTableFixture::BLK_SZ);
-const size_t HashTableFixture::NBLK   = 1024 * 1024;
-const size_t HashTableFixture::BLK_SZ = 4096;
-
-/*******************************************************************************
- * Section: Fixture correctness tests.
- *
- * Sanity checks to make sure that the callback methods aren't buggy, etc.
- ******************************************************************************/
-
-TEST_F(HashTableFixture, SetUpAndTearDown) {
-    ASSERT_NE(idx_spec.idx_mem_man, nullptr)   << "Allocation failed";
-    ASSERT_NE(idx_spec.idx_callbacks, nullptr) << "Allocation failed";
-}
-
-TEST_F(HashTableFixture, MockMemoryCallbacks) {
-    void* mem = idx_spec.idx_mem_man->mm_malloc(1024);
-    ASSERT_NE(mem, nullptr);
-    idx_spec.idx_mem_man->mm_free(mem);
-}
-
-TEST_F(HashTableFixture, MockPersistentCallbacks) {
-    void* mem = idx_spec.idx_mem_man->mm_malloc(1024);
-    ASSERT_NE(mem, nullptr);
-    idx_spec.idx_mem_man->mm_free(mem);
-}
-
-
 /*******************************************************************************
  * Section: Hashtable correctness tests.
  *
@@ -42,22 +13,12 @@ TEST_F(HashTableFixture, MockPersistentCallbacks) {
  */
 
 TEST_F(HashTableFixture, InitNew) {
-    idx_struct_t hashtable = {0,};
-    paddr_t metadata_loc = 0;
-    ASSERT_EQ(hashtable.idx_metadata, nullptr);
-    hashtable_initialize(&idx_spec, &hashtable, &metadata_loc);
     ASSERT_NE(hashtable.idx_metadata, nullptr);
     ASSERT_LT(metadata_loc, NBLK);
+    ASSERT_EQ(0, init_err);
 }
 
 TEST_F(HashTableFixture, InitExists) {
-    idx_struct_t hashtable = {0,};
-    paddr_t metadata_loc = 0;
-    ASSERT_EQ(hashtable.idx_metadata, nullptr);
-    int ret = hashtable_initialize(&idx_spec, &hashtable, &metadata_loc);
-    ASSERT_NE(hashtable.idx_metadata, nullptr);
-    ASSERT_FALSE(ret);
-
     idx_struct_t hash_copy = hashtable;
     ASSERT_NE(hash_copy.idx_metadata, nullptr);
     int err = hashtable_initialize(&idx_spec, &hash_copy, &metadata_loc);
@@ -66,15 +27,10 @@ TEST_F(HashTableFixture, InitExists) {
 }
 
 TEST_F(HashTableFixture, InsertSingle) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -82,15 +38,10 @@ TEST_F(HashTableFixture, InsertSingle) {
 }
 
 TEST_F(HashTableFixture, InsertMulti) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -98,15 +49,10 @@ TEST_F(HashTableFixture, InsertMulti) {
 }
 
 TEST_F(HashTableFixture, LookupSingle) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -119,15 +65,10 @@ TEST_F(HashTableFixture, LookupSingle) {
 }
 
 TEST_F(HashTableFixture, LookupMulti) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -142,15 +83,10 @@ TEST_F(HashTableFixture, LookupMulti) {
 }
 
 TEST_F(HashTableFixture, EraseSingle) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -167,15 +103,10 @@ TEST_F(HashTableFixture, EraseSingle) {
 }
 
 TEST_F(HashTableFixture, EraseMulti) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
-    size_t blk_sz = BLK_SZ;
 
     ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -192,15 +123,10 @@ TEST_F(HashTableFixture, EraseMulti) {
 }
 
 TEST_F(HashTableFixture, EraseDeallocate) {
-    idx_struct_t hashtable = {0,};
-    paddr_t _unused = 0;
-    hashtable_initialize(&idx_spec, &hashtable, &_unused);
-
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 20;
-    size_t blk_sz = BLK_SZ;
 
     size_t nalloced_meta_only = device.num_allocated();
 

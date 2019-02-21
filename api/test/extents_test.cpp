@@ -1,0 +1,268 @@
+#include "extents_test.hpp"
+
+#include <iostream>
+using namespace std;
+
+/*******************************************************************************
+ * Section: Hashtable correctness tests.
+ *
+ * Here is where we make sure the hashtable functions properly.
+ ******************************************************************************/
+/*
+ * HashTable initialization tests.
+ */
+
+TEST_F(ExtentTreeFixture, InitNew) {
+    ASSERT_NE(nullptr, ext_idx.idx_metadata);
+    ASSERT_EQ(0, init_err);
+
+    EXTMETA(&ext_idx, ext_meta);
+    ASSERT_NE(nullptr, ext_meta->et_direct_data);
+}
+
+TEST_F(ExtentTreeFixture, InitExists) {
+    idx_struct_t ext_copy = ext_idx;
+    int err = extent_tree_init(&idx_spec, &inode_space, &ext_copy);
+    ASSERT_NE(0, err);
+    ASSERT_EQ(0, strncmp((char*)&ext_copy, (char*)&ext_idx, sizeof(ext_idx)));
+}
+
+TEST_F(ExtentTreeFixture, InsertSingle) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+}
+
+TEST_F(ExtentTreeFixture, InsertPersist) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    idx_struct_t new_ext = {};
+    int err = extent_tree_init(&idx_spec, &inode_space, &new_ext);
+
+    EXTMETA(&ext_idx, ext_meta);
+    EXTMETA(&new_ext, new_meta);
+    ASSERT_EQ(0, strncmp((char*)new_meta->et_direct_data,
+                         (char*)ext_meta->et_direct_data,
+                         inode_space.pr_nbytes));
+}
+
+TEST_F(ExtentTreeFixture, InsertMulti) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 20;
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+}
+
+TEST_F(ExtentTreeFixture, InsertFragmented) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk1 = 0;
+    paddr_t pblk2 = 0;
+    size_t npages = 1;
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk1);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk1, 0);
+
+    device.allocate(1);
+
+    ret = extent_tree_create(&ext_idx, inum, lblk + 1, npages, &pblk2);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk2, 0);
+
+    ASSERT_NE(pblk1, pblk2);
+}
+
+TEST_F(ExtentTreeFixture, InsertDeep) {
+    inum_t inum   = 0;
+    size_t npages = 1000;
+
+    paddr_t prev_blk = -1;
+    for(size_t i = 0; i < npages; ++i) {
+        laddr_t lblk = (laddr_t)i;
+        paddr_t pblk;
+        ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, 1, &pblk);
+        ASSERT_EQ(1, ret);
+        ASSERT_NE(prev_blk, pblk);
+
+        prev_blk = pblk;
+        device.allocate(1);
+    }
+}
+
+TEST_F(ExtentTreeFixture, InsertDeepPersist) {
+    inum_t inum   = 0;
+    size_t npages = 1000;
+
+    paddr_t prev_blk = -1;
+    for(size_t i = 0; i < npages; ++i) {
+        laddr_t lblk = (laddr_t)i;
+        paddr_t pblk;
+        ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, 1, &pblk);
+        ASSERT_EQ(1, ret);
+        ASSERT_NE(prev_blk, pblk);
+
+        prev_blk = pblk;
+        device.allocate(1);
+    }
+
+    idx_struct_t new_ext = {};
+    int err = extent_tree_init(&idx_spec, &inode_space, &new_ext);
+    for(size_t i = 0; i < npages; ++i) {
+        laddr_t lblk = (laddr_t)i;
+        paddr_t pblk;
+        ssize_t ret = extent_tree_lookup(&new_ext, inum, lblk, &pblk);
+        ASSERT_EQ(1, ret);
+    }
+}
+
+TEST_F(ExtentTreeFixture, InsertRepeat) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    size_t nalloced_total = device.num_allocated();
+
+    ssize_t err = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, err);
+    ASSERT_GT(pblk, 0);
+    ASSERT_EQ(nalloced_total, device.num_allocated()) <<
+        "Error: new blocks mistakenly allocated for existing logical block.";
+}
+
+TEST_F(ExtentTreeFixture, LookupSingle) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    paddr_t check_paddr;
+    ssize_t check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
+    ASSERT_EQ(pblk, check_paddr);
+    ASSERT_EQ(npages, check_size);
+}
+
+TEST_F(ExtentTreeFixture, LookupMulti) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 20;
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    for (size_t p = 0; p < npages; ++p) {
+        paddr_t check_paddr;
+        ssize_t check_size = extent_tree_lookup(&ext_idx, inum, lblk + p, &check_paddr);
+        ASSERT_EQ(pblk + p, check_paddr);
+        ASSERT_EQ(npages - p, check_size);
+    }
+}
+
+TEST_F(ExtentTreeFixture, RemoveSingle) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    ssize_t check_size = extent_tree_remove(&ext_idx, inum, lblk, npages);
+    ASSERT_EQ(npages, check_size);
+
+    paddr_t check_paddr = 0;
+    check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
+    ASSERT_NE(pblk, check_paddr);
+    ASSERT_NE(npages, check_size);
+    ASSERT_LE(check_size, 0);
+}
+
+TEST_F(ExtentTreeFixture, EraseMulti) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 20;
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    ssize_t check_size = extent_tree_remove(&ext_idx, inum, lblk, npages);
+    ASSERT_EQ(npages, check_size);
+
+    paddr_t check_paddr = 0;
+    check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
+    ASSERT_NE(pblk, check_paddr);
+    ASSERT_NE(npages, check_size);
+    ASSERT_LE(check_size, 0);
+}
+
+TEST_F(ExtentTreeFixture, EraseDeep) {
+    inum_t inum   = 0;
+    size_t npages = 1000;
+
+    paddr_t prev_blk = -1;
+    for(size_t i = 0; i < npages; ++i) {
+        laddr_t lblk = (laddr_t)i;
+        paddr_t pblk;
+        ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, 1, &pblk);
+        ASSERT_EQ(1, ret);
+        ASSERT_NE(prev_blk, pblk);
+
+        prev_blk = pblk;
+        device.allocate(1);
+    }
+
+    ssize_t check_size = extent_tree_remove(&ext_idx, inum, 0, npages);
+    ASSERT_EQ(npages, check_size);
+}
+TEST_F(ExtentTreeFixture, EraseDeallocate) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 20;
+
+    size_t nalloced_meta_only = device.num_allocated();
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    ssize_t check_size = extent_tree_remove(&ext_idx, inum, lblk, npages);
+    ASSERT_EQ(npages, check_size);
+    ASSERT_EQ(nalloced_meta_only, device.num_allocated());
+
+    paddr_t check_paddr = 0;
+    check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
+    ASSERT_NE(pblk, check_paddr);
+    ASSERT_NE(npages, check_size);
+    ASSERT_LE(check_size, 0);
+}
