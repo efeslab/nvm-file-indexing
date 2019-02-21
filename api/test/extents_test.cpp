@@ -225,6 +225,25 @@ TEST_F(ExtentTreeFixture, EraseMulti) {
     ASSERT_LE(check_size, 0);
 }
 
+TEST_F(ExtentTreeFixture, EraseDeep) {
+    inum_t inum   = 0;
+    size_t npages = 1000;
+
+    paddr_t prev_blk = -1;
+    for(size_t i = 0; i < npages; ++i) {
+        laddr_t lblk = (laddr_t)i;
+        paddr_t pblk;
+        ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, 1, &pblk);
+        ASSERT_EQ(1, ret);
+        ASSERT_NE(prev_blk, pblk);
+
+        prev_blk = pblk;
+        device.allocate(1);
+    }
+
+    ssize_t check_size = extent_tree_remove(&ext_idx, inum, 0, npages);
+    ASSERT_EQ(npages, check_size);
+}
 TEST_F(ExtentTreeFixture, EraseDeallocate) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
