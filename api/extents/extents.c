@@ -93,13 +93,15 @@ static inline int ext_space_block_idx(idx_struct_t *ext_idx)
 static inline ssize_t ext_space_root(const idx_struct_t *ext_idx)
 {
     EXTMETA(ext_idx, ext_meta);
-    return ext_meta->et_direct_range.pr_nbytes / sizeof(extent_leaf_t);
+    return (ext_meta->et_direct_range.pr_nbytes - sizeof(extent_header_t))
+            / sizeof(extent_leaf_t);
 }
 
 static inline int ext_space_root_idx(const idx_struct_t *ext_idx)
 {
     EXTMETA(ext_idx, ext_meta);
-    return ext_meta->et_direct_range.pr_nbytes / sizeof(extent_branch_t);
+    return (ext_meta->et_direct_range.pr_nbytes - sizeof(extent_header_t))
+            / sizeof(extent_branch_t);
 }
 
 static int ext_max_entries(idx_struct_t *ext_idx, int depth)
@@ -152,7 +154,9 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     ext_meta->et_direct_range = *direct_ents;
 
     size_t ents_root = ext_space_root(ext_idx);
-    ext_meta->et_direct_data = ZALLOC(idx_spec, ents_root * sizeof(extent_leaf_t));
+    ext_meta->et_direct_data = ZALLOC(idx_spec,
+            (ents_root * sizeof(extent_leaf_t)) + sizeof(extent_header_t));
+    if (NULL == ext_meta->et_direct_data) return -ENOMEM;
 
     EXTHDR(ext_meta, eh);
 
@@ -161,7 +165,7 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     eh->eh_magic = cpu_to_le16(EXT_MAGIC);
     eh->eh_max = cpu_to_le16(ents_root);
 
-    if (NULL == ext_meta->et_direct_data) return -ENOMEM;
+    if (write_ext_direct_data(ext_idx)) return -EIO;
 
     return 0;
 }
@@ -330,7 +334,7 @@ void ext_drop_refs(idx_struct_t *ext_idx, extent_path_t *path)
  * is correct or not.
  */
 static int ext_check(idx_struct_t *ext_idx, extent_header_t *eh,
-        int depth, paddr_t pblk)
+                     int depth, paddr_t pblk)
 {
     extent_tail_t *tail;
     const char *error_msg;
@@ -373,8 +377,9 @@ static void ext_binsearch_idx(idx_struct_t *ext_idx,
                                    extent_path_t *path,
                                    laddr_t block)
 {
-    EXTMETA(ext_idx, ext_meta);
-    EXTHDR(ext_meta, eh);
+    //EXTMETA(ext_idx, ext_meta);
+    //EXTHDR(ext_meta, eh);
+    extent_header_t *eh = path->p_hdr;
     extent_branch_t *r, *l, *m;
 
     l = EXT_FIRST_INDEX(eh) + 1;
@@ -400,9 +405,9 @@ static void ext_binsearch_idx(idx_struct_t *ext_idx,
 static void ext_binsearch(idx_struct_t *ext_idx, extent_path_t *path,
                           laddr_t block)
 {
-    EXTMETA(ext_idx, ext_meta);
-    EXTHDR(ext_meta, eh);
-    //extent_header_t *eh = path->p_hdr;
+    //EXTMETA(ext_idx, ext_meta);
+    //EXTHDR(ext_meta, eh);
+    extent_header_t *eh = path->p_hdr;
     extent_leaf_t *r, *l, *m;
 
     if (eh->eh_entries == 0) {
@@ -432,7 +437,7 @@ static void ext_binsearch(idx_struct_t *ext_idx, extent_path_t *path,
  * path[0] is root of the tree (stored in inode->i_data)
  */
 extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
-                                extent_path_t **orig_path, int flags)
+                           extent_path_t **orig_path, int flags)
 {
     //struct buffer_head *bh;
     char *buf;
@@ -910,8 +915,7 @@ static int ext_grow_indepth(idx_struct_t *ext_idx, unsigned int flags)
     /* move top-level index/leaf into new block */
     //memmove(bh->b_data, inode->i_data, sizeof(inode->l1.i_data));
     //memmove(bh->b_data, ext_header(ext_idx), sizeof(inode->l1.i_data));
-    memmove(buf, ext_header(ext_idx),
-            ext_meta->et_direct_range.pr_nbytes / sizeof(extent_leaf_t));
+    memmove(buf, ext_header(ext_idx), ext_meta->et_direct_range.pr_nbytes);
 
     /* set size of new block */
     neh = ext_header_from_block(buf);
@@ -924,6 +928,10 @@ static int ext_grow_indepth(idx_struct_t *ext_idx, unsigned int flags)
     }
     neh->eh_magic = cpu_to_le16(EXT_MAGIC);
     extent_block_csum_set(ext_idx, neh);
+
+    ssize_t nwrite = CB(ext_idx, cb_write,
+                        newblock, 0, device_block_size(ext_idx), buf);
+    if_then_panic(nwrite != device_block_size(ext_idx), "wat");
     /*
     set_buffer_uptodate(bh);
     unlock_buffer(bh);
@@ -943,6 +951,7 @@ static int ext_grow_indepth(idx_struct_t *ext_idx, unsigned int flags)
     }
 
     le16_add_cpu(&neh->eh_depth, 1);
+    err = write_ext_direct_data(ext_idx);
     //mark_inode_dirty(inode);
 out:
     //fs_brelse(bh);
@@ -997,7 +1006,7 @@ repeat:
 
         /* refill path */
         path = find_extent(ext_idx, ext_lblock(newext),
-                ppath, gb_flags);
+                           ppath, gb_flags);
         if (IS_ERR(path)) {
             err = PTR_ERR(path);
             goto out;
@@ -1490,7 +1499,7 @@ static void ext_try_to_merge(idx_struct_t *ext_idx,
  * creating new leaf in the no-space case.
  */
 int ext_insert_extent(idx_struct_t *ext_idx, extent_path_t **ppath,
-                           extent_leaf_t *newext, int gb_flags)
+                      extent_leaf_t *newext, int gb_flags)
 {
     extent_path_t *path = *ppath;
     extent_header_t *eh;

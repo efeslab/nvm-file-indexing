@@ -68,7 +68,7 @@ _Static_assert(sizeof(extent_branch_t) == sizeof(extent_leaf_t),
 typedef struct nvm_api_extent_header {
     uint16_t eh_magic;      /* probably will support different formats */
     uint16_t eh_entries;    /* number of valid entries */
-    uint16_t eh_max;    /* capacity of store in entries */
+    uint16_t eh_max;        /* capacity of store in entries */
     uint16_t eh_depth;      /* has tree real underlying blocks? */
     uint32_t eh_generation; /* generation of the tree */
 } extent_header_t;
@@ -79,13 +79,12 @@ typedef struct nvm_api_extent_header {
 
 typedef struct nvm_api_extent_tree_metadata {
     paddr_range_t et_direct_range;
-    extent_header_t et_direct_header;
     // could be extent leaf or branch node
     void* et_direct_data;
 } ext_meta_t;
 
 #define EXTMETA(i, n) ext_meta_t *(n) = (ext_meta_t*)(i)->idx_metadata
-#define EXTHDR(m, n)  extent_header_t *(n) = &((m)->et_direct_header)
+#define EXTHDR(m, n)  extent_header_t *(n) = (extent_header_t*)((m)->et_direct_data)
 
 #define EXT_MAGIC (0xf30a)
 
@@ -227,6 +226,25 @@ static inline extent_header_t *ext_header(const idx_struct_t *ext_idx)
 {
     EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, eh);
     return eh;
+}
+
+static inline int write_ext_direct_data(const idx_struct_t *ext_idx)
+{
+    EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, eh);
+    ssize_t nbytes = CB(ext_idx, cb_write,
+                        ext_meta->et_direct_range.pr_start,
+                        ext_meta->et_direct_range.pr_blk_offset,
+                        ext_meta->et_direct_range.pr_nbytes,
+                        (char*)ext_meta->et_direct_data);
+    if (nbytes != ext_meta->et_direct_range.pr_nbytes) {
+        printf("nbytes = %lu, but wrote %lu\n",
+                ext_meta->et_direct_range.pr_nbytes,
+                nbytes);
+        fflush(stdout);
+        return -EIO;
+    }
+
+    return 0;
 }
 
 static inline extent_header_t *ext_header_from_block(char *buf)
