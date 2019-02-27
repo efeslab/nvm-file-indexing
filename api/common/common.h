@@ -8,6 +8,7 @@ extern "C" {
 #include "indexing_structure.h"
 #include "util.h"
 #include "kerncompat.h"
+#include "stats.h"
 
 #ifdef __cplusplus
 }

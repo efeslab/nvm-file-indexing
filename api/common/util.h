@@ -13,15 +13,16 @@
 
 void _panic(void);
 
-#define panic(str) \
+#define panic(str, ...) \
     do { \
-        fprintf(stdout, "%s:%d %s(): %s\n",  \
-                __FILE__, __LINE__, __func__, str); \
+        fprintf(stdout, "%s:%d %s(): ",  \
+                __FILE__, __LINE__, __func__); \
+        fprintf(stdout, str, ## __VA_ARGS__); \
         fflush(stdout); \
         GDB_TRAP; \
         _panic(); \
     } while (0)
 
-#define if_then_panic(a, str) if (1 == (a)) panic(str)
+#define if_then_panic(a, str, ...) if (1 == (a)) panic(str, ## __VA_ARGS__)
 
 #endif

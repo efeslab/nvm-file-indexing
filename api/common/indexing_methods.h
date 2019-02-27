@@ -1,6 +1,7 @@
 #ifndef __NVMIDX_COMMON_INDEXING_METHODS_H__
 #define __NVMIDX_COMMON_INDEXING_METHODS_H__
 
+#include <stdbool.h>
 #include "types.h"
 
 /*******************************************************************************
@@ -57,6 +58,9 @@ int clear_caches();
  * Functions for monitoring performance and profiling structures.
  */
 
+typedef void (*set_stats_t)(idx_struct_t*, bool);
+typedef void (*print_stats_t)(idx_struct_t*);
+
 
 /*******************************************************************************
  * Section: Data Types
@@ -68,6 +72,8 @@ typedef struct indexing_functions {
     lookup_index_fn_t         im_lookup;
     create_index_fn_t         im_create;
     remove_index_fn_t         im_remove;
+    set_stats_t               im_set_stats;
+    print_stats_t             im_print_stats;
 } idx_fns_t;
 
 #endif  // __INDEXING_METHODS_H__

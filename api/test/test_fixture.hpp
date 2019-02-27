@@ -16,6 +16,8 @@ class TestFixture : public ::testing::Test {
         static const size_t BLK_SZ;
         static MockDevice device;
 
+        static void set_restricted_data_alloc(bool enable) { enable_ = enable; }
+
         static int mock_get_dev_info(device_info_t* di);
 
         static ssize_t mock_alloc_metadata(size_t nblocks, paddr_t *blk);
@@ -36,5 +38,7 @@ class TestFixture : public ::testing::Test {
         virtual void TearDown() override;
 
         idx_spec_t idx_spec;
+
+        static bool enable_;
 };
 
