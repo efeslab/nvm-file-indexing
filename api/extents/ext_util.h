@@ -61,8 +61,10 @@ typedef struct nvm_api_extent_idx {
     uint16_t ei_unused;
 } extent_branch_t;
 
+#if 0
 _Static_assert(sizeof(extent_branch_t) == sizeof(extent_leaf_t),
                "Must be the same size!");
+#endif
 
 /*
  * Each block (leaves and indexes), even inode-stored has header.
@@ -386,6 +388,10 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
                            extent_path_t **orig_path, int flags);
 
 int ext_truncate(idx_struct_t *ext_idx, laddr_t from, laddr_t to);
+
+void extent_tree_set_stats(idx_struct_t *ext_idx, bool enable);
+
+void extent_tree_print_stats(idx_struct_t *ext_idx);
 
 #ifdef __cplusplus
 }

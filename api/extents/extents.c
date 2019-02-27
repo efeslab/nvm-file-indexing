@@ -21,43 +21,6 @@
 
 #define BUG_ON(x) 0
 
-#if 0
-static struct inode *__buffer_search(struct rb_root *root,
-                       uint32_t inum)
-{
-    struct rb_node *_new = root->rb_node;
-
-    /* Figure out where to put new node */
-    while (_new) {
-        struct inode *ip =
-            container_of(_new, struct inode, i_rb_node);
-        int64_t result = inum - ip->inum;
-
-        if (result < 0)
-            _new = _new->rb_left;
-        else if (result > 0)
-            _new = _new->rb_right;
-        else
-            return ip;
-    }
-
-    return NULL;
-}
-
-static int inode_cmp(struct rb_node *a, struct rb_node *b)
-{
-    struct inode *a_inode, *b_inode;
-    a_inode = container_of(a, struct inode, i_rb_node);
-    b_inode = container_of(b, struct inode, i_rb_node);
-
-    if (a_inode->inum < b_inode->inum)
-        return -1;
-    else if (a_inode->inum > b_inode->inum)
-        return 1;
-
-    return 0;
-}
-#endif
 /*
  * Return the right sibling of a tree node(either leaf or indexes node)
  */
@@ -158,6 +121,10 @@ int extent_tree_init(const idx_spec_t *idx_spec,
             (ents_root * sizeof(extent_leaf_t)) + sizeof(extent_header_t));
     if (NULL == ext_meta->et_direct_data) return -ENOMEM;
 
+    ext_meta->et_stats = ZALLOC(idx_spec, sizeof(*(ext_meta->et_stats)));
+    if (NULL == ext_meta->et_stats) return -ENOMEM;
+    ext_meta->et_enable_stats = false;
+
     ssize_t nmeta = CB(ext_idx, cb_read,
                        ext_meta->et_direct_range.pr_start,
                        ext_meta->et_direct_range.pr_blk_offset,
@@ -186,6 +153,11 @@ int extent_tree_init(const idx_spec_t *idx_spec,
 static char *read_extent_tree_block(idx_struct_t *ext_idx,
                                     paddr_t pblk, int depth)
 {
+    EXTMETA(ext_idx, ext_meta);
+    DECLARE_TIMING();
+    if (ext_meta->et_enable_stats) {
+        START_TIMING();
+    }
     char *buf;
     device_info_t devinfo;
     int err = CB(ext_idx, cb_get_dev_info, &devinfo);
@@ -205,6 +177,10 @@ static char *read_extent_tree_block(idx_struct_t *ext_idx,
     if (depth >= 0) {
         err = ext_check(ext_idx, ext_header_from_block(buf), depth, pblk);
         if (err) goto errout;
+    }
+
+    if (ext_meta->et_enable_stats) {
+        UPDATE_TIMING(ext_meta->et_stats, read_metadata_blocks);
     }
 
     return buf;
@@ -2809,10 +2785,23 @@ ssize_t extent_tree_remove(idx_struct_t *ext_idx,
     return size;
 }
 
+void extent_tree_set_stats(idx_struct_t *ext_idx, bool enable) {
+    EXTMETA(ext_idx, ext_meta);
+    ext_meta->et_enable_stats = enable;
+}
+
+void extent_tree_print_stats(idx_struct_t *ext_idx) {
+    EXTMETA(ext_idx, ext_meta);
+    print_ext_stats(ext_meta->et_stats);
+}
+
+
 idx_fns_t extent_tree_fns = {
     .im_init          = NULL,
     .im_init_prealloc = extent_tree_init,
     .im_lookup        = extent_tree_lookup,
     .im_create        = extent_tree_create,
-    .im_remove        = extent_tree_remove
+    .im_remove        = extent_tree_remove,
+    .im_set_stats     = extent_tree_set_stats,
+    .im_print_stats   = extent_tree_print_stats
 };

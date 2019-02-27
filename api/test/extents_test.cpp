@@ -132,6 +132,34 @@ TEST_F(ExtentTreeFixture, InsertDeepPersist) {
     }
 }
 
+TEST_F(ExtentTreeFixture, InsertDeepPersistStats) {
+    inum_t inum   = 0;
+    size_t npages = 1000;
+
+    paddr_t prev_blk = -1;
+    for(size_t i = 0; i < npages; ++i) {
+        laddr_t lblk = (laddr_t)i;
+        paddr_t pblk;
+        ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, 1, &pblk);
+        ASSERT_EQ(1, ret);
+        ASSERT_NE(prev_blk, pblk);
+
+        prev_blk = pblk;
+        device.allocate(1);
+    }
+
+    idx_struct_t new_ext = {};
+    int err = extent_tree_init(&idx_spec, &inode_space, &new_ext);
+    extent_tree_set_stats(&new_ext, true);
+    for(size_t i = 0; i < npages; ++i) {
+        laddr_t lblk = (laddr_t)i;
+        paddr_t pblk;
+        ssize_t ret = extent_tree_lookup(&new_ext, inum, lblk, &pblk);
+        ASSERT_EQ(1, ret);
+    }
+    extent_tree_print_stats(&new_ext);
+}
+
 TEST_F(ExtentTreeFixture, InsertRepeat) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
