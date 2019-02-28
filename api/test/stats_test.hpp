@@ -6,10 +6,4 @@ extern "C" {
         STAT_FIELD(a);
         STAT_FIELD(b);
     } test_stats_t;
-
-    typedef struct test_stats_var {
-        STAT_FIELDS(a, b);
-    } test_stats_var_t;
-
-    STAT_STRUCT(omega_stats, foo);
 }

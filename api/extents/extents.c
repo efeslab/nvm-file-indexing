@@ -98,7 +98,6 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     if (NULL == idx_spec) return -EINVAL;
     if (NULL == direct_ents) return -EINVAL;
 
-
     EXTMETA(ext_idx, ext_meta);
 
     if (NULL != ext_meta) return -EEXIST;
@@ -124,6 +123,16 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     ext_meta->et_stats = ZALLOC(idx_spec, sizeof(*(ext_meta->et_stats)));
     if (NULL == ext_meta->et_stats) return -ENOMEM;
     ext_meta->et_enable_stats = false;
+
+    ext_meta->et_buffers = ZALLOC(idx_spec, MAX_DEPTH * sizeof(char*));
+    if (NULL == ext_meta->et_buffers) return -ENOMEM;
+
+    size_t blksz = device_block_size(ext_idx);
+
+    for (int i = 0; i < MAX_DEPTH; ++i) {
+        ext_meta->et_buffers[i] = ZALLOC(idx_spec, blksz);
+        if (NULL == ext_meta->et_buffers[i]) return -ENOMEM;
+    }
 
     ssize_t nmeta = CB(ext_idx, cb_read,
                        ext_meta->et_direct_range.pr_start,
@@ -163,10 +172,16 @@ static char *read_extent_tree_block(idx_struct_t *ext_idx,
     int err = CB(ext_idx, cb_get_dev_info, &devinfo);
     if (err) return (char*)ERR_PTR(err);
 
-    buf = (char*)ZALLOC(ext_idx, devinfo.di_block_size);
+    if_then_panic(depth >= MAX_DEPTH, "not enough buffers!");
+    buf = ext_meta->et_buffers[depth];
+    //buf = (char*)MALLOC(ext_idx, devinfo.di_block_size);
 
+    uint64_t second_tsc = _asm_rdtscp();
     ssize_t nbytes = CB(ext_idx, cb_read,
                         pblk, 0, devinfo.di_block_size, buf);
+    if (ext_meta->et_enable_stats) {
+        UPDATE_STAT(ext_meta->et_stats, read_from_device, second_tsc);
+    }
 
     if (nbytes < 0) goto errout;
     if (nbytes != devinfo.di_block_size) {
@@ -186,7 +201,7 @@ static char *read_extent_tree_block(idx_struct_t *ext_idx,
     return buf;
 
 errout:
-    FREE(ext_idx, buf);
+    //FREE(ext_idx, buf);
     return (char*)ERR_PTR(err);
 }
 
@@ -318,7 +333,7 @@ void ext_drop_refs(idx_struct_t *ext_idx, extent_path_t *path)
     depth = path->p_depth;
     for (i = 0; i <= depth; i++, path++) {
         if (path->p_raw) {
-            FREE(ext_idx, path->p_raw);
+            //FREE(ext_idx, path->p_raw);
             path->p_raw = NULL;
         }
     }
@@ -448,7 +463,7 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
     if (path) {
         ext_drop_refs(ext_idx, path);
         if (depth > path[0].p_maxdepth) {
-            FREE(ext_idx, path);
+            //FREE(ext_idx, path);
             *orig_path = path = NULL;
         }
     }
@@ -490,7 +505,7 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
         ppos++;
         if (unlikely(ppos > depth)) {
             //fs_brelse(bh);
-            FREE(ext_idx, buf);
+            //FREE(ext_idx, buf);
             //ERROR_INODE(inode, "ppos %d > depth %d", ppos, depth);
             ret = -EIO;
             goto err;
@@ -821,7 +836,7 @@ static int ext_split(idx_struct_t *ext_idx,
 
         //fs_brelse(bh);
         //bh = NULL;
-        FREE(ext_idx, buf);
+        //FREE(ext_idx, buf);
 
         /* correct old index */
         if (m) {
@@ -842,7 +857,7 @@ cleanup:
     if (bh)
         fs_brelse(bh);
     */
-    if (buf) FREE(ext_idx, buf);
+    //if (buf) FREE(ext_idx, buf);
 
     if (err) {
         /* free all allocated blocks in error case */
@@ -953,7 +968,7 @@ static int ext_grow_indepth(idx_struct_t *ext_idx, unsigned int flags)
     //mark_inode_dirty(inode);
 out:
     //fs_brelse(bh);
-    FREE(ext_idx, buf);
+    //FREE(ext_idx, buf);
 
     return err;
 }
@@ -1184,7 +1199,7 @@ got_index:
         ix = EXT_FIRST_INDEX(eh);
         block = idx_pblock(ix);
         //fs_brelse(bh);
-        FREE(ext_idx, buf);
+        //FREE(ext_idx, buf);
     }
 
     buf = read_extent_tree_block(ext_idx, block, path->p_depth - depth);
@@ -1202,7 +1217,7 @@ found_extent:
 
     if (buf) {
         //fs_brelse(bh);
-        FREE(ext_idx, buf);
+        //FREE(ext_idx, buf);
     }
 
     return 0;
@@ -1457,7 +1472,7 @@ static void ext_try_to_merge_up(idx_struct_t *ext_idx, extent_path_t *path)
     path[0].p_hdr->eh_max = cpu_to_le16(max_root);
 
     //fs_brelse(path[1].p_bh);
-    FREE(ext_idx, path[1].p_raw);
+    //FREE(ext_idx, path[1].p_raw);
     /*
     free_blocks(ext_idx, NULL, blk, 1,
             FREE_BLOCKS_METADATA | FREE_BLOCKS_FORGET);
@@ -2155,7 +2170,7 @@ int ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
             err = ext_rm_leaf(ext_idx, path, start, end);
             /* root level have p_bh == NULL, fs_brelse() can handle this. */
             //fs_brelse(path[i].p_bh);
-            FREE(ext_idx, path[i].p_raw);
+            //FREE(ext_idx, path[i].p_raw);
             path[i].p_raw = NULL;
             i--;
             continue;
@@ -2217,7 +2232,7 @@ int ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
             fs_brelse(path[i].p_bh);
             path[i].p_bh = NULL;
             */
-            FREE(ext_idx, path[i].p_raw);
+            //FREE(ext_idx, path[i].p_raw);
             path[i].p_raw = NULL;
             i--;
         }
