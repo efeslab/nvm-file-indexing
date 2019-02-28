@@ -67,3 +67,7 @@ _deps
 # API files
 api/build/
 tags
+
+# Vim stuff
+*.vim
+*.swp

@@ -9,6 +9,7 @@ set (VERSION_MINOR 1)
 add_subdirectory(common)
 add_subdirectory(hashtable)
 add_subdirectory(extents)
+add_subdirectory(levelhash)
 add_subdirectory(test)
 
 file(GLOB api_src
@@ -21,4 +22,5 @@ add_library(NVMIndexingAPI SHARED
             $<TARGET_OBJECTS:Common>
             $<TARGET_OBJECTS:HashTable>
             $<TARGET_OBJECTS:ExtentTree>
+            $<TARGET_OBJECTS:LevelHashing>
             )

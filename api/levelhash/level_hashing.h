@@ -7,19 +7,25 @@
 #include <math.h>
 #include "hash.h"
 
-#define ASSOC_NUM 4                       // The number of slots in a bucket
-#define KEY_LEN 16                        // The maximum length of a key
-#define VALUE_LEN 15                      // The maximum length of a value
+#include "common/common.h"
 
-typedef struct entry{                     // A slot storing a key-value item 
-    uint8_t key[KEY_LEN];
-    uint8_t value[VALUE_LEN];
-} entry;
+#define ASSOC_NUM 4                       // The number of slots in a bucket
+//#define KEY_LEN 16                        // The maximum length of a key
+//#define VALUE_LEN 15                      // The maximum length of a value
+#define KEY_LEN sizeof(laddr_t)
+#define VALUE_LEN sizeof(paddr_t)
+
+typedef struct entry {                    // A slot storing a key-value item 
+    //uint8_t key[KEY_LEN];
+    //uint8_t value[VALUE_LEN];
+    laddr_t e_key;
+    paddr_t e_val;
+} entry_t;
 
 typedef struct level_bucket               // A bucket
 {
     uint8_t token[ASSOC_NUM];             // A token indicates whether its corresponding slot is empty, which can also be implemented using 1 bit
-    entry slot[ASSOC_NUM];
+    entry_t slot[ASSOC_NUM];
 } level_bucket;
 
 typedef struct level_hash {               // A Level hash table
@@ -37,21 +43,22 @@ typedef struct level_hash {               // A Level hash table
 
 level_hash *level_init(uint64_t level_size);     
 
-uint8_t level_insert(level_hash *level, uint8_t *key, uint8_t *value);          
+uint8_t level_insert(level_hash *level, laddr_t key, paddr_t value);          
 
-uint8_t* level_static_query(level_hash *level, uint8_t *key);
+paddr_t level_static_query(level_hash *level, laddr_t key);
 
-uint8_t* level_dynamic_query(level_hash *level, uint8_t *key);
+paddr_t level_dynamic_query(level_hash *level, laddr_t key);
 
-uint8_t level_delete(level_hash *level, uint8_t*key);
+uint8_t level_delete(level_hash *level, laddr_t key);
 
-uint8_t level_update(level_hash *level, uint8_t *key, uint8_t *new_value);
+uint8_t level_update(level_hash *level, laddr_t key, paddr_t new_value);
 
 void level_expand(level_hash *level);
 
 void level_shrink(level_hash *level);
 
-uint8_t try_movement(level_hash *level, uint64_t idx, uint64_t level_num, uint8_t *key, uint8_t *value);
+uint8_t try_movement(level_hash *level, uint64_t idx, uint64_t level_num, 
+                     laddr_t key, paddr_t value);
 
 int b2t_movement(level_hash *level, uint64_t idx);
 

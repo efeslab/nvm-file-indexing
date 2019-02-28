@@ -13,6 +13,7 @@ extern "C" {
 #include "common/common.h"
 #include "hashtable/hashtable.h"
 #include "extents/extents.h"
+#include "levelhash/levelhash.h"
 
 #ifdef __cplusplus
 }
