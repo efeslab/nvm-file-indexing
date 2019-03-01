@@ -46,3 +46,22 @@ TEST_F(LevelHashingFixture, LevelRemove) {
     ASSERT_GT(0, ret);
     ASSERT_EQ(0, lookup_paddr);
 }
+
+TEST_F(LevelHashingFixture, LevelPersist) {
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = levelhash_create(&level_idx, 0, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+
+    idx_struct_t new_idx;
+    int err = levelhash_init(&idx_spec, &inode_space, &new_idx);
+
+    paddr_t lookup_paddr;
+    ret = levelhash_lookup(&new_idx, 0, lblk, &lookup_paddr);
+    ASSERT_EQ(npages, ret);
+    ASSERT_EQ(pblk, lookup_paddr);
+}
