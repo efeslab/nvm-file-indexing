@@ -14,7 +14,7 @@ int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents,
                    idx_struct_t* level_idx) {
     int ret = 0;
 
-    level_hash *lh = level_init(1);
+    level_hash_t *lh = level_init(idx_spec, 2);
 
     level_idx->idx_callbacks = idx_spec->idx_callbacks;
     level_idx->idx_mem_man   = idx_spec->idx_mem_man;
@@ -26,7 +26,12 @@ int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents,
 
 ssize_t levelhash_lookup(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, paddr_t* paddr) {
-    return 0;
+    LEVELMETA(level_idx, lh);
+    *paddr = level_dynamic_query(lh, laddr);
+
+    if (0 == *paddr) return -ENOENT;
+
+    return 1;
 }
 
 ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum, 
@@ -51,7 +56,14 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
 
 ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, size_t nblk) {
-    return 0;
+    LEVELMETA(level_idx, lh);
+
+    for (size_t blk = 0; blk < nblk; ++blk) {
+        uint8_t ret = level_delete(lh, laddr + blk);
+        if (ret) return -EIO;
+    }
+
+    return (ssize_t) nblk;
 }
 
 

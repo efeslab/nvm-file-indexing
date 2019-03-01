@@ -34,7 +34,7 @@ void levelhash_print_stats(idx_struct_t* level_idx);
  * Convenience macros.
  */
 
-#define LEVELMETA(i, l) level_hash *(l) = (level_hash*)(i)->idx_metadata
+#define LEVELMETA(i, l) level_hash_t *(l) = (level_hash_t*)(i)->idx_metadata
 
 #ifdef __cplusplus
 }

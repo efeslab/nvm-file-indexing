@@ -4,7 +4,7 @@
 Function: F_HASH()
         Compute the first hash value of a key-value item
 */
-uint64_t F_HASH(level_hash *level, laddr_t key) {
+uint64_t F_HASH(level_hash_t *level, laddr_t key) {
     return (hash((void *)&key, sizeof(key), level->f_seed));
 }
 
@@ -12,7 +12,7 @@ uint64_t F_HASH(level_hash *level, laddr_t key) {
 Function: S_HASH() 
         Compute the second hash value of a key-value item
 */
-uint64_t S_HASH(level_hash *level, laddr_t key) {
+uint64_t S_HASH(level_hash_t *level, laddr_t key) {
     return (hash((void *)&key, sizeof(key), level->s_seed));
 }
 
@@ -32,18 +32,57 @@ uint64_t S_IDX(uint64_t hashKey, uint64_t capacity) {
     return hashKey % (capacity / 2) + capacity / 2;
 }
 
-
+/*
 void* alignedmalloc(size_t size) {
   void* ret;
   posix_memalign(&ret, 64, size);
   return ret;
 }
+*/
+
+/***
+ * API related things.
+ */
+paddr_t idx_to_paddr(level_hash_t *level, uint64_t bucket_idx) {
+    uint64_t bucket_idx_bytes = bucket_idx * sizeof(level_bucket_t);
+    return bucket_idx_bytes / level->block_size;
+}
+
+off_t idx_to_paddr_offset(level_hash_t *level, uint64_t bucket_idx) {
+    uint64_t bucket_idx_bytes = bucket_idx * sizeof(level_bucket_t);
+    return bucket_idx_bytes % level->block_size;
+}
+
+int do_bucket_read(level_hash_t *level, int which, uint64_t bucket_idx) {
+    paddr_t paddr  = idx_to_paddr(level, bucket_idx);
+    off_t   offset = idx_to_paddr_offset(level, bucket_idx);
+    ssize_t ret    = CB(level->idx_spec, cb_read,
+                        paddr, offset, sizeof(level_bucket_t), 
+                        (char*)(level->buckets[which] + bucket_idx)); 
+
+    if (ret != sizeof(level_bucket_t)) return -EIO;
+
+    return 0;
+}
+
+int do_bucket_write(level_hash_t *level, int which, uint64_t bucket_idx) {
+    paddr_t paddr  = idx_to_paddr(level, bucket_idx);
+    off_t   offset = idx_to_paddr_offset(level, bucket_idx);
+    ssize_t ret    = CB(level->idx_spec, cb_write,
+                        paddr, offset, sizeof(level_bucket_t), 
+                        (const char*)(level->buckets[which] + bucket_idx)); 
+
+    if (ret != sizeof(level_bucket_t)) return -EIO;
+
+    return 0;
+}
+
 
 /*
 Function: generate_seeds() 
         Generate two randomized seeds for hash functions
 */
-void generate_seeds(level_hash *level)
+void generate_seeds(level_hash_t *level)
 {
     srand(time(NULL));
     do
@@ -59,9 +98,10 @@ void generate_seeds(level_hash *level)
 Function: level_init() 
         Initialize a level hash table
 */
-level_hash *level_init(uint64_t level_size)
+level_hash_t *level_init(const idx_spec_t *idx_spec, uint64_t level_size)
 {
-    level_hash *level = alignedmalloc(sizeof(level_hash));
+    //level_hash_t *level = alignedmalloc(sizeof(level_hash_t));
+    level_hash_t *level = ZALLOC(idx_spec, sizeof(level_hash_t));
     if (!level)
     {
         printf("The level hash table initialization fails:1\n");
@@ -72,8 +112,14 @@ level_hash *level_init(uint64_t level_size)
     level->addr_capacity = pow(2, level_size);
     level->total_capacity = pow(2, level_size) + pow(2, level_size - 1);
     generate_seeds(level);
-    level->buckets[0] = alignedmalloc(pow(2, level_size)*sizeof(level_bucket));
-    level->buckets[1] = alignedmalloc(pow(2, level_size - 1)*sizeof(level_bucket));
+    //level->buckets[0] = alignedmalloc(pow(2, level_size)*sizeof(level_bucket_t));
+    //level->buckets[1] = alignedmalloc(pow(2, level_size - 1)*sizeof(level_bucket_t));
+    size_t top_size = pow(2, level_size);
+    size_t top_size_bytes = top_size * sizeof(level_bucket_t);
+    size_t bot_size = pow(2, level_size - 1);
+    size_t bot_size_bytes = bot_size * sizeof(level_bucket_t);
+    level->buckets[0] = ZALLOC(idx_spec, top_size_bytes);
+    level->buckets[1] = ZALLOC(idx_spec, bot_size_bytes);
     level->level_item_num[0] = 0;
     level->level_item_num[1] = 0;
     level->level_expand_time = 0;
@@ -85,11 +131,44 @@ level_hash *level_init(uint64_t level_size)
         exit(1);
     }
 
+    /* API Init */
+    level->idx_spec = idx_spec;
+    level->do_cache = false;
+    level->cache_state[0] = ZALLOC(idx_spec, top_size*sizeof(int8_t));
+    level->cache_state[1] = ZALLOC(idx_spec, bot_size*sizeof(int8_t));
+
+    device_info_t di;
+    int err = CB(idx_spec, cb_get_dev_info, &di);
+    if (err) {
+        printf("The level hash table initialization fails: 3\n");
+        return NULL;
+    }
+
+    level->block_size = di.di_block_size;
+
+    size_t top_blocks = top_size_bytes / level->block_size; 
+    if (top_size_bytes % level->block_size != 0) top_blocks++;
+    paddr_t top_block_start;
+    ssize_t top_blocks_alloced = CB(idx_spec, cb_alloc_metadata,
+                                    top_blocks, &top_block_start);
+    if_then_panic(top_blocks_alloced != top_blocks, "could not alloc!");
+    level->dev_levels[0] = top_block_start;
+
+    size_t bot_blocks = bot_size_bytes / level->block_size;
+    if (bot_size_bytes % level->block_size != 0) bot_blocks++;
+    paddr_t bot_block_start;
+    ssize_t bot_blocks_alloced = CB(idx_spec, cb_alloc_metadata,
+                                    bot_blocks, &bot_block_start);
+    if_then_panic(bot_blocks_alloced != bot_blocks, "could not alloc!");
+    level->dev_levels[1] = bot_block_start;
+
+    /*
     printf("Level hashing: ASSOC_NUM %d, KEY_LEN %d, VALUE_LEN %d \n", ASSOC_NUM, KEY_LEN, VALUE_LEN);
     printf("The number of top-level buckets: %ld\n", level->addr_capacity);
     printf("The number of all buckets: %ld\n", level->total_capacity);
     printf("The number of all entries: %ld\n", level->total_capacity*ASSOC_NUM);
     printf("The level hash table initialization succeeds!\n");
+    */
     return level;
 }
 
@@ -99,7 +178,7 @@ Function: level_expand()
         Put a new level on top of the old hash table and only rehash the
         items in the bottom level of the old hash table;
 */
-void level_expand(level_hash *level) 
+void level_expand(level_hash_t *level) 
 {
     if (!level) {
         printf("The expanding fails: 1\n");
@@ -108,7 +187,8 @@ void level_expand(level_hash *level)
 
     level->resize_state = 1;
     level->addr_capacity = pow(2, level->level_size + 1);
-    level_bucket *newBuckets = alignedmalloc(level->addr_capacity*sizeof(level_bucket));
+    //level_bucket_t *newBuckets = alignedmalloc(level->addr_capacity*sizeof(level_bucket_t));
+    level_bucket_t *newBuckets = ZALLOC(level->idx_spec, level->addr_capacity*sizeof(level_bucket_t));
     if (!newBuckets) {
         printf("The expanding fails: 2\n");
         exit(1);
@@ -185,7 +265,7 @@ Function: level_shrink()
         Put a new level at the bottom of the old hash table and only rehash the
         items in the top level of the old hash table;
 */
-void level_shrink(level_hash *level)
+void level_shrink(level_hash_t *level)
 {
     if (!level)
     {
@@ -201,8 +281,10 @@ void level_shrink(level_hash *level)
 
     level->resize_state = 2;
     level->level_size --;
-    level_bucket *newBuckets = alignedmalloc(pow(2, level->level_size - 1)*sizeof(level_bucket));
-    level_bucket *interimBuckets = level->buckets[0];
+    //level_bucket_t *newBuckets = alignedmalloc(pow(2, level->level_size - 1)*sizeof(level_bucket_t));
+    size_t new_size = pow(2, level->level_size - 1);
+    level_bucket_t *newBuckets = ZALLOC(level->idx_spec, new_size*sizeof(level_bucket_t));
+    level_bucket_t *interimBuckets = level->buckets[0];
     level->buckets[0] = level->buckets[1];
     level->buckets[1] = newBuckets;
     newBuckets = NULL;
@@ -230,7 +312,7 @@ void level_shrink(level_hash *level)
         }
     } 
 
-    free(interimBuckets);
+    FREE(level->idx_spec, interimBuckets);
     level->level_expand_time = 0;
     level->resize_state = 0;
 }
@@ -240,7 +322,7 @@ Function: level_dynamic_query()
         Lookup a key-value item in level hash table via danamic search scheme;
         First search the level with more items;
 */
-paddr_t level_dynamic_query(level_hash *level, laddr_t key)
+paddr_t level_dynamic_query(level_hash_t *level, laddr_t key)
 {
     
     uint64_t f_hash = F_HASH(level, key);
@@ -297,7 +379,8 @@ paddr_t level_dynamic_query(level_hash *level, laddr_t key)
             s_idx = S_IDX(s_hash, level->addr_capacity);
         }
     }
-    return NULL;
+
+    return 0;
 }
 
 /*
@@ -305,7 +388,7 @@ Function: level_static_query()
         Lookup a key-value item in level hash table via static search scheme;
         Always first search the top level and then search the bottom level;
 */
-paddr_t level_static_query(level_hash *level, laddr_t key)
+paddr_t level_static_query(level_hash_t *level, laddr_t key)
 {
     uint64_t f_hash = F_HASH(level, key);
     uint64_t s_hash = S_HASH(level, key);
@@ -334,7 +417,7 @@ paddr_t level_static_query(level_hash *level, laddr_t key)
         s_idx = S_IDX(s_hash, level->addr_capacity / 2);
     }
 
-    return NULL;
+    return 0;
 }
 
 
@@ -343,7 +426,7 @@ Function: level_delete()
         Remove a key-value item from level hash table;
         The function can be optimized by using the dynamic search scheme
 */
-uint8_t level_delete(level_hash *level, laddr_t key)
+uint8_t level_delete(level_hash_t *level, laddr_t key)
 {
     uint64_t f_hash = F_HASH(level, key);
     uint64_t s_hash = S_HASH(level, key);
@@ -384,7 +467,7 @@ Function: level_update()
         Update the value of a key-value item in level hash table;
         The function can be optimized by using the dynamic search scheme
 */
-uint8_t level_update(level_hash *level, laddr_t key, paddr_t new_value)
+uint8_t level_update(level_hash_t *level, laddr_t key, paddr_t new_value)
 {
     uint64_t f_hash = F_HASH(level, key);
     uint64_t s_hash = S_HASH(level, key);
@@ -424,7 +507,7 @@ uint8_t level_update(level_hash *level, laddr_t key, paddr_t new_value)
 Function: level_insert() 
         Insert a key-value item into level hash table;
 */
-uint8_t level_insert(level_hash *level, laddr_t key, paddr_t value)
+uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value)
 {
     uint64_t f_hash = F_HASH(level, key);
     uint64_t s_hash = S_HASH(level, key);
@@ -511,7 +594,7 @@ uint8_t level_insert(level_hash *level, laddr_t key, paddr_t value)
 Function: try_movement() 
         Try to move an item from the current bucket to its same-level alternative bucket;
 */
-uint8_t try_movement(level_hash *level, uint64_t idx, uint64_t level_num, 
+uint8_t try_movement(level_hash_t *level, uint64_t idx, uint64_t level_num, 
                      laddr_t key, paddr_t value)
 {
     uint64_t i, j, jdx;
@@ -559,7 +642,7 @@ uint8_t try_movement(level_hash *level, uint64_t idx, uint64_t level_num,
 Function: b2t_movement() 
         Try to move a bottom-level item to its top-level alternative buckets;
 */
-int b2t_movement(level_hash *level, uint64_t idx)
+int b2t_movement(level_hash_t *level, uint64_t idx)
 {
     laddr_t key; 
     paddr_t value;
@@ -610,9 +693,9 @@ int b2t_movement(level_hash *level, uint64_t idx)
 Function: level_destroy() 
         Destroy a level hash table
 */
-void level_destroy(level_hash *level)
+void level_destroy(level_hash_t *level)
 {
-    free(level->buckets[0]);
-    free(level->buckets[1]);
+    FREE(level->idx_spec, level->buckets[0]);
+    FREE(level->idx_spec, level->buckets[1]);
     level = NULL;
 }
