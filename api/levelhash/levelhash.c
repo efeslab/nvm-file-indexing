@@ -14,7 +14,7 @@ int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents,
                    idx_struct_t* level_idx) {
     int ret = 0;
 
-    level_hash_t *lh = level_init(idx_spec, 2);
+    level_hash_t *lh = level_init(idx_spec, direct_ents, 2);
 
     level_idx->idx_callbacks = idx_spec->idx_callbacks;
     level_idx->idx_mem_man   = idx_spec->idx_mem_man;
@@ -48,12 +48,21 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
 
     for (size_t blk = 0; blk < nblk; ++blk) {
         uint8_t ret = level_insert(lh, laddr + blk, (*paddr) + blk);
-        if (ret) return -EIO;
+        if (ret) {
+            // Trying to resize.
+            level_expand(lh);
+            ret = level_insert(lh, laddr + blk, (*paddr) + blk);
+            if (ret) return -EIO;
+        }
     }
+
+    int err = write_metadata(lh);
+    if (err) return -EIO;
 
     return (ssize_t) nblk;
 }
 
+// TODO also free the data!
 ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, size_t nblk) {
     LEVELMETA(level_idx, lh);
@@ -62,6 +71,9 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
         uint8_t ret = level_delete(lh, laddr + blk);
         if (ret) return -EIO;
     }
+
+    int err = write_metadata(lh);
+    if (err) return -EIO;
 
     return (ssize_t) nblk;
 }

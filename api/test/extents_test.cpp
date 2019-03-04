@@ -3,6 +3,21 @@
 #include <iostream>
 using namespace std;
 
+bool operator== (const ext_meta_t& lhs, const ext_meta_t& rhs) {
+    return lhs.et_direct_range == rhs.et_direct_range &&
+           0 == strncmp((char*)lhs.et_direct_data, (char*)rhs.et_direct_data,
+                        lhs.et_direct_range.pr_nbytes);
+}
+
+bool operator== (const idx_struct_t& lhs, const idx_struct_t& rhs) {
+    EXTMETA(&lhs, lm);
+    EXTMETA(&rhs, rm);
+    return lhs.idx_callbacks   == rhs.idx_callbacks &&
+           lhs.idx_mem_man     == rhs.idx_mem_man   &&
+           lhs.idx_fns         == rhs.idx_fns       &&
+           *lm == *rm;
+}
+
 /*******************************************************************************
  * Section: Hashtable correctness tests.
  *
@@ -24,7 +39,7 @@ TEST_F(ExtentTreeFixture, InitExists) {
     idx_struct_t ext_copy = ext_idx;
     int err = extent_tree_init(&idx_spec, &inode_space, &ext_copy);
     ASSERT_NE(0, err);
-    ASSERT_EQ(0, strncmp((char*)&ext_copy, (char*)&ext_idx, sizeof(ext_idx)));
+    ASSERT_EQ(ext_idx, ext_copy);
 }
 
 TEST_F(ExtentTreeFixture, InsertSingle) {
@@ -51,11 +66,7 @@ TEST_F(ExtentTreeFixture, InsertPersist) {
     idx_struct_t new_ext = {};
     int err = extent_tree_init(&idx_spec, &inode_space, &new_ext);
 
-    EXTMETA(&ext_idx, ext_meta);
-    EXTMETA(&new_ext, new_meta);
-    ASSERT_EQ(0, strncmp((char*)new_meta->et_direct_data,
-                         (char*)ext_meta->et_direct_data,
-                         inode_space.pr_nbytes));
+    ASSERT_EQ(ext_idx, new_ext);
 }
 
 TEST_F(ExtentTreeFixture, InsertMulti) {

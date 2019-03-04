@@ -1,17 +1,9 @@
 #pragma once
 
-#include <stdint.h>
-#include <errno.h>
-#include <new>
+#include "test/test_utils.hpp"
 
-#include "gtest/gtest.h"
-
-#include "common/common.h"
 #include "extents/ext_util.h"
 #include "extents/extents.h"
-
-#include "mock_device.hpp"
-#include "test_fixture.hpp"
 
 class ExtentTreeFixture : public TestFixture {
     protected:
@@ -42,4 +34,5 @@ class ExtentTreeFixture : public TestFixture {
         int init_err = 0;
 };
 
+bool operator== (const ext_meta_t& lhs, const ext_meta_t& rhs);
 bool operator== (const idx_struct_t& lhs, const idx_struct_t& rhs);

@@ -1,10 +1,8 @@
 #pragma once
 
-#include "gtest/gtest.h"
-#include "levelhash/levelhash.h"
+#include "test/test_utils.hpp"
 
-#include "mock_device.hpp"
-#include "test_fixture.hpp"
+#include "levelhash/levelhash.h"
 
 class LevelHashingFixture : public TestFixture {
     protected:
@@ -16,12 +14,13 @@ class LevelHashingFixture : public TestFixture {
                 .pr_nbytes     = 256
             };
 
-            init_err = levelhash_init(&idx_spec, &inode_space, &level_idx);
             // Since the per-inode extent trees don't initially allocate any
             // space, the first data block allocated could be zero. Since this
             // could also be an error condition, we will go ahead and allocate a
             // dummy block here.
             device.allocate(1);
+
+            init_err = levelhash_init(&idx_spec, &inode_space, &level_idx);
         }
 
         void TearDown() override {
