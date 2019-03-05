@@ -1,6 +1,7 @@
 #include "levelhash_test.hpp"
 
 #include <iostream>
+#include <map>
 #include <set>
 
 using namespace std;
@@ -71,7 +72,7 @@ TEST_F(LevelHashingFixture, LevelPersist) {
 }
 
 /*******************************************************************************
- * Section: Tests which cause the hash table to change sizes.
+ * Section: Tests which cause the hash table to expand.
  ******************************************************************************/
 
 TEST_F(LevelHashingFixture, LevelExpandIteratively) {
@@ -90,3 +91,57 @@ TEST_F(LevelHashingFixture, LevelExpandIteratively) {
         ASSERT_TRUE(prev_paddrs.insert(pblk).second);
     }
 }
+
+TEST_F(LevelHashingFixture, LevelExpandIterativelyAndLookup) {
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1000;
+    size_t npage_inc = 1;
+
+    map<laddr_t, paddr_t> prev_paddrs;
+
+    for (size_t p = 0; p < npages; p += npage_inc) {
+        ssize_t ret = levelhash_create(&level_idx, 0, lblk+p, npage_inc, &pblk);
+        ASSERT_EQ(npage_inc, ret);
+
+        prev_paddrs[lblk + p] = pblk;
+
+        for (size_t l = 0; l <= p; ++l) {
+            paddr_t lookup_paddr;
+            ssize_t ret = levelhash_lookup(&level_idx, 0, lblk + l,
+                                           &lookup_paddr);
+           
+            ASSERT_EQ(npage_inc, ret);
+            ASSERT_EQ(prev_paddrs[lblk + l], lookup_paddr);
+        }
+    }
+}
+
+TEST_F(LevelHashingFixture, LevelExpandSlab) {
+    paddr_t pblk  = 0;
+    size_t npages = 1000;
+
+    ssize_t ret = levelhash_create(&level_idx, 0, 0, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+}
+
+TEST_F(LevelHashingFixture, LevelLookupAfterExpand) {
+    paddr_t pblk  = 0;
+    size_t npages = 1000;
+
+    ssize_t ret = levelhash_create(&level_idx, 0, 0, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+        paddr_t lookup_paddr;
+        ret = levelhash_lookup(&level_idx, 0, lblk, &lookup_paddr);
+        ASSERT_EQ(npages - (ssize_t)lblk, ret);
+        ASSERT_EQ(pblk + (ssize_t)lblk, lookup_paddr);
+    }
+}
+
+/*******************************************************************************
+ * Section: Tests which cause the hash table to shrink.
+ ******************************************************************************/

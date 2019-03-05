@@ -30,11 +30,35 @@ ssize_t TestFixture::mock_dealloc_data(size_t nblocks, paddr_t blk) {
 }
 
 ssize_t TestFixture::mock_read(paddr_t blk, off_t off, size_t nbytes, char* buf) {
-    return device[blk].read(off, nbytes, buf);
+    paddr_t end_blk = blk + ((off + nbytes) / BLK_SZ);
+    size_t total = 0;
+    ssize_t cret = 0;
+    for (paddr_t p = blk; p <= end_blk; ++p) {
+        off_t  o = p == blk ? off : 0;
+        size_t b = (nbytes - total) > (BLK_SZ - o) ? (BLK_SZ - o) : (nbytes - total);
+        ssize_t ret = device[p].read(o, b, buf + total);
+        total += b; 
+        if (ret < 0) return ret;
+        cret += ret;
+    }
+
+    return cret;
 }
 
 ssize_t TestFixture::mock_write(paddr_t blk, off_t off, size_t nbytes, const char* buf) {
-    return device[blk].write(off, nbytes, buf);
+    paddr_t end_blk = blk + ((off + nbytes) / BLK_SZ);
+    size_t total = 0;
+    ssize_t cret = 0;
+    for (paddr_t p = blk; p <= end_blk; ++p) {
+        off_t  o = (p == blk) ? off : 0;
+        size_t b = (nbytes - total) > (BLK_SZ - o) ? (BLK_SZ - o) : (nbytes - total);
+        ssize_t ret = device[p].write(o, b, buf + total);
+        total += b; 
+        if (ret < 0) return ret;
+        cret += ret;
+    }
+
+    return cret;
 }
 
 void TestFixture::SetUp() {
@@ -80,4 +104,42 @@ TEST_F(TestFixture, MockPersistentCallbacks) {
     idx_spec.idx_mem_man->mm_free(mem);
 }
 
+TEST_F(TestFixture, MockWrite) {
+    paddr_t pblk;
+    size_t  npages = 2;
+    size_t  nbytes = BLK_SZ;
+    off_t   offset = BLK_SZ / 2;
+    ssize_t nalloc = mock_alloc_data(npages, &pblk);
+    ASSERT_EQ(npages, nalloc);
 
+    char* mem = (char*)idx_spec.idx_mem_man->mm_malloc(nbytes);
+    ASSERT_NE(mem, nullptr);
+
+    memset(mem, 1, nbytes);
+    ssize_t ret = mock_write(pblk, offset, nbytes, mem);
+    ASSERT_EQ(nbytes, ret);
+}
+
+TEST_F(TestFixture, MockRead) {
+    paddr_t pblk;
+    size_t  npages = 2;
+    size_t  nbytes = BLK_SZ;
+    off_t   offset = BLK_SZ / 2;
+    ssize_t nalloc = mock_alloc_data(npages, &pblk);
+    ASSERT_EQ(npages, nalloc);
+
+    char* mem = (char*)idx_spec.idx_mem_man->mm_malloc(nbytes);
+    ASSERT_NE(mem, nullptr);
+    char* buf = (char*)idx_spec.idx_mem_man->mm_malloc(nbytes);
+    ASSERT_NE(buf, nullptr);
+
+    memset(mem, 1, nbytes);
+    ssize_t ret = mock_write(pblk, offset, nbytes, mem);
+    ASSERT_EQ(nbytes, ret);
+
+    memset(buf, 0, nbytes);
+    ret = mock_read(pblk, offset, nbytes, buf);
+    ASSERT_EQ(nbytes, ret);
+
+    ASSERT_EQ(0, strncmp(mem, buf, nbytes));
+}

@@ -326,6 +326,12 @@ void level_expand(level_hash_t *level)
                           new_buckets_blocks, &new_buckets_paddr);
     if_then_panic(nalloced != new_buckets_blocks, "could not alloc metadata!");
 
+    // Ensure the new blocks are zeroed out.
+    ssize_t nzeroed = CB(level->idx_spec, cb_write,
+                         new_buckets_paddr, 0, new_buckets_bytes, 
+                         (char*)newBuckets); 
+    if_then_panic(nzeroed != new_buckets_bytes, "could not zero out metadata!");
+
     uint64_t new_level_item_num = 0;
     
     uint64_t old_idx;
