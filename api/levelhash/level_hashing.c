@@ -433,34 +433,62 @@ Function: level_shrink()
 */
 void level_shrink(level_hash_t *level)
 {
-    if (!level)
-    {
-        printf("The shrinking fails: 1\n");
-        exit(1);
-    }
-    if_then_panic(true, "Have yet to implement this for the API!");
+    if_then_panic(!level, "level hash table cannot be null!");
 
     // The shrinking is performed only when the hash table has very few items.
-    if(level->level_item_num[0] + level->level_item_num[1] > level->total_capacity*ASSOC_NUM*0.4){
-        printf("The shrinking fails: 2\n");
-        exit(1);
+    if(level->level_item_num[0] + level->level_item_num[1] > level->total_capacity*ASSOC_NUM*0.4 || 
+       level->total_capacity*ASSOC_NUM*0.4 == 0){
+        return;
     }
 
+    if (level->level_size - 1 <= 1) return;
+
     level->resize_state = 2;
-    level->level_size --;
+    level->level_size--;
     //level_bucket_t *newBuckets = alignedmalloc(pow(2, level->level_size - 1)*sizeof(level_bucket_t));
     size_t new_size = pow(2, level->level_size - 1);
+
     level_bucket_t *newBuckets = ZALLOC(level->idx_spec, new_size*sizeof(level_bucket_t));
     level_bucket_t *interimBuckets = level->buckets[0];
     level->buckets[0] = level->buckets[1];
     level->buckets[1] = newBuckets;
-    newBuckets = NULL;
 
     level->level_item_num[0] = level->level_item_num[1];
     level->level_item_num[1] = 0;
 
     level->addr_capacity = pow(2, level->level_size);
     level->total_capacity = pow(2, level->level_size) + pow(2, level->level_size - 1);
+
+    size_t new_buckets_bytes = level->addr_capacity * sizeof(level_bucket_t);
+    size_t new_buckets_blocks = new_buckets_bytes / level->block_size;
+    if(new_buckets_bytes % level->block_size != 0) new_buckets_blocks++;
+
+    int8_t *new_cache_state = ZALLOC(level->idx_spec, level->addr_capacity*sizeof(int8_t));
+
+    if_then_panic(!newBuckets || !new_cache_state, "could not alloc for shrink!");
+
+    paddr_t new_buckets_paddr;
+    ssize_t nalloced = CB(level->idx_spec, cb_alloc_metadata,
+                          new_buckets_blocks, &new_buckets_paddr);
+    if_then_panic(nalloced != new_buckets_blocks, "could not alloc metadata!");
+
+    size_t interimDevSize = level->dev_sizes[0];
+    level->dev_sizes[0] = level->dev_sizes[1];
+    level->dev_sizes[1] = new_buckets_blocks;
+
+    paddr_t interimDevLoc = level->dev_levels[0];
+    level->dev_levels[0] = level->dev_levels[1];
+    level->dev_levels[1] = new_buckets_paddr;
+
+    int8_t *interimCacheState = level->cache_state[0];
+    level->cache_state[0] = level->cache_state[1];
+    level->cache_state[1] = new_cache_state;
+
+    // Ensure the new blocks are zeroed out.
+    ssize_t nzeroed = CB(level->idx_spec, cb_write,
+                         new_buckets_paddr, 0, new_buckets_bytes, 
+                         (char*)newBuckets); 
+    if_then_panic(nzeroed != new_buckets_bytes, "could not zero out metadata!");
 
     uint64_t old_idx, i;
     for (old_idx = 0; old_idx < pow(2, level->level_size+1); old_idx ++) {
@@ -481,6 +509,10 @@ void level_shrink(level_hash_t *level)
     } 
 
     FREE(level->idx_spec, interimBuckets);
+    FREE(level->idx_spec, interimCacheState);
+    ssize_t nfreed = CB(level->idx_spec, cb_dealloc_metadata,
+                        interimDevSize, interimDevLoc);
+    if_then_panic(nfreed != interimDevSize, "could not dealloc!");
     level->level_expand_time = 0;
     level->resize_state = 0;
 }

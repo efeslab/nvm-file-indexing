@@ -72,6 +72,8 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
         if (ret) return -EIO;
     }
 
+    level_shrink(lh);
+
     int err = write_metadata(lh);
     if (err) return -EIO;
 

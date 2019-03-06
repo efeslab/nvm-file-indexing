@@ -145,3 +145,20 @@ TEST_F(LevelHashingFixture, LevelLookupAfterExpand) {
 /*******************************************************************************
  * Section: Tests which cause the hash table to shrink.
  ******************************************************************************/
+
+TEST_F(LevelHashingFixture, LevelShrinkSlab) {
+    paddr_t pblk  = 0;
+    size_t npages = 1000;
+
+    ssize_t ret = levelhash_create(&level_idx, 0, 0, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    ret = levelhash_remove(&level_idx, 0, 0, npages - 1);
+    ASSERT_EQ(npages - 1, ret);
+
+    paddr_t lookup_paddr;
+    ret = levelhash_lookup(&level_idx, 0, npages - 1, &lookup_paddr);
+    ASSERT_GT(ret, 0);
+    ASSERT_EQ(pblk + npages - 1, lookup_paddr);
+}
