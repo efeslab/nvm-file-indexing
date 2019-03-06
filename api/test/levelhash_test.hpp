@@ -8,6 +8,7 @@ class LevelHashingFixture : public TestFixture {
     protected:
         void SetUp() override {
             TestFixture::SetUp();
+            srand(0);
             inode_space = {
                 .pr_start      = 0,
                 .pr_blk_offset = 0,

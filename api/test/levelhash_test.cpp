@@ -111,8 +111,8 @@ TEST_F(LevelHashingFixture, LevelExpandIterativelyAndLookup) {
             ssize_t ret = levelhash_lookup(&level_idx, 0, lblk + l,
                                            &lookup_paddr);
            
-            ASSERT_EQ(npage_inc, ret);
-            ASSERT_EQ(prev_paddrs[lblk + l], lookup_paddr);
+            ASSERT_EQ(npage_inc, ret) << lblk + l << " " << p << endl;
+            ASSERT_EQ(prev_paddrs[lblk + l], lookup_paddr) << l << " " << p;
         }
     }
 }

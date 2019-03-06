@@ -34,7 +34,11 @@ ssize_t TestFixture::mock_read(paddr_t blk, off_t off, size_t nbytes, char* buf)
     size_t total = 0;
     ssize_t cret = 0;
     for (paddr_t p = blk; p <= end_blk; ++p) {
-        off_t  o = p == blk ? off : 0;
+        off_t  o = (p == blk) ? off : 0;
+        if (o > BLK_SZ) {
+            p += (o / BLK_SZ);
+            o %= BLK_SZ;
+        }
         size_t b = (nbytes - total) > (BLK_SZ - o) ? (BLK_SZ - o) : (nbytes - total);
         ssize_t ret = device[p].read(o, b, buf + total);
         total += b; 
@@ -51,6 +55,10 @@ ssize_t TestFixture::mock_write(paddr_t blk, off_t off, size_t nbytes, const cha
     ssize_t cret = 0;
     for (paddr_t p = blk; p <= end_blk; ++p) {
         off_t  o = (p == blk) ? off : 0;
+        if (o > BLK_SZ) {
+            p += (o / BLK_SZ);
+            o %= BLK_SZ;
+        }
         size_t b = (nbytes - total) > (BLK_SZ - o) ? (BLK_SZ - o) : (nbytes - total);
         ssize_t ret = device[p].write(o, b, buf + total);
         total += b; 
@@ -118,6 +126,31 @@ TEST_F(TestFixture, MockWrite) {
     memset(mem, 1, nbytes);
     ssize_t ret = mock_write(pblk, offset, nbytes, mem);
     ASSERT_EQ(nbytes, ret);
+}
+
+TEST_F(TestFixture, MockWriteBigOffset) {
+    paddr_t pblk;
+    size_t  npages = 3;
+    size_t  nbytes = BLK_SZ;
+    off_t   offset = (BLK_SZ * 3 ) / 2;
+    ssize_t nalloc = mock_alloc_data(npages, &pblk);
+    ASSERT_EQ(npages, nalloc);
+
+    char* mem = (char*)idx_spec.idx_mem_man->mm_malloc(nbytes);
+    ASSERT_NE(mem, nullptr);
+
+    memset(mem, 1, nbytes);
+    ssize_t ret = mock_write(pblk, offset, nbytes, mem);
+    ASSERT_EQ(nbytes, ret);
+
+    char* buf = (char*)idx_spec.idx_mem_man->mm_malloc(nbytes);
+    ASSERT_NE(buf, nullptr);
+
+    memset(buf, 0, nbytes);
+    ret = mock_read(pblk, offset, nbytes, buf);
+    ASSERT_EQ(nbytes, ret);
+
+    ASSERT_EQ(0, strncmp(mem, buf, nbytes));
 }
 
 TEST_F(TestFixture, MockRead) {

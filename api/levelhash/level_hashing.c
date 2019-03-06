@@ -109,11 +109,13 @@ int mark_bucket_dirty(level_hash_t *level, int l, uint64_t bucket_idx) {
 int mark_new_bucket_dirty(level_hash_t *level,
                           level_bucket_t *new_bucket,
                           int8_t *cache_state,
-                          paddr_t paddr,
+                          paddr_t new_bucket_addr,
                           uint64_t bucket_idx) {
     int ret = 0;
 
     if (!level->do_cache){
+        paddr_t paddr  = new_bucket_addr +
+                         idx_to_paddr_blkno(level, bucket_idx);
         off_t   offset = idx_to_paddr_offset(level, bucket_idx);
         ssize_t ret    = CB(level->idx_spec, cb_write,
                             paddr, offset, sizeof(level_bucket_t), 
@@ -132,7 +134,7 @@ Function: generate_seeds()
 */
 void generate_seeds(level_hash_t *level)
 {
-    srand(time(NULL));
+    //srand(time(NULL));
     do
     {
         level->f_seed = rand();
@@ -385,6 +387,8 @@ void level_expand(level_hash_t *level)
                 }
                 
                 level->buckets[1][old_idx].token[i] = 0;
+                int oerr = mark_bucket_dirty(level, 1, old_idx);
+                if_then_panic(oerr, "couldn't write!");
             }
         }
     }
