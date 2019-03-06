@@ -344,6 +344,7 @@ void level_expand(level_hash_t *level)
             {
                 laddr_t  key   = level->buckets[1][old_idx].slot[i].e_key;
                 paddr_t  value = level->buckets[1][old_idx].slot[i].e_val;
+                size_t   size  = level->buckets[1][old_idx].slot[i].e_size;
                 uint64_t f_idx = F_IDX(F_HASH(level, key), level->addr_capacity);
                 uint64_t s_idx = S_IDX(S_HASH(level, key), level->addr_capacity);
 
@@ -356,8 +357,9 @@ void level_expand(level_hash_t *level)
                     {
                         //memcpy(newBuckets[f_idx].slot[j].key, key, KEY_LEN);
                         //memcpy(newBuckets[f_idx].slot[j].value, value, VALUE_LEN);
-                        newBuckets[f_idx].slot[j].e_key = key;
-                        newBuckets[f_idx].slot[j].e_val = value;
+                        newBuckets[f_idx].slot[j].e_key  = key;
+                        newBuckets[f_idx].slot[j].e_val  = value;
+                        newBuckets[f_idx].slot[j].e_size = size;
                         newBuckets[f_idx].token[j] = 1;
                         insertSuccess = 1;
                         new_level_item_num ++;
@@ -370,8 +372,9 @@ void level_expand(level_hash_t *level)
                     {
                         //memcpy(newBuckets[s_idx].slot[j].key, key, KEY_LEN);
                         //memcpy(newBuckets[s_idx].slot[j].value, value, VALUE_LEN);
-                        newBuckets[s_idx].slot[j].e_key = key;
-                        newBuckets[s_idx].slot[j].e_val = value;
+                        newBuckets[s_idx].slot[j].e_key  = key;
+                        newBuckets[s_idx].slot[j].e_val  = value;
+                        newBuckets[s_idx].slot[j].e_size = size;
                         newBuckets[s_idx].token[j] = 1;
                         insertSuccess = 1;
                         new_level_item_num ++;
@@ -465,7 +468,8 @@ void level_shrink(level_hash_t *level)
             if (interimBuckets[old_idx].token[i] == 1)
             {
                 if(level_insert(level, interimBuckets[old_idx].slot[i].e_key, 
-                                       interimBuckets[old_idx].slot[i].e_val))
+                                       interimBuckets[old_idx].slot[i].e_val,
+                                       interimBuckets[old_idx].slot[i].e_size))
                 {
                     printf("The shrinking fails: 3\n");
                     exit(1);   
@@ -486,11 +490,13 @@ Function: level_dynamic_query()
         Lookup a key-value item in level hash table via danamic search scheme;
         First search the level with more items;
 */
-paddr_t level_dynamic_query(level_hash_t *level, laddr_t key)
+size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
 {
     
     uint64_t f_hash = F_HASH(level, key);
     uint64_t s_hash = S_HASH(level, key);
+
+    *value = 0;
 
     uint64_t i, j, f_idx, s_idx;
     if(level->level_item_num[0] > level->level_item_num[1]){
@@ -505,25 +511,26 @@ paddr_t level_dynamic_query(level_hash_t *level, laddr_t key)
                     //strcmp(level->buckets[i][f_idx].slot[j].key, key) == 0)
                     level->buckets[i][f_idx].slot[j].e_key == key)
                 {
-                    return level->buckets[i][f_idx].slot[j].e_val;
+                    *value = level->buckets[i][f_idx].slot[j].e_val;
+                    return level->buckets[i][f_idx].slot[j].e_size;
                 }
             }
 
             int s_err = ensure_bucket_uptodate(level, i, s_idx);
             if (s_err) return 0;
-            for(j = 0; j < ASSOC_NUM; j ++){
+            for(j = 0; j < ASSOC_NUM; j ++) {
                 if (level->buckets[i][s_idx].token[j] == 1 &&
                     //strcmp(level->buckets[i][s_idx].slot[j].key, key) == 0)
                     level->buckets[i][s_idx].slot[j].e_key == key) 
                 {
-                    return level->buckets[i][s_idx].slot[j].e_val;
+                    *value = level->buckets[i][s_idx].slot[j].e_val;
+                    return level->buckets[i][s_idx].slot[j].e_size;
                 }
             }
             f_idx = F_IDX(f_hash, level->addr_capacity / 2);
             s_idx = S_IDX(s_hash, level->addr_capacity / 2);
         }
-    }
-    else{
+    } else {
         f_idx = F_IDX(f_hash, level->addr_capacity/2);
         s_idx = S_IDX(s_hash, level->addr_capacity/2);
 
@@ -535,7 +542,8 @@ paddr_t level_dynamic_query(level_hash_t *level, laddr_t key)
                     //strcmp(level->buckets[i-1][f_idx].slot[j].key, key) == 0)
                     level->buckets[i-1][f_idx].slot[j].e_key == key)
                 {
-                    return level->buckets[i-1][f_idx].slot[j].e_val;
+                    *value = level->buckets[i-1][f_idx].slot[j].e_val;
+                    return level->buckets[i-1][f_idx].slot[j].e_size;
                 }
             }
 
@@ -546,7 +554,8 @@ paddr_t level_dynamic_query(level_hash_t *level, laddr_t key)
                     //strcmp(level->buckets[i-1][s_idx].slot[j].key, key) == 0)
                     level->buckets[i-1][s_idx].slot[j].e_key == key)
                 {
-                    return level->buckets[i-1][s_idx].slot[j].e_val;
+                    *value = level->buckets[i-1][s_idx].slot[j].e_val;
+                    return level->buckets[i-1][s_idx].slot[j].e_size;
                 }
             }
             f_idx = F_IDX(f_hash, level->addr_capacity);
@@ -562,12 +571,14 @@ Function: level_static_query()
         Lookup a key-value item in level hash table via static search scheme;
         Always first search the top level and then search the bottom level;
 */
-paddr_t level_static_query(level_hash_t *level, laddr_t key)
+size_t level_static_query(level_hash_t *level, laddr_t key, paddr_t *value)
 {
     uint64_t f_hash = F_HASH(level, key);
     uint64_t s_hash = S_HASH(level, key);
     uint64_t f_idx = F_IDX(f_hash, level->addr_capacity);
     uint64_t s_idx = S_IDX(s_hash, level->addr_capacity);
+
+    *value = 0;
     
     uint64_t i, j;
     for(i = 0; i < 2; i ++){
@@ -578,7 +589,8 @@ paddr_t level_static_query(level_hash_t *level, laddr_t key)
                 //strcmp(level->buckets[i][f_idx].slot[j].key, key) == 0)
                 level->buckets[i][f_idx].slot[j].e_key == key)
             {
-                return level->buckets[i][f_idx].slot[j].e_val;
+                *value = level->buckets[i][f_idx].slot[j].e_val;
+                return level->buckets[i][f_idx].slot[j].e_size;
             }
         }
 
@@ -589,7 +601,8 @@ paddr_t level_static_query(level_hash_t *level, laddr_t key)
                 //strcmp(level->buckets[i][s_idx].slot[j].key, key) == 0)
                 level->buckets[i][s_idx].slot[j].e_key == key)
             {
-                return level->buckets[i][s_idx].slot[j].e_val;
+                *value = level->buckets[i][s_idx].slot[j].e_val;
+                return level->buckets[i][s_idx].slot[j].e_size;
             }
         }
         f_idx = F_IDX(f_hash, level->addr_capacity / 2);
@@ -693,7 +706,7 @@ uint8_t level_update(level_hash_t *level, laddr_t key, paddr_t new_value)
 Function: level_insert() 
         Insert a key-value item into level hash table;
 */
-uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value)
+uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value, size_t size)
 {
     uint64_t f_hash = F_HASH(level, key);
     uint64_t s_hash = S_HASH(level, key);
@@ -714,8 +727,9 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value)
             {
                 //memcpv(level->buckets[i][f_idx].slot[j].key, key, KEY_LEN);
                 //memcpy(level->buckets[i][f_idx].slot[j].value, value, VALUE_LEN);
-                level->buckets[i][f_idx].slot[j].e_key = key;
-                level->buckets[i][f_idx].slot[j].e_val = value;
+                level->buckets[i][f_idx].slot[j].e_key  = key;
+                level->buckets[i][f_idx].slot[j].e_val  = value;
+                level->buckets[i][f_idx].slot[j].e_size = size;
                 level->buckets[i][f_idx].token[j] = 1;
                 level->level_item_num[i] ++;
                 int f_err = mark_bucket_dirty(level, i, f_idx);
@@ -728,8 +742,9 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value)
             {
                 //memcpy(level->buckets[i][s_idx].slot[j].key, key, KEY_LEN);
                 //memcpy(level->buckets[i][s_idx].slot[j].value, value, VALUE_LEN);
-                level->buckets[i][s_idx].slot[j].e_key = key;
-                level->buckets[i][s_idx].slot[j].e_val = value;
+                level->buckets[i][s_idx].slot[j].e_key  = key;
+                level->buckets[i][s_idx].slot[j].e_val  = value;
+                level->buckets[i][s_idx].slot[j].e_size = size;
                 level->buckets[i][s_idx].token[j] = 1;
                 level->level_item_num[i] ++;
                 int s_err = mark_bucket_dirty(level, i, s_idx);
@@ -746,10 +761,10 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value)
     s_idx = S_IDX(s_hash, level->addr_capacity);
     
     for(i = 0; i < 2; i++){
-        if(!try_movement(level, f_idx, i, key, value)){
+        if(!try_movement(level, f_idx, i, key, value, size)){
             return 0;
         }
-        if(!try_movement(level, s_idx, i, key, value)){
+        if(!try_movement(level, s_idx, i, key, value, size)){
             return 0;
         }
 
@@ -762,8 +777,9 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value)
         if(empty_location != -1){
             //memcpy(level->buckets[1][f_idx].slot[empty_location].key, key, KEY_LEN);
             //memcpy(level->buckets[1][f_idx].slot[empty_location].value, value, VALUE_LEN);
-            level->buckets[1][f_idx].slot[empty_location].e_key = key;
-            level->buckets[1][f_idx].slot[empty_location].e_val = value;
+            level->buckets[1][f_idx].slot[empty_location].e_key  = key;
+            level->buckets[1][f_idx].slot[empty_location].e_val  = value;
+            level->buckets[1][f_idx].slot[empty_location].e_size = size;
             level->buckets[1][f_idx].token[empty_location] = 1;
             level->level_item_num[1] ++;
             int f_err = mark_bucket_dirty(level, 1, f_idx);
@@ -775,8 +791,9 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value)
         if(empty_location != -1){
             //memcpy(level->buckets[1][s_idx].slot[empty_location].key, key, KEY_LEN);
             //memcpy(level->buckets[1][s_idx].slot[empty_location].value, value, VALUE_LEN);
-            level->buckets[1][s_idx].slot[empty_location].e_key = key;
-            level->buckets[1][s_idx].slot[empty_location].e_val = value;
+            level->buckets[1][s_idx].slot[empty_location].e_key  = key;
+            level->buckets[1][s_idx].slot[empty_location].e_val  = value;
+            level->buckets[1][s_idx].slot[empty_location].e_size = size;
             level->buckets[1][s_idx].token[empty_location] = 1;
             level->level_item_num[1] ++;
             int s_err = mark_bucket_dirty(level, 1, s_idx);
@@ -793,13 +810,14 @@ Function: try_movement()
         Try to move an item from the current bucket to its same-level alternative bucket;
 */
 uint8_t try_movement(level_hash_t *level, uint64_t idx, uint64_t level_num, 
-                     laddr_t key, paddr_t value)
+                     laddr_t key, paddr_t value, size_t size)
 {
     uint64_t i, j, jdx;
 
     for(i = 0; i < ASSOC_NUM; i ++){
         laddr_t  m_key = level->buckets[level_num][idx].slot[i].e_key;
         paddr_t  m_value = level->buckets[level_num][idx].slot[i].e_val;
+        size_t   m_size = level->buckets[level_num][idx].slot[i].e_size;
         uint64_t f_hash = F_HASH(level, m_key);
         uint64_t s_hash = S_HASH(level, m_key);
         uint64_t f_idx = F_IDX(f_hash, level->addr_capacity/(1+level_num));
@@ -815,16 +833,18 @@ uint8_t try_movement(level_hash_t *level, uint64_t idx, uint64_t level_num,
             {
                 //memcpy(level->buckets[level_num][jdx].slot[j].key, m_key, KEY_LEN);
                 //memcpy(level->buckets[level_num][jdx].slot[j].value, m_value, VALUE_LEN);
-                level->buckets[level_num][jdx].slot[j].e_key = m_key;
-                level->buckets[level_num][jdx].slot[j].e_val = m_value;
+                level->buckets[level_num][jdx].slot[j].e_key  = m_key;
+                level->buckets[level_num][jdx].slot[j].e_val  = m_value;
+                level->buckets[level_num][jdx].slot[j].e_size = m_size;
                 level->buckets[level_num][jdx].token[j] = 1;
                 level->buckets[level_num][idx].token[i] = 0;
                 // The movement is finished and then the new item is inserted
 
                 //memcpy(level->buckets[level_num][idx].slot[i].key, key, KEY_LEN);
                 //memcpy(level->buckets[level_num][idx].slot[i].value, value, VALUE_LEN);
-                level->buckets[level_num][idx].slot[i].e_key = key;
-                level->buckets[level_num][idx].slot[i].e_val = value;
+                level->buckets[level_num][idx].slot[i].e_key  = key;
+                level->buckets[level_num][idx].slot[i].e_val  = value;
+                level->buckets[level_num][idx].slot[i].e_size = size;
                 level->buckets[level_num][idx].token[i] = 1;
                 level->level_item_num[level_num] ++;
                 
@@ -848,6 +868,7 @@ int b2t_movement(level_hash_t *level, uint64_t idx)
 {
     laddr_t key; 
     paddr_t value;
+    size_t size;
     uint64_t s_hash, f_hash;
     uint64_t s_idx, f_idx;
     
@@ -855,6 +876,7 @@ int b2t_movement(level_hash_t *level, uint64_t idx)
     for(i = 0; i < ASSOC_NUM; i ++){
         key = level->buckets[1][idx].slot[i].e_key;
         value = level->buckets[1][idx].slot[i].e_val;
+        size = level->buckets[1][idx].slot[i].e_size;
         f_hash = F_HASH(level, key);
         s_hash = S_HASH(level, key);  
         f_idx = F_IDX(f_hash, level->addr_capacity);
@@ -865,8 +887,9 @@ int b2t_movement(level_hash_t *level, uint64_t idx)
             {
                 //memcpy(level->buckets[0][f_idx].slot[j].key, key, KEY_LEN);
                 //memcpy(level->buckets[0][f_idx].slot[j].value, value, VALUE_LEN);
-                level->buckets[0][f_idx].slot[j].e_key = key;
-                level->buckets[0][f_idx].slot[j].e_val = value;
+                level->buckets[0][f_idx].slot[j].e_key  = key;
+                level->buckets[0][f_idx].slot[j].e_val  = value;
+                level->buckets[0][f_idx].slot[j].e_size = size;
                 level->buckets[0][f_idx].token[j] = 1;
                 level->buckets[1][idx].token[i] = 0;
                 level->level_item_num[0] ++;
@@ -881,8 +904,9 @@ int b2t_movement(level_hash_t *level, uint64_t idx)
             {
                 //memcpy(level->buckets[0][s_idx].slot[j].key, key, KEY_LEN);
                 //memcpy(level->buckets[0][s_idx].slot[j].value, value, VALUE_LEN);
-                level->buckets[0][s_idx].slot[j].e_key = key;
-                level->buckets[0][s_idx].slot[j].e_val = value;
+                level->buckets[0][s_idx].slot[j].e_key  = key;
+                level->buckets[0][s_idx].slot[j].e_val  = value;
+                level->buckets[0][s_idx].slot[j].e_size = size;
                 level->buckets[0][s_idx].token[j] = 1;
                 level->buckets[1][idx].token[i] = 0;
                 level->level_item_num[0] ++;

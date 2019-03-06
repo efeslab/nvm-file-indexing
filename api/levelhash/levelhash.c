@@ -27,11 +27,11 @@ int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents,
 ssize_t levelhash_lookup(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, paddr_t* paddr) {
     LEVELMETA(level_idx, lh);
-    *paddr = level_dynamic_query(lh, laddr);
+    size_t size = level_dynamic_query(lh, laddr, paddr);
 
-    if (0 == *paddr) return -ENOENT;
+    if (0 == size) return -ENOENT;
 
-    return 1;
+    return (ssize_t)size;
 }
 
 ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum, 
@@ -47,11 +47,11 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
     }
 
     for (size_t blk = 0; blk < nblk; ++blk) {
-        uint8_t ret = level_insert(lh, laddr + blk, (*paddr) + blk);
+        uint8_t ret = level_insert(lh, laddr + blk, (*paddr) + blk, nalloc - blk);
         if (ret) {
             // Trying to resize.
             level_expand(lh);
-            ret = level_insert(lh, laddr + blk, (*paddr) + blk);
+            ret = level_insert(lh, laddr + blk, (*paddr) + blk, nalloc - blk);
             if (ret) return -EIO;
         }
     }

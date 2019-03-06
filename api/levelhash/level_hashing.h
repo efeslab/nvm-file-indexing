@@ -21,6 +21,7 @@ typedef struct entry {                    // A slot storing a key-value item
     //uint8_t value[VALUE_LEN];
     laddr_t e_key;
     paddr_t e_val;
+    size_t e_size;
 } entry_t;
 
 #define MAGIC 0xcafebabe
@@ -76,11 +77,11 @@ level_hash_t *level_init(const idx_spec_t *idx_spec,
                          const paddr_range_t *loc,
                          uint64_t level_size);     
 
-uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value);          
+uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value, size_t size);          
 
-paddr_t level_static_query(level_hash_t *level, laddr_t key);
+size_t level_static_query(level_hash_t *level, laddr_t key, paddr_t *value);
 
-paddr_t level_dynamic_query(level_hash_t *level, laddr_t key);
+size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value);
 
 uint8_t level_delete(level_hash_t *level, laddr_t key);
 
@@ -91,7 +92,7 @@ void level_expand(level_hash_t *level);
 void level_shrink(level_hash_t *level);
 
 uint8_t try_movement(level_hash_t *level, uint64_t idx, uint64_t level_num, 
-                     laddr_t key, paddr_t value);
+                     laddr_t key, paddr_t value, size_t size);
 
 int b2t_movement(level_hash_t *level, uint64_t idx);
 
