@@ -38,6 +38,8 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
                          laddr_t laddr, size_t nblk, paddr_t* paddr) {
     LEVELMETA(level_idx, lh);
 
+    nblk = nblk > LH_MAX_SIZE ? LH_MAX_SIZE : nblk;
+
     ssize_t nalloc = CB(level_idx, cb_alloc_data, nblk, paddr);
 
     if (nalloc < 0) {

@@ -9,6 +9,9 @@
 #include "hash.h"
 
 #include "common/common.h"
+#ifdef __cplusplus
+#define _Static_assert static_assert
+#endif
 
 #define ASSOC_NUM 4                       // The number of slots in a bucket
 //#define KEY_LEN 16                        // The maximum length of a key
@@ -16,16 +19,18 @@
 #define KEY_LEN sizeof(laddr_t)
 #define VALUE_LEN sizeof(paddr_t)
 
+#pragma pack(push, 1)
 typedef struct entry {                    // A slot storing a key-value item 
     //uint8_t key[KEY_LEN];
     //uint8_t value[VALUE_LEN];
     laddr_t e_key;
+    uint16_t e_size;
     paddr_t e_val;
-    size_t e_size;
 } entry_t;
 
+#define LH_MAX_SIZE UINT16_MAX
+
 #define MAGIC 0xcafebabe
-#pragma pack(push, 1)
 typedef struct on_device_level_hash {  //
     uint32_t init_magic;               // So we know if stuff is initialized.
     paddr_t  dev_levels[2];            // API: Device location for the blocks.
@@ -44,6 +49,8 @@ typedef struct level_bucket            // A bucket
     uint8_t token[ASSOC_NUM];          // A token indicates whether its corresponding slot is empty, which can also be implemented using 1 bit
     entry_t slot[ASSOC_NUM];
 } level_bucket_t;
+
+_Static_assert(sizeof(level_bucket_t) <= 64, "level bucket is too big!");
 
 typedef struct level_hash {            // A Level hash table
     level_bucket_t *buckets[2];        // The top level and bottom level in the Level hash table

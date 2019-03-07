@@ -134,7 +134,7 @@ Function: generate_seeds()
 */
 void generate_seeds(level_hash_t *level)
 {
-    //srand(time(NULL));
+    srand(time(NULL));
     do
     {
         level->f_seed = rand();
