@@ -117,6 +117,69 @@ TEST_F(LevelHashingFixture, LevelExpandIterativelyAndLookup) {
     }
 }
 
+TEST_F(LevelHashingFixture, LevelExpandIterativelyAndLookupPersistent) {
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1000;
+    size_t npage_inc = 1;
+
+    map<laddr_t, paddr_t> prev_paddrs;
+
+    for (size_t p = 0; p < npages; p += npage_inc) {
+        ssize_t ret = levelhash_create(&level_idx, 0, lblk+p, npage_inc, &pblk);
+        ASSERT_EQ(npage_inc, ret);
+
+        prev_paddrs[lblk + p] = pblk;
+
+        idx_struct_t temp_idx;
+        int err = levelhash_init(&idx_spec, &inode_space, &temp_idx);
+        ASSERT_FALSE(err);
+        for (size_t l = 0; l <= p; ++l) {
+            paddr_t lookup_paddr;
+            ssize_t ret = levelhash_lookup(&temp_idx, 0, lblk + l,
+                                           &lookup_paddr);
+           
+            ASSERT_EQ(npage_inc, ret) << lblk + l << " " << p << endl;
+            ASSERT_EQ(prev_paddrs[lblk + l], lookup_paddr) << l << " " << p;
+        }
+    }
+}
+
+TEST_F(LevelHashingFixture, LevelExpandIterativelyUnfavorableAlloc) {
+    paddr_t pblk  = 0;
+    size_t npages = 64 * 256;
+    size_t npage_inc = 256;
+
+    map<laddr_t, paddr_t> prev_paddrs;
+    map<laddr_t, size_t> prev_sizes;
+
+    set_restricted_data_alloc(true);
+
+    for (size_t laddr = 0; laddr < npages; ) {
+        ssize_t ret = levelhash_create(&level_idx, 0, laddr, npage_inc, &pblk);
+        ASSERT_GT(ret, 0);
+
+        for (laddr_t k = 0; k < ret; ++k) {
+            prev_paddrs[laddr + k] = pblk + k;
+            prev_sizes[laddr + k] = ret - k;
+        }
+
+        idx_struct_t temp_idx;
+        int err = levelhash_init(&idx_spec, &inode_space, &temp_idx);
+        ASSERT_FALSE(err);
+        for (size_t l = 0; l < laddr + ret; ++l) {
+            paddr_t lookup_paddr;
+            ssize_t ret = levelhash_lookup(&temp_idx, 0, l, &lookup_paddr);
+           
+            ASSERT_EQ(prev_sizes[l], ret) << l << " " << laddr << endl;
+            ASSERT_EQ(prev_paddrs[l], lookup_paddr) << l << " " << laddr << endl;
+        }
+
+        laddr += ret;
+    }
+}
+
+
 TEST_F(LevelHashingFixture, LevelExpandSlab) {
     paddr_t pblk  = 0;
     size_t npages = 1000;

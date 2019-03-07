@@ -5,6 +5,8 @@ const size_t TestFixture::BLK_SZ = 4096;
 MockDevice TestFixture::device = MockDevice(TestFixture::NBLK,
                                             TestFixture::BLK_SZ);
 
+bool TestFixture::enable_ = false;
+
 int TestFixture::mock_get_dev_info(device_info_t* di) {
     di->di_size_blocks = NBLK;
     di->di_block_size  = BLK_SZ;
@@ -22,7 +24,8 @@ ssize_t TestFixture::mock_dealloc_metadata(size_t nblocks, paddr_t blk) {
 }
 
 ssize_t TestFixture::mock_alloc_data(size_t nblocks, paddr_t *blk) {
-    return mock_alloc_metadata(nblocks, blk);
+    size_t adj = nblocks > 8 && enable_ ? 8 : nblocks;
+    return mock_alloc_metadata(adj, blk);
 }
 
 ssize_t TestFixture::mock_dealloc_data(size_t nblocks, paddr_t blk) {

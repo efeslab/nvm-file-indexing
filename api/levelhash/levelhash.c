@@ -46,11 +46,14 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
         return -ENOMEM;
     }
 
-    for (size_t blk = 0; blk < nblk; ++blk) {
+    for (size_t blk = 0; blk < nalloc; ++blk) {
         uint8_t ret = level_insert(lh, laddr + blk, (*paddr) + blk, nalloc - blk);
         if (ret) {
             // Trying to resize.
             level_expand(lh);
+            int err = write_metadata(lh);
+            if (err) return -EIO;
+
             ret = level_insert(lh, laddr + blk, (*paddr) + blk, nalloc - blk);
             if (ret) return -EIO;
         }
@@ -59,7 +62,7 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
     int err = write_metadata(lh);
     if (err) return -EIO;
 
-    return (ssize_t) nblk;
+    return (ssize_t) nalloc;
 }
 
 // TODO also free the data!
@@ -69,7 +72,10 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
 
     for (size_t blk = 0; blk < nblk; ++blk) {
         uint8_t ret = level_delete(lh, laddr + blk);
-        if (ret) return -EIO;
+        if (ret) {
+            (void)write_metadata(lh);
+            return -EIO;
+        }
     }
 
     level_shrink(lh);

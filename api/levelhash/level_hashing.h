@@ -25,7 +25,7 @@ typedef struct entry {                    // A slot storing a key-value item
 } entry_t;
 
 #define MAGIC 0xcafebabe
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct on_device_level_hash {  //
     uint32_t init_magic;               // So we know if stuff is initialized.
     paddr_t  dev_levels[2];            // API: Device location for the blocks.
@@ -37,6 +37,7 @@ typedef struct on_device_level_hash {  //
     uint64_t s_seed;                   // Two randomized seeds for hash functions
     size_t   block_size;               // size of block on underlying device.
 } dev_level_hash_t;
+#pragma pack(pop)
 
 typedef struct level_bucket            // A bucket
 {
