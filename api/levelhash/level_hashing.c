@@ -337,7 +337,7 @@ level_hash_t *level_init(const idx_spec_t *idx_spec,
     printf("The number of all entries: %ld\n", level->total_capacity*ASSOC_NUM);
     printf("The level hash table initialization succeeds!\n");
     */
-    if (write_metadata(level)) return NULL;
+    if (!already_exists && write_metadata(level)) return NULL;
     return level;
 }
 
@@ -366,6 +366,17 @@ void level_expand(level_hash_t *level)
     paddr_t new_buckets_paddr;
     ssize_t nalloced = CB(level->idx_spec, cb_alloc_metadata,
                           new_buckets_blocks, &new_buckets_paddr);
+    if (nalloced != new_buckets_blocks) {
+        // try again
+        paddr_t to_delete = new_buckets_paddr;
+        ssize_t old_size = nalloced;
+        nalloced = CB(level->idx_spec, cb_alloc_metadata,
+                      new_buckets_blocks, &new_buckets_paddr);
+        ssize_t ndeleted = CB(level->idx_spec, cb_dealloc_metadata,
+                              old_size, to_delete);
+        if_then_panic(ndeleted != old_size, "could not delete!");
+    }
+
     if_then_panic(nalloced != new_buckets_blocks, 
             "could not alloc metadata! Wanted %llu, got %llu!\n",
             new_buckets_blocks, nalloced);
@@ -513,7 +524,7 @@ void level_shrink(level_hash_t *level)
     level->addr_capacity = pow(2, level->level_size);
     level->total_capacity = pow(2, level->level_size) + pow(2, level->level_size - 1);
 
-    size_t new_buckets_bytes = level->addr_capacity * sizeof(level_bucket_t);
+    size_t new_buckets_bytes = new_size * sizeof(level_bucket_t);
     size_t new_buckets_blocks = new_buckets_bytes / level->block_size;
     if(new_buckets_bytes % level->block_size != 0) new_buckets_blocks++;
 
