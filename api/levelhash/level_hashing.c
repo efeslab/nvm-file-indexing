@@ -147,7 +147,9 @@ void generate_seeds(level_hash_t *level)
 int read_metadata(const idx_spec_t *idx_spec, 
                   const paddr_range_t *loc, 
                   dev_level_hash_t *dhash) {
-    if_then_panic(loc->pr_nbytes < sizeof(*dhash), "region is too small!");
+    if_then_panic(loc->pr_nbytes < sizeof(*dhash), 
+                  "region is too small! Only have %llu bytes, but need %llu!\n",
+                  loc->pr_nbytes, sizeof(*dhash));
 
     ssize_t ret = CB(idx_spec, cb_read,
                      loc->pr_start, loc->pr_blk_offset, sizeof(*dhash),
@@ -167,8 +169,6 @@ int write_metadata(level_hash_t *level) {
         .dev_levels     = { level->dev_levels[0], level->dev_levels[1] },
         .dev_sizes      = { level->dev_sizes[0], level->dev_sizes[1] },
         .level_item_num = { level->level_item_num[0], level->level_item_num[1]},
-        .addr_capacity  = level->addr_capacity,
-        .total_capacity = level->total_capacity,
         .level_size     = level->level_size,
         .f_seed         = level->f_seed,
         .s_seed         = level->s_seed,
@@ -201,7 +201,11 @@ level_hash_t *level_init(const idx_spec_t *idx_spec,
     int ret = read_metadata(idx_spec, loc, &dhash);
     bool already_exists = dhash.init_magic == MAGIC;
 
-    level->level_size = already_exists ? dhash.level_size : level_size;
+    if (already_exists) {
+        level_size = dhash.level_size;
+    }
+
+    level->level_size = level_size;
     level->addr_capacity = pow(2, level_size);
     level->total_capacity = pow(2, level_size) + pow(2, level_size - 1);
 

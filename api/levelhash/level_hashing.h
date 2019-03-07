@@ -25,15 +25,14 @@ typedef struct entry {                    // A slot storing a key-value item
 } entry_t;
 
 #define MAGIC 0xcafebabe
+#pragma pack(1)
 typedef struct on_device_level_hash {  //
-    uint64_t init_magic;               // So we know if stuff is initialized.
+    uint32_t init_magic;               // So we know if stuff is initialized.
     paddr_t  dev_levels[2];            // API: Device location for the blocks.
-    size_t   dev_sizes[2];
-    uint64_t level_item_num[2];        // The numbers of items stored in the top and bottom levels respectively
+    uint32_t dev_sizes[2];
+    uint32_t level_item_num[2];        // The numbers of items stored in the top and bottom levels respectively
 
-    uint64_t addr_capacity;            // The number of buckets in the top level
-    uint64_t total_capacity;           // The number of all buckets in the Level hash table    
-    uint64_t level_size;               // level_size = log2(addr_capacity)
+    uint32_t level_size;               // level_size = log2(addr_capacity)
     uint64_t f_seed;
     uint64_t s_seed;                   // Two randomized seeds for hash functions
     size_t   block_size;               // size of block on underlying device.
