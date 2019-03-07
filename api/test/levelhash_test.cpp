@@ -35,6 +35,26 @@ TEST_F(LevelHashingFixture, LevelLookup) {
     ASSERT_EQ(pblk, lookup_paddr);
 }
 
+TEST_F(LevelHashingFixture, LevelLookupRepeat) {
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = levelhash_create(&level_idx, 0, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    paddr_t lookup_paddr;
+    ret = levelhash_lookup(&level_idx, 0, lblk, &lookup_paddr);
+    ASSERT_EQ(npages, ret);
+    ASSERT_EQ(pblk, lookup_paddr);
+
+    paddr_t repeat;
+    ret = levelhash_create(&level_idx, 0, lblk, npages, &repeat);
+    ASSERT_EQ(npages, ret);
+    ASSERT_EQ(lookup_paddr, repeat);
+}
+
 TEST_F(LevelHashingFixture, LevelRemove) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
@@ -114,6 +134,29 @@ TEST_F(LevelHashingFixture, LevelExpandIterativelyAndLookup) {
             ASSERT_EQ(npage_inc, ret) << lblk + l << " " << p << endl;
             ASSERT_EQ(prev_paddrs[lblk + l], lookup_paddr) << l << " " << p;
         }
+    }
+}
+
+TEST_F(LevelHashingFixture, LevelExpandIterativelyAndLookupHuge) {
+    paddr_t pblk  = 0;
+    size_t npages = 10000;
+    size_t npage_inc = 1;
+
+    map<laddr_t, paddr_t> prev_paddrs;
+
+    for (size_t p = 0; p < npages; p += npage_inc) {
+        ssize_t ret = levelhash_create(&level_idx, 0, p, npage_inc, &pblk);
+        ASSERT_EQ(npage_inc, ret);
+
+        prev_paddrs[p] = pblk;
+    }
+
+    for (size_t l = 0; l < npages; ++l) {
+        paddr_t lookup_paddr;
+        ssize_t ret = levelhash_lookup(&level_idx, 0, l, &lookup_paddr);
+       
+        ASSERT_EQ(npage_inc, ret) << l << endl;
+        ASSERT_EQ(prev_paddrs[l], lookup_paddr) << l << endl;
     }
 }
 
@@ -200,6 +243,26 @@ TEST_F(LevelHashingFixture, LevelLookupAfterExpand) {
     for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
         paddr_t lookup_paddr;
         ret = levelhash_lookup(&level_idx, 0, lblk, &lookup_paddr);
+        ASSERT_EQ(npages - (ssize_t)lblk, ret);
+        ASSERT_EQ(pblk + (ssize_t)lblk, lookup_paddr);
+    }
+}
+
+TEST_F(LevelHashingFixture, LevelLookupAfterExpandAcrossIndices) {
+    paddr_t pblk  = 0;
+    size_t npages = 1000;
+
+    idx_struct_t test_idx;
+    int init_again = levelhash_init(&idx_spec, &inode_space, &test_idx);
+    ASSERT_FALSE(init_again);
+
+    ssize_t ret = levelhash_create(&level_idx, 0, 0, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+        paddr_t lookup_paddr;
+        ret = levelhash_lookup(&test_idx, 0, lblk, &lookup_paddr);
         ASSERT_EQ(npages - (ssize_t)lblk, ret);
         ASSERT_EQ(pblk + (ssize_t)lblk, lookup_paddr);
     }

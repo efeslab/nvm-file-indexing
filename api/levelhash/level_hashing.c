@@ -159,6 +159,48 @@ int read_metadata(const idx_spec_t *idx_spec,
     return 0;
 }
 
+int reread_metadata(level_hash_t *level) {
+    dev_level_hash_t dhash;
+    int ret = read_metadata(level->idx_spec, &(level->range), &dhash);
+    if (ret) return -EIO;
+
+    bool resized = false;
+    for (int i = 0; i < 2; ++i) {
+        if (level->dev_sizes[i] != dhash.dev_sizes[i]) {
+            resized = true;
+        }
+
+        level->level_item_num[i] = dhash.level_item_num[i];
+        level->dev_levels[i]     = dhash.dev_levels[i];
+        level->dev_sizes[i]      = dhash.dev_sizes[i];
+    }
+
+    level->level_size = dhash.level_size;
+    level->addr_capacity = pow(2, dhash.level_size);
+    level->total_capacity = pow(2, dhash.level_size) + 
+                            pow(2, dhash.level_size - 1);
+    level->f_seed = dhash.f_seed;
+    level->s_seed = dhash.s_seed;
+    level->block_size = dhash.block_size;
+
+    if (resized) {
+        for (int i = 0; i < 2; ++i) {
+            size_t new_size = pow(2, level->level_size - i);
+            FREE(level->idx_spec, level->buckets[i]);
+            FREE(level->idx_spec, level->cache_state[i]);
+            size_t bucket_bytes = new_size * sizeof(level_bucket_t);
+            size_t cache_state_bytes = new_size * sizeof(int8_t);
+
+            level->buckets[i] = ZALLOC(level->idx_spec, bucket_bytes);
+            level->cache_state[i] = ZALLOC(level->idx_spec, cache_state_bytes);
+
+            if (!level->buckets[i] || !level->cache_state[i]) return -ENOMEM;
+        }
+    }
+
+    return level_cache_invalidate(level);
+}
+
 int write_metadata(level_hash_t *level) {
     paddr_range_t *loc = &(level->range);
     if_then_panic(loc->pr_nbytes < sizeof(dev_level_hash_t), 
@@ -295,6 +337,7 @@ level_hash_t *level_init(const idx_spec_t *idx_spec,
     printf("The number of all entries: %ld\n", level->total_capacity*ASSOC_NUM);
     printf("The level hash table initialization succeeds!\n");
     */
+    if (write_metadata(level)) return NULL;
     return level;
 }
 
@@ -319,6 +362,14 @@ void level_expand(level_hash_t *level)
     size_t new_buckets_blocks = new_buckets_bytes / level->block_size;
     if(new_buckets_bytes % level->block_size != 0) new_buckets_blocks++;
     //level_bucket_t *newBuckets = alignedmalloc(level->addr_capacity*sizeof(level_bucket_t));
+
+    paddr_t new_buckets_paddr;
+    ssize_t nalloced = CB(level->idx_spec, cb_alloc_metadata,
+                          new_buckets_blocks, &new_buckets_paddr);
+    if_then_panic(nalloced != new_buckets_blocks, 
+            "could not alloc metadata! Wanted %llu, got %llu!\n",
+            new_buckets_blocks, nalloced);
+
     level_bucket_t *newBuckets = ZALLOC(level->idx_spec, new_buckets_bytes);
     int8_t *new_cache_state = ZALLOC(level->idx_spec, level->addr_capacity*sizeof(int8_t));
 
@@ -326,12 +377,6 @@ void level_expand(level_hash_t *level)
         printf("The expanding fails: 2\n");
         exit(1);
     }
-
-    paddr_t new_buckets_paddr;
-    ssize_t nalloced = CB(level->idx_spec, cb_alloc_metadata,
-                          new_buckets_blocks, &new_buckets_paddr);
-    if_then_panic(nalloced != new_buckets_blocks, "could not alloc metadata!");
-
     // Ensure the new blocks are zeroed out.
     ssize_t nzeroed = CB(level->idx_spec, cb_write,
                          new_buckets_paddr, 0, new_buckets_bytes, 
@@ -388,14 +433,19 @@ void level_expand(level_hash_t *level)
                         break;
                     }
                 }
+
                 if(!insertSuccess){
                     printf("The expanding fails: 3\n");
+                    printf("\tWas expanding to level size %llu\n",
+                            level->level_size + 1);
                     exit(1);                    
                 }
-                
+               
+                /*
                 level->buckets[1][old_idx].token[i] = 0;
                 int oerr = mark_bucket_dirty(level, 1, old_idx);
                 if_then_panic(oerr, "couldn't write!");
+                */
             }
         }
     }
@@ -975,5 +1025,5 @@ int level_persist(level_hash_t *level) {
 }
 
 int level_cache_invalidate(level_hash_t *level) {
-    return -1;
+    return 0;
 }
