@@ -54,14 +54,16 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
     }
 
     for (size_t blk = 0; blk < nalloc; ++blk) {
-        uint8_t ret = level_insert(lh, laddr + blk, (*paddr) + blk, nalloc - blk);
+        uint8_t ret = level_insert(lh, laddr + blk, (*paddr) + blk, 
+                                   blk, nalloc - blk);
         if (ret) {
             // Trying to resize.
             level_expand(lh);
             int err = write_metadata(lh);
             if (err) return -EIO;
 
-            ret = level_insert(lh, laddr + blk, (*paddr) + blk, nalloc - blk);
+            ret = level_insert(lh, laddr + blk, (*paddr) + blk, 
+                               blk, nalloc - blk);
             if (ret) return -EIO;
         }
     }
@@ -78,11 +80,52 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
     LEVELMETA(level_idx, lh);
     if (reread_metadata(lh)) return -EIO;
 
+    // TODO this is inefficient but correct.
     for (size_t blk = 0; blk < nblk; ++blk) {
-        uint8_t ret = level_delete(lh, laddr + blk);
+        size_t idx;
+        size_t full_range;
+        paddr_t paddr;
+
+        laddr_t cur_laddr = laddr + blk;
+
+        uint8_t ret = level_delete(lh, cur_laddr, &paddr, &idx, &full_range);
         if (ret) {
+            printf("remove failed: laddr = %lu\n", cur_laddr);
             (void)write_metadata(lh);
             return -EIO;
+        }
+
+        // 1) Change the sizes of earlier entries in the range.
+        if (idx > 0) {
+            size_t new_size = idx;
+            for (laddr_t l = 0; l < (laddr_t)idx; ++l) {
+                size_t new_idx = (size_t)l;
+                laddr_t lblk = (cur_laddr - idx) + l;
+                uint8_t r = level_update(lh, lblk, new_idx, new_size);
+                if (r) {
+                    printf("index update failed: laddr = %lu, %llu/%llu\n", 
+                            lblk, blk + 1, nblk);
+                    (void)write_metadata(lh);
+                    return -EIO;
+                }
+            }
+        }
+        // 2) Change the indices and sizes of the later entries.
+        if (idx < full_range) {
+            // minus 1 because we just deleted one
+            size_t new_size = full_range - idx - 1;
+            // start after this laddr we just deleted.
+            for (laddr_t l = 1; l < new_size + 1; ++l) {
+                size_t new_idx = (size_t)l - 1;
+                laddr_t lblk = cur_laddr + l;
+                uint8_t r = level_update(lh, lblk, new_idx, new_size);
+                if (r) {
+                    printf("range update failed: laddr = %lu, %llu/%llu\n", 
+                            lblk, blk + 1, nblk);
+                    (void)write_metadata(lh);
+                    return -EIO;
+                }
+            }
         }
     }
 

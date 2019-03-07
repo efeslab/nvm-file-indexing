@@ -38,21 +38,28 @@ extern "C" {
 #include "hash_functions.h"
 
 // For the big hash table, mapping (inode, lblk) -> single block
+#pragma pack(push,2)
 typedef struct hash_index_entry {
-  paddr_t      key;
-  uint16_t     size;
-  uint16_t     value_hi16;
-  uint32_t     value_low32;
+    paddr_t  key;
+    uint16_t index; // Go backwards to modify size on truncate
+    uint16_t size;
+    uint16_t value_hi16;
+    uint32_t value_low32;
+    uint16_t padding_[7];
 } hash_ent_t;
+#pragma pack(pop)
 
 #define HASH_ENT_VAL(x) (((paddr_t)x.value_hi16 << 32) | ((paddr_t)x.value_low32))
-#define HASH_ENT_IS_TOMBSTONE(x) (x.value_hi16 == ~0 && x.value_low32 == ~0)
+#define HASH_ENT_IS_TOMBSTONE(x) (x.value_hi16 == (uint16_t)~0 && \
+                                  x.value_low32 == (uint32_t)~0)
 #define HASH_ENT_IS_EMPTY(x) (x.value_hi16 == 0 && x.value_low32 == 0)
 #define HASH_ENT_IS_VALID(x) (!HASH_ENT_IS_EMPTY(x) && !HASH_ENT_IS_TOMBSTONE(x))
 
-#define HASH_ENT_SET_TOMBSTONE(x) do {x.value_hi16 = ~0; x.value_low32 = ~0;} while(0)
+#define HASH_ENT_SET_TOMBSTONE(x) do {x.value_hi16 = ~0; \
+                                      x.value_low32 = ~0;} while(0)
 #define HASH_ENT_SET_EMPTY(x) do {x.value_hi16 = 0; x.value_low32 = 0;} while(0)
-#define HASH_ENT_SET_VAL(x,v) do {x.value_hi16 = (uint16_t)(v >> 32); x.value_low32 = (uint32_t)(v);} while(0)
+#define HASH_ENT_SET_VAL(x,v) do {x.value_hi16 = (uint16_t)(v >> 32); \
+                                  x.value_low32 = (uint32_t)(v);} while(0)
 
 //#define RANGE_SIZE (1 << 5) // 32
 #define RANGE_SIZE (1 << 9) // 512 -- 2MB
@@ -123,27 +130,30 @@ typedef struct nvm_hashtable_index {
 
 nvm_hash_idx_t *
 nvm_hash_table_new (hash_func_t       hash_func,
-                  size_t            max_entries,
-                  size_t            block_size,
-                  size_t            range_size,
-                  paddr_t           metadata_location,
-                  const idx_spec_t *idx_spec);
+                    size_t            max_entries,
+                    size_t            block_size,
+                    size_t            range_size,
+                    paddr_t           metadata_location,
+                    const idx_spec_t *idx_spec);
 
 void nvm_hash_table_destroy(nvm_hash_idx_t     *hash_table);
 
 int nvm_hash_table_insert(nvm_hash_idx_t *hash_table,
-                          paddr_t     key,
-                          paddr_t     value,
-                          paddr_t     range);
+                          paddr_t         key,
+                          paddr_t         value,
+                          size_t          index,
+                          size_t          range);
 
-int nvm_hash_table_replace(nvm_hash_idx_t *hash_table,
-                           paddr_t key,
-                           paddr_t value);
+// Used for truncate
+int nvm_hash_table_update(nvm_hash_idx_t *hash_table,
+                          paddr_t         key,
+                          size_t          new_range);
 
 int nvm_hash_table_remove(nvm_hash_idx_t *hash_table,
-                          paddr_t key,
-                          paddr_t *value,
-                          size_t  *nblocks);
+                          paddr_t         key,
+                          paddr_t        *value,
+                          size_t         *nprevious,
+                          size_t         *nblocks);
 
 void nvm_hash_table_lookup(nvm_hash_idx_t *hash_table, paddr_t key,
     paddr_t *val, paddr_t *size, bool force);
@@ -259,6 +269,7 @@ nvm_write_metadata(nvm_hash_idx_t *ht) {
 
     // reconsititute the rest of the httable from
     metadata.nvram_size = ht->nvram_size;
+    metadata.blksz = ht->blksz;
     metadata.size = ht->size;
     metadata.range_size = ht->range_size;
     metadata.mod = ht->mod;

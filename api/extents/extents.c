@@ -134,12 +134,8 @@ int extent_tree_init(const idx_spec_t *idx_spec,
         if (NULL == ext_meta->et_buffers[i]) return -ENOMEM;
     }
 
-    ssize_t nmeta = CB(ext_idx, cb_read,
-                       ext_meta->et_direct_range.pr_start,
-                       ext_meta->et_direct_range.pr_blk_offset,
-                       ext_meta->et_direct_range.pr_nbytes,
-                       ext_meta->et_direct_data);
-    if(nmeta != ext_meta->et_direct_range.pr_nbytes) return -EIO;
+    int read_ret = read_ext_direct_data(ext_idx);
+    if (read_ret) return read_ret;
 
     EXTHDR(ext_meta, eh);
 
@@ -2605,6 +2601,10 @@ ssize_t extent_tree_create(idx_struct_t *ext_idx, inum_t inum,
     int create;
 
     if (NULL == ext_idx) return -EINVAL;
+    if_then_panic(size > UINT16_MAX, "too big!!\n");
+
+    int read_ret = read_ext_direct_data(ext_idx);
+    if (read_ret) return read_ret;
 
     /* find extent for this block */
     path = find_extent(ext_idx, laddr, NULL, 0);
@@ -2749,6 +2749,9 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
     *paddr = 0;
     ret = 0;
 
+    int read_ret = read_ext_direct_data(ext_idx);
+    if (read_ret) return read_ret;
+
     /* find extent for this block */
     path = find_extent(ext_idx, laddr, NULL, 0);
     if (IS_ERR(path)) {
@@ -2795,6 +2798,9 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
 
 ssize_t extent_tree_remove(idx_struct_t *ext_idx,
                            inum_t inum, laddr_t laddr, size_t size) {
+    int read_ret = read_ext_direct_data(ext_idx);
+    if (read_ret) return read_ret;
+
     int err = ext_truncate(ext_idx, laddr, laddr + size - 1);
     if (err) return err;
     return size;

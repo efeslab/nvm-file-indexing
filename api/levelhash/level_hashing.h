@@ -13,7 +13,7 @@
 #define _Static_assert static_assert
 #endif
 
-#define ASSOC_NUM 4                       // The number of slots in a bucket
+#define ASSOC_NUM 3                       // The number of slots in a bucket
 //#define KEY_LEN 16                        // The maximum length of a key
 //#define VALUE_LEN 15                      // The maximum length of a value
 #define KEY_LEN sizeof(laddr_t)
@@ -24,6 +24,7 @@ typedef struct entry {                    // A slot storing a key-value item
     //uint8_t key[KEY_LEN];
     //uint8_t value[VALUE_LEN];
     laddr_t e_key;
+    uint16_t e_idx;
     uint16_t e_size;
     paddr_t e_val;
 } entry_t;
@@ -85,22 +86,25 @@ level_hash_t *level_init(const idx_spec_t *idx_spec,
                          const paddr_range_t *loc,
                          uint64_t level_size);     
 
-uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value, size_t size);          
+uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value, 
+                     size_t idx, size_t size);          
 
 size_t level_static_query(level_hash_t *level, laddr_t key, paddr_t *value);
 
 size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value);
 
-uint8_t level_delete(level_hash_t *level, laddr_t key);
+uint8_t level_delete(level_hash_t *level, laddr_t key, paddr_t *old_paddr, 
+                     size_t *old_idx, size_t *old_size);
 
-uint8_t level_update(level_hash_t *level, laddr_t key, paddr_t new_value);
+uint8_t level_update(level_hash_t *level, laddr_t key, 
+                     size_t new_idx, size_t new_size);
 
 void level_expand(level_hash_t *level);
 
 void level_shrink(level_hash_t *level);
 
 uint8_t try_movement(level_hash_t *level, uint64_t idx, uint64_t level_num, 
-                     laddr_t key, paddr_t value, size_t size);
+                     laddr_t key, paddr_t value, size_t p_idx, size_t size);
 
 int b2t_movement(level_hash_t *level, uint64_t idx);
 

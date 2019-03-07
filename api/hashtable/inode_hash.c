@@ -13,7 +13,8 @@
 #endif
 
 int hashtable_initialize(const idx_spec_t *idx_spec,
-                         idx_struct_t *idx_struct, paddr_t *location) {
+                         idx_struct_t *idx_struct,
+                         paddr_t *location) {
     trace_me();
     if_then_panic(!idx_spec, "idx_spec cannot be null!");
     if_then_panic(!idx_struct, "idx_struct cannot be null!");
@@ -32,7 +33,9 @@ int hashtable_initialize(const idx_spec_t *idx_spec,
 
     // Allocate space on device.
     if_then_panic(devinfo.di_block_size % sizeof(hash_ent_t) != 0,
-                  "bad hesh_entry_t size");
+                  "bad hash_entry_t size: %llu %% %llu = %llu overflow\n",
+                  devinfo.di_block_size, sizeof(hash_ent_t),
+                  devinfo.di_block_size % sizeof(hash_ent_t));
 
     size_t entries_per_block = devinfo.di_block_size / sizeof(hash_ent_t);
 
@@ -71,8 +74,17 @@ ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
 
     for (size_t blkno = 0; blkno < nalloc; ++blkno) {
         hash_key_t k = MAKEKEY(inum, laddr + blkno);
-        int err = nvm_hash_table_insert(ht, k, (*paddr) + blkno, size - blkno);
-        if (!err) return -EEXIST;
+        // Range: how many more logical blocks are contiguous after this one?
+        size_t range = nalloc - blkno;
+        // Index: how many more logical blocks are contiguous before this one?
+        size_t index = blkno;
+        int err = nvm_hash_table_insert(ht, k, (*paddr) + blkno, index, range);
+        if (!err) {
+            ssize_t dealloc = CB(idx_struct, cb_dealloc_data, nalloc, *paddr);
+            if_then_panic(nalloc != dealloc, "could not free data blocks!\n");
+            *paddr = 0;
+            return -EEXIST;
+        }
     }
 
     return nalloc;
@@ -106,18 +118,58 @@ ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     if (size == 0) return -EINVAL;
 
     ssize_t ret = 0;
+    size_t smallest_idx = UINT64_MAX;
+    laddr_t smallest_lblk;
+    size_t new_size;
+    laddr_t range_start;
     for (laddr_t lblk = laddr; lblk < laddr + size; ++lblk) {
         hash_key_t k = MAKEKEY(inum, lblk);
-        paddr_t removed;
-        size_t nblk;
-        ret += nvm_hash_table_remove(ht, k, &removed, &nblk);
-        if_then_panic(!nblk, "size was 0 on delete!");
-        ssize_t ndeleted = CB(idx_struct, cb_dealloc_data, 1, removed);
-        if_then_panic(ndeleted < 0, "error in dealloc!");
-        if_then_panic(1 != (size_t)ndeleted, "could not deallocate!");
+        size_t removed;
+        size_t index;
+        size_t range;
+        ssize_t was_removed = nvm_hash_table_remove(ht, k, &removed, &index, &range);
+        if_then_panic(!range, "size was 0 on delete!");
+
+        if (lblk == laddr) {
+            // total size of the contiguous region
+            new_size = (index + range) - size;
+            range_start = laddr - index;
+        }
+
+        // Maintain the smallest index. After this loop, go back and amend
+        // previous entries to reduce range size.
+        if (index < smallest_idx) {
+            smallest_idx = index;
+            smallest_lblk = lblk;
+        }
+
+        if (was_removed > 0) {
+            ssize_t ndeleted = CB(idx_struct, cb_dealloc_data, was_removed, removed);
+            if_then_panic(ndeleted < 0, "error in dealloc!");
+            if_then_panic(was_removed != (size_t)ndeleted, "could not deallocate!");
+            ret += was_removed;
+        } else {
+            printf("Could not remove requested block %lu from %lu, returned %lld\n", 
+                    lblk, inum, was_removed);
+        }
+
     }
 
-    if (ret == 0) return -ENOENT;
+    if (new_size > 0) {
+        //for (laddr_t lblk = smallest_lblk; lblk >= range_start; --lblk) {
+        for (laddr_t lblk = range_start; lblk < smallest_lblk; ++lblk) {
+            hash_key_t k = MAKEKEY(inum, lblk);
+            size_t new_range = new_size - lblk;
+            if_then_panic(new_range == 0, "Cannot insert with size 0!");
+            int was_updated = nvm_hash_table_update(ht, k, new_range);
+            if_then_panic(!was_updated, "could not update range size!\n");
+        }
+    }
+
+    if (ret <= 0) return -ENOENT;
+
+    if (ret != size)
+        printf("Only freed %llu of %llu blocks!\n", ret, size);
 
     return ret;
 }

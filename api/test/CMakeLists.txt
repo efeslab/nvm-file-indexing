@@ -20,5 +20,6 @@ add_executable(TestSuite
                $<TARGET_OBJECTS:HashTable>
                $<TARGET_OBJECTS:ExtentTree>
                $<TARGET_OBJECTS:LevelHashing>
+               $<TARGET_OBJECTS:RadixTree>
                )
 target_link_libraries(TestSuite gtest)

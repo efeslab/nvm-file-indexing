@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <sys/types.h>
 
 typedef uint32_t inum_t;
 typedef uint32_t laddr_t;

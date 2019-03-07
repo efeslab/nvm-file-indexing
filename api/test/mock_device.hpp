@@ -37,8 +37,8 @@ struct MockMemPage {
     char *data()  const { return data_ptr_; }
 
     std::vector<char> data_;
-    char *data_ptr_;
-    size_t   data_sz_;
+    char             *data_ptr_;
+    size_t            data_sz_;
 };
 
 struct MockDevice {
@@ -64,8 +64,10 @@ struct MockDevice {
     }
 
     paddr_t allocate(size_t nblocks) {
-        paddr_t largest_region = -1;
+        paddr_t largest_region = 0;
         size_t  largest_region_size = 0;
+
+        if_then_panic(!nblocks, "Asked to allocate 0 blocks!\n");
 
         paddr_t i = 0;
         paddr_t cur = 0;
@@ -93,6 +95,8 @@ struct MockDevice {
 
             ++i;
         }
+
+        if_then_panic(largest_region_size == 0, "Could not allocate region!\n");
 
         set_range(largest_region, largest_region_size, true);
         return largest_region;

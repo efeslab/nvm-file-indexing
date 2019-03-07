@@ -244,6 +244,30 @@ TEST_F(ExtentTreeFixture, RemoveSingle) {
     ASSERT_LE(check_size, 0);
 }
 
+TEST_F(ExtentTreeFixture, RemoveSingleReinsert) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    ssize_t check_size = extent_tree_remove(&ext_idx, inum, lblk, npages);
+    ASSERT_EQ(npages, check_size);
+
+    paddr_t check_paddr = 0;
+    check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
+    ASSERT_NE(pblk, check_paddr);
+    ASSERT_NE(npages, check_size);
+    ASSERT_LE(check_size, 0);
+
+    ret = extent_tree_create(&ext_idx, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+}
+
 TEST_F(ExtentTreeFixture, EraseMulti) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
