@@ -78,6 +78,7 @@ int read_metadata(const idx_spec_t *idx_spec,
                   const paddr_range_t *loc, 
                   dev_level_hash_t *dhash);
 
+int reread_metadata(level_hash_t *level);
 int write_metadata(level_hash_t *level);
 
 level_hash_t *level_init(const idx_spec_t *idx_spec, 
