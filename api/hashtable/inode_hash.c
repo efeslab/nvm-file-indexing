@@ -110,14 +110,21 @@ ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         hash_key_t k = MAKEKEY(inum, lblk);
         paddr_t removed;
         size_t nblk;
-        ret += nvm_hash_table_remove(ht, k, &removed, &nblk);
+        ssize_t was_removed = nvm_hash_table_remove(ht, k, &removed, &nblk);
         if_then_panic(!nblk, "size was 0 on delete!");
-        ssize_t ndeleted = CB(idx_struct, cb_dealloc_data, 1, removed);
-        if_then_panic(ndeleted < 0, "error in dealloc!");
-        if_then_panic(1 != (size_t)ndeleted, "could not deallocate!");
+
+        if (was_removed > 0) {
+            ssize_t ndeleted = CB(idx_struct, cb_dealloc_data, was_removed, removed);
+            if_then_panic(ndeleted < 0, "error in dealloc!");
+            if_then_panic(was_removed != (size_t)ndeleted, "could not deallocate!");
+            ret += was_removed;
+        } else {
+            printf("Weird, but not removed! Returned %lld\n", was_removed);
+        }
+
     }
 
-    if (ret == 0) return -ENOENT;
+    if (ret <= 0) return -ENOENT;
 
     return ret;
 }

@@ -102,6 +102,30 @@ TEST_F(HashTableFixture, EraseSingle) {
     ASSERT_LE(check_size, 0);
 }
 
+TEST_F(HashTableFixture, EraseRecreate) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    ssize_t check_size = hashtable_remove(&hashtable, inum, lblk, npages);
+    ASSERT_EQ(npages, check_size);
+
+    paddr_t check_paddr = 0;
+    check_size = hashtable_lookup(&hashtable, inum, lblk, &check_paddr);
+    ASSERT_NE(pblk, check_paddr);
+    ASSERT_NE(npages, check_size);
+    ASSERT_LE(check_size, 0);
+
+    ret = hashtable_create(&hashtable, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+}
+
 TEST_F(HashTableFixture, EraseMulti) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;

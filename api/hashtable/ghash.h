@@ -46,7 +46,8 @@ typedef struct hash_index_entry {
 } hash_ent_t;
 
 #define HASH_ENT_VAL(x) (((paddr_t)x.value_hi16 << 32) | ((paddr_t)x.value_low32))
-#define HASH_ENT_IS_TOMBSTONE(x) (x.value_hi16 == ~0 && x.value_low32 == ~0)
+#define HASH_ENT_IS_TOMBSTONE(x) (x.value_hi16 == (uint16_t)~0 && \
+                                  x.value_low32 == (uint32_t)~0)
 #define HASH_ENT_IS_EMPTY(x) (x.value_hi16 == 0 && x.value_low32 == 0)
 #define HASH_ENT_IS_VALID(x) (!HASH_ENT_IS_EMPTY(x) && !HASH_ENT_IS_TOMBSTONE(x))
 
