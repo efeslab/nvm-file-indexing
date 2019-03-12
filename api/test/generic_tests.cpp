@@ -20,7 +20,7 @@ TEST_P(GenericTestFixture, InsertPersist) {
                          &idx_struct, inum, lblk, 1, &pblk);
 
         mapping[lblk] = pblk;
-        ASSERT_EQ(1, ret);
+        ASSERT_EQ(1, ret) << "Insert: " << lblk << ": " << pblk;
     }
 
     for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
@@ -28,7 +28,7 @@ TEST_P(GenericTestFixture, InsertPersist) {
         ssize_t ret = FN(&idx_other, im_lookup,
                          &idx_other, inum, lblk, &pblk);
 
-        ASSERT_LE(1, ret);
+        ASSERT_LE(1, ret) << strerror(-ret) << " on lblk " << lblk;
         ASSERT_LE(ret, npages - lblk);
         ASSERT_EQ(mapping[lblk], pblk);
     }

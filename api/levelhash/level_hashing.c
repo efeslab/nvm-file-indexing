@@ -29,7 +29,7 @@ Function: S_IDX()
         Compute the second hash location
 */
 uint64_t S_IDX(uint64_t hashKey, uint64_t capacity) {
-    return hashKey % (capacity / 2) + capacity / 2;
+    return (hashKey % (capacity / 2)) + (capacity / 2);
 }
 
 /*
@@ -137,10 +137,14 @@ void generate_seeds(level_hash_t *level)
     srand(time(NULL));
     do
     {
-        level->f_seed = rand();
-        level->s_seed = rand();
-        level->f_seed = level->f_seed << (rand() % 63);
-        level->s_seed = level->s_seed << (rand() % 63);
+        level->f_seed = (((uint64_t) rand() <<  0) & 0x000000000000FFFFull) | 
+                        (((uint64_t) rand() << 16) & 0x00000000FFFF0000ull) | 
+                        (((uint64_t) rand() << 32) & 0x0000FFFF00000000ull) |
+                        (((uint64_t) rand() << 48) & 0xFFFF000000000000ull);
+        level->s_seed = (((uint64_t) rand() <<  0) & 0x000000000000FFFFull) | 
+                        (((uint64_t) rand() << 16) & 0x00000000FFFF0000ull) | 
+                        (((uint64_t) rand() << 32) & 0x0000FFFF00000000ull) |
+                        (((uint64_t) rand() << 48) & 0xFFFF000000000000ull);
     } while (level->f_seed == level->s_seed);
 }
 
@@ -947,10 +951,11 @@ uint8_t try_movement(level_hash_t *level, uint64_t idx, uint64_t level_num,
         uint64_t f_idx = F_IDX(f_hash, level->addr_capacity/(1+level_num));
         uint64_t s_idx = S_IDX(s_hash, level->addr_capacity/(1+level_num));
         
-        if(f_idx == idx)
+        if (f_idx == idx) {
             jdx = s_idx;
-        else
+        } else {
             jdx = f_idx;
+        }
 
         for(j = 0; j < ASSOC_NUM; j ++){
             if (level->buckets[level_num][jdx].token[j] == 0)

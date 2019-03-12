@@ -19,6 +19,7 @@ class GenericTestFixture : public TestFixture,
             idx_fns = GetParam();
 
             if (idx_fns->im_init) {
+                metadata_loc = device.allocate(1);
                 init_err = idx_fns->im_init(&idx_spec, &idx_struct,
                                             &metadata_loc);
                 init_err |= idx_fns->im_init(&idx_spec, &idx_other,

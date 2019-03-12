@@ -42,7 +42,7 @@ uint64_t reads;
 uint64_t writes;
 uint64_t blocks;
 
-#if 1
+#if 0
 #define pthread_rwlock_rdlock(x) 0
 #define pthread_rwlock_wrlock(x) 0
 #define pthread_rwlock_unlock(x) 0
@@ -371,12 +371,12 @@ nvm_hash_table_maybe_resize (nvm_hash_idx_t *hash_table) {
  * Returns: a new #nvm_hash_idx_t
  */
 nvm_hash_idx_t *
-nvm_hash_table_new (hash_func_t       hash_func,
-                    size_t            max_entries,
-                    size_t            block_size,
-                    size_t            range_size,
-                    paddr_t           metadata_location,
-                    const idx_spec_t *idx_spec) {
+nvm_hash_table_new(hash_func_t       hash_func,
+                   size_t            max_entries,
+                   size_t            block_size,
+                   size_t            range_size,
+                   paddr_t           metadata_location,
+                   const idx_spec_t *idx_spec) {
   nvm_hash_idx_t *ht;
 
   ht = MALLOC(idx_spec, sizeof(*ht));

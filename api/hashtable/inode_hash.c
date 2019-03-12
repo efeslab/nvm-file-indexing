@@ -75,7 +75,7 @@ ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
     for (size_t blkno = 0; blkno < nalloc; ++blkno) {
         hash_key_t k = MAKEKEY(inum, laddr + blkno);
         // Range: how many more logical blocks are contiguous after this one?
-        size_t range = size - blkno;
+        size_t range = nalloc - blkno;
         // Index: how many more logical blocks are contiguous before this one?
         size_t index = blkno;
         int err = nvm_hash_table_insert(ht, k, (*paddr) + blkno, index, range);
@@ -149,7 +149,8 @@ ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
             if_then_panic(was_removed != (size_t)ndeleted, "could not deallocate!");
             ret += was_removed;
         } else {
-            printf("Weird, but not removed! Returned %lld\n", was_removed);
+            printf("Could not remove requested block %lu from %lu, returned %lld\n", 
+                    lblk, inum, was_removed);
         }
 
     }

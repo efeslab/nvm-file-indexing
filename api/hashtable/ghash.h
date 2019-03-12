@@ -269,6 +269,7 @@ nvm_write_metadata(nvm_hash_idx_t *ht) {
 
     // reconsititute the rest of the httable from
     metadata.nvram_size = ht->nvram_size;
+    metadata.blksz = ht->blksz;
     metadata.size = ht->size;
     metadata.range_size = ht->range_size;
     metadata.mod = ht->mod;
