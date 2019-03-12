@@ -12,7 +12,9 @@
 #define GDB_TRAP asm("int $3;");
 
 void _panic(void);
-
+#ifdef panic
+#undef panic
+#endif
 #define panic(str, ...) \
     do { \
         fprintf(stdout, "%s:%d %s(): ",  \

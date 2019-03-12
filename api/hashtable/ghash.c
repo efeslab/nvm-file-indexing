@@ -226,6 +226,63 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
   return node_index;
 }
 
+static void 
+nvm_hash_table_update_internal(nvm_hash_idx_t *hash_table,
+                               hash_ent_t     *ent,
+                               uint32_t        node_index,
+                               size_t          new_range) 
+{
+    ent->size = new_range;
+    nvm_update(hash_table, node_index, ent);
+}
+// Very similar to lookup, but we also update the entry at the end.
+int nvm_hash_table_update(nvm_hash_idx_t *hash_table,
+                          paddr_t         key,
+                          size_t          new_range) {
+  uint32_t node_index;
+  uint32_t hash_value;
+  uint32_t step = 0;
+  hash_ent_t *buffer;
+  hash_ent_t cur;
+
+  hash_value = hash_table->hash_func(key);
+  if (unlikely (!HASH_IS_REAL (hash_value))) {
+    hash_value = 2;
+  }
+
+  //pthread_rwlock_rdlock(hash_table->cache_lock);
+
+  //node_index = hash_value % hash_table->mod;
+  node_index = hash_value & hash_table->mask;
+  pthread_rwlock_rdlock(hash_table->locks + node_index);
+
+  nvm_read_entry(hash_table, node_index, &cur, false);
+  //cur = hash_table->cache[BLK_NUM(node_index)][BLK_IDX(node_index)];
+
+  while (!HASH_ENT_IS_EMPTY(cur)) {
+    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
+      nvm_hash_table_update_internal(hash_table, &cur, node_index, new_range);
+      pthread_rwlock_unlock(hash_table->locks + node_index);
+      //pthread_rwlock_unlock(hash_table->cache_lock);
+      return 1;
+    } 
+
+    step++;
+    uint32_t new_idx = (node_index + step) & hash_table->mask;
+    //uint32_t new_idx = (node_index + step) % hash_table->mod;
+    pthread_rwlock_unlock(hash_table->locks + node_index);
+    pthread_rwlock_rdlock(hash_table->locks + new_idx);
+
+    node_index = new_idx;
+    nvm_read_entry(hash_table, node_index, &cur, false);
+  }
+
+  pthread_rwlock_unlock(hash_table->locks + node_index);
+
+  //pthread_rwlock_unlock(hash_table->cache_lock);
+  return 0;
+}
+
 /*
  * nvm_hash_table_remove_node:
  * @hash_table: our #nvm_hash_idx_t
@@ -241,6 +298,7 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
 static void nvm_hash_table_remove_node (nvm_hash_idx_t  *hash_table,
                                         int              i,
                                         paddr_t         *pblk,
+                                        size_t          *old_precursor,
                                         size_t          *old_size) {
   hash_ent_t ent;
 
@@ -249,9 +307,11 @@ static void nvm_hash_table_remove_node (nvm_hash_idx_t  *hash_table,
   nvm_read_entry(hash_table, i, &ent, true);
   *pblk = HASH_ENT_VAL(ent);
   *old_size = (size_t)ent.size;
+  *old_precursor = (size_t)ent.index;
 
   HASH_ENT_SET_TOMBSTONE(ent);
   ent.size = 0;
+  ent.index = 0;
 
   /* Erect tombstone */
   nvm_update(hash_table, i, &ent);
@@ -432,7 +492,7 @@ static int
 nvm_hash_table_insert_node(nvm_hash_idx_t *hash_table,
                            uint32_t node_index, uint32_t key_hash,
                            paddr_t new_key, paddr_t new_value, 
-                           paddr_t new_range)
+                           size_t new_index, size_t new_range)
 {
   int already_exists;
   hash_ent_t ent;
@@ -440,13 +500,14 @@ nvm_hash_table_insert_node(nvm_hash_idx_t *hash_table,
   nvm_read_entry(hash_table, node_index, &ent, false);
   already_exists = HASH_ENT_IS_VALID(ent);
 
-  // TODO consider bookkeeping (nnodes, noccupied?)
+  // todo consider bookkeeping (nnodes, noccupied?)
   if (unlikely(already_exists)) {
-    printf("Already exists: %lx %lx (trying to insert: %lx %lx)\n",
+    printf("already exists: %lx %lx (trying to insert: %lx %lx)\n",
         ent.key, HASH_ENT_VAL(ent), new_key, new_value);
   } else {
     ent.key = new_key;
     HASH_ENT_SET_VAL(ent, new_value);
+    ent.index = new_index;
     ent.size = new_range;
     nvm_update(hash_table, node_index, &ent);
   }
@@ -525,9 +586,10 @@ void nvm_hash_table_lookup(nvm_hash_idx_t *hash_table, paddr_t key,
  */
 static inline int
 nvm_hash_table_insert_internal (nvm_hash_idx_t *hash_table,
-                              paddr_t    key,
-                              paddr_t    value,
-                              paddr_t    size)
+                                paddr_t    key,
+                                paddr_t    value,
+                                size_t     index,
+                                size_t     size)
 {
   assert(hash_table != NULL);
   /*
@@ -583,7 +645,7 @@ nvm_hash_table_insert_internal (nvm_hash_idx_t *hash_table,
   }
 
   int res = nvm_hash_table_insert_node(
-      hash_table, node_index, hash_value, key, value, size);
+      hash_table, node_index, hash_value, key, value, index, size);
 
   pthread_rwlock_unlock(hash_table->locks + node_index);
 
@@ -610,35 +672,12 @@ nvm_hash_table_insert_internal (nvm_hash_idx_t *hash_table,
  */
 int
 nvm_hash_table_insert (nvm_hash_idx_t *hash_table,
-                     paddr_t     key,
-                     paddr_t     value,
-                     paddr_t     size)
+                       paddr_t     key,
+                       paddr_t     value,
+                       size_t      index,
+                       size_t      size)
 {
-  return nvm_hash_table_insert_internal (hash_table, key, value, size);
-}
-
-/**
- * nvm_hash_table_replace:
- * @hash_table: a #nvm_hash_idx_t
- * @key: a key to insert
- * @value: the value to associate with the key
- *
- * Inserts a new key and value into a #nvm_hash_idx_t similar to
- * nvm_hash_table_insert(). The difference is that if the key
- * already exists in the #nvm_hash_idx_t, it gets replaced by the
- * new key. If you supplied a @value_destroy_func when creating
- * the #nvm_hash_idx_t, the old value is freed using that function.
- * If you supplied a @key_destroy_func when creating the
- * #nvm_hash_idx_t, the old key is freed using that function.
- *
- * Returns: %TRUE if the key did not exist yet
- */
-int
-nvm_hash_table_replace (nvm_hash_idx_t *hash_table,
-                      paddr_t key,
-                      paddr_t value)
-{
-  return nvm_hash_table_insert_internal (hash_table, key, value, TRUE);
+  return nvm_hash_table_insert_internal(hash_table, key, value, index, size);
 }
 
 /*
@@ -658,6 +697,7 @@ static int
 nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
                                 paddr_t         key,
                                 paddr_t        *old_pblk,
+                                size_t         *old_idx,
                                 size_t         *old_size)
 {
   /*
@@ -701,7 +741,7 @@ nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
   }
 
   if (HASH_ENT_IS_VALID(cur)) {
-    nvm_hash_table_remove_node(hash_table, node_index, old_pblk, old_size);
+    nvm_hash_table_remove_node(hash_table, node_index, old_pblk, old_idx, old_size);
   }
 
   pthread_rwlock_unlock(hash_table->locks + node_index);
@@ -728,9 +768,11 @@ int
 nvm_hash_table_remove (nvm_hash_idx_t *hash_table,
                        paddr_t         key,
                        paddr_t        *removed,
+                       size_t         *nprevious,
                        size_t         *ncontiguous)
 {
-  return nvm_hash_table_remove_internal (hash_table, key, removed, ncontiguous);
+  return nvm_hash_table_remove_internal(hash_table, key, removed,
+                                        nprevious, ncontiguous);
 }
 
 
