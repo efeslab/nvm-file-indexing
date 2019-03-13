@@ -166,7 +166,7 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveAll) {
     }
 
     ret = FN(&idx_struct, im_remove, &idx_struct, inum, lblk, npages);
-    ASSERT_EQ(ret, npages);
+    ASSERT_EQ(ret, npages) << "Remove error: " << strerror(-ret);
 
     // Do another lookup, make sure they are all gone.
     for (laddr_t l = 0; l < (laddr_t)npages + lblk; ++l) {
