@@ -25,16 +25,17 @@ class GenericTestFixture : public TestFixture,
                 init_err |= idx_fns->im_init(&idx_spec, &idx_other,
                                             &metadata_loc);
             } else {
+                // Since the per-inode extent trees don't initially allocate any
+                // space, the first data block allocated could be zero. Since this
+                // could also be an error condition, we will go ahead and allocate a
+                // dummy block here.
+                device.allocate(1);
+
                 init_err = idx_fns->im_init_prealloc(&idx_spec, &inode_space,
                                                      &idx_struct);
                 init_err |= idx_fns->im_init_prealloc(&idx_spec, &inode_space,
                                                      &idx_other);
             }
-            // Since the per-inode extent trees don't initially allocate any
-            // space, the first data block allocated could be zero. Since this
-            // could also be an error condition, we will go ahead and allocate a
-            // dummy block here.
-            device.allocate(1);
         }
 
         void TearDown() override {

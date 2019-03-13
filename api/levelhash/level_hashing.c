@@ -189,7 +189,6 @@ int reread_metadata(level_hash_t *level) {
     level->block_size = dhash.block_size;
 
     if (resized) {
-        printf("METADATA RESIZE!\n");
         for (int i = 0; i < 2; ++i) {
             size_t new_size = pow(2, level->level_size - i);
             FREE(level->idx_spec, level->buckets[i]);
@@ -359,8 +358,6 @@ void level_expand(level_hash_t *level)
         printf("The expanding fails: 1\n");
         exit(1);
     }
-
-    printf("EXPAND %p\n", level);
 
     //if_then_panic(true, "Have yet to implement this for the API!");
 

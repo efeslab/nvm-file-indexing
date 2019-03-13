@@ -29,6 +29,7 @@ TEST_P(GenericTestFixture, InsertPersist) {
         mapping[lblk] = pblk;
         ASSERT_EQ(1, ret) << "Insert: " << lblk << ": " << pblk;
 
+        //printme(mapping);
         // Make sure no entries go missing during insert.
         for (laddr_t l = 0; l <= lblk; ++l) {
             ASSERT_EQ(1, mapping.count(l)) << "This should never happen";
@@ -37,7 +38,6 @@ TEST_P(GenericTestFixture, InsertPersist) {
             ssize_t r = FN(&idx_other, im_lookup,
                            &idx_other, inum, l, &p);
 
-            printme(mapping);
 
             ASSERT_LE(1, r) << strerror(-r) << " on lblk " << l 
                                             << " after insertion of " << lblk;
