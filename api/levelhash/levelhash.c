@@ -53,8 +53,6 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
         return -ENOMEM;
     }
 
-    if_then_panic(nalloc > nblk, "what on earth?\n");
-
     for (size_t blk = 0; blk < nalloc; ++blk) {
         uint8_t ret = level_insert(lh, laddr + blk, (*paddr) + blk, 
                                    blk, nalloc - blk);

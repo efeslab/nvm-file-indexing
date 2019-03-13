@@ -134,7 +134,8 @@ Function: generate_seeds()
 */
 void generate_seeds(level_hash_t *level)
 {
-    srand(time(NULL));
+    //srand(time(NULL));
+    srand(0);
     do
     {
         level->f_seed = (((uint64_t) rand() <<  0) & 0x000000000000FFFFull) | 
@@ -169,11 +170,11 @@ int reread_metadata(level_hash_t *level) {
     if (ret) return -EIO;
 
     bool resized = false;
-    for (int i = 0; i < 2; ++i) {
-        if (level->dev_sizes[i] != dhash.dev_sizes[i]) {
-            resized = true;
-        }
+    if (level->level_size != dhash.level_size) {
+        resized = true;
+    }
 
+    for (int i = 0; i < 2; ++i) {
         level->level_item_num[i] = dhash.level_item_num[i];
         level->dev_levels[i]     = dhash.dev_levels[i];
         level->dev_sizes[i]      = dhash.dev_sizes[i];
@@ -188,6 +189,7 @@ int reread_metadata(level_hash_t *level) {
     level->block_size = dhash.block_size;
 
     if (resized) {
+        printf("METADATA RESIZE!\n");
         for (int i = 0; i < 2; ++i) {
             size_t new_size = pow(2, level->level_size - i);
             FREE(level->idx_spec, level->buckets[i]);
@@ -357,6 +359,8 @@ void level_expand(level_hash_t *level)
         printf("The expanding fails: 1\n");
         exit(1);
     }
+
+    printf("EXPAND %p\n", level);
 
     //if_then_panic(true, "Have yet to implement this for the API!");
 
