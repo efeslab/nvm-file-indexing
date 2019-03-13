@@ -180,7 +180,7 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveAll) {
 
     device.deallocate();
 }
-/*
+
 TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveSome) {
     inum_t inum    = 17;
     size_t npages  = 10000;
@@ -228,7 +228,6 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveSome) {
 
     device.deallocate();
 }
-*/
 
 INSTANTIATE_TEST_CASE_P(AllStructures, 
                         GenericTestFixture,
