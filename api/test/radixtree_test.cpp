@@ -25,7 +25,6 @@ TEST_F(RadixTreeFixture, InitExists) {
                 sizeof(radixtree_meta_t)));
 }
 
-#if 0
 TEST_F(RadixTreeFixture, InsertSingle) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
@@ -37,6 +36,23 @@ TEST_F(RadixTreeFixture, InsertSingle) {
     ASSERT_GT(pblk, 0);
 }
 
+TEST_F(RadixTreeFixture, LookupSingle) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = radixtree_create(&radixtree, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    paddr_t check_paddr = UINT64_MAX;
+    ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk, &check_paddr);
+    ASSERT_EQ(pblk, check_paddr);
+    ASSERT_EQ(npages, check_size);
+}
+
+#if 0
 TEST_F(RadixTreeFixture, InsertRepeat) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
@@ -64,21 +80,6 @@ TEST_F(RadixTreeFixture, InsertMulti) {
     ASSERT_GT(pblk, 0);
 }
 
-TEST_F(RadixTreeFixture, LookupSingle) {
-    inum_t inum   = 0;
-    laddr_t lblk  = 0;
-    paddr_t pblk  = 0;
-    size_t npages = 1;
-
-    ssize_t ret = radixtree_create(&radixtree, inum, lblk, npages, &pblk);
-    ASSERT_EQ(npages, ret);
-    ASSERT_GT(pblk, 0);
-
-    paddr_t check_paddr;
-    ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk, &check_paddr);
-    ASSERT_EQ(pblk, check_paddr);
-    ASSERT_EQ(npages, check_size);
-}
 
 TEST_F(RadixTreeFixture, LookupMulti) {
     inum_t inum   = 0;

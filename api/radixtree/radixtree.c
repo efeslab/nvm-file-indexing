@@ -67,13 +67,8 @@ static int read_radix_node(radixtree_meta_t *radix, radix_node_t *node) {
 
         paddr_t entry = node->rn_dev_contents[i];
         int depth = node->rn_depth + 1;
-        if (!n) {
-            err = create_radix_node(radix, entry, depth, n);
-            if (err) return err;
-        } else {
-            n->rn_depth = depth;
-            n->rn_page  = entry;
-        }
+        n->rn_depth = depth;
+        n->rn_page  = entry;
     }
 
     return err;
@@ -108,24 +103,25 @@ static radix_node_t* index_node(radixtree_meta_t *radix,
     if_then_panic(idx >= radix->ents_per_node, 
                   "Bad index calculation! (%llu)\n", idx);
     if_then_panic(!node, "Can't index nullptr!\n");
+    if_then_panic(node->rn_depth >= radix->max_depth, 
+                  "Cannot index further!\n");
 
     radix_node_t *child = &(node->rn_cache_tree[idx]);
 
-    if (!child) {
-        paddr_t entry = node->rn_dev_contents[idx];
-        if (!entry) {
-            // We need to allocate this page!
-            ssize_t nalloc = CB(radix, cb_alloc_metadata,
-                                radix->nblk_per_node, &entry);
-            if_then_panic(nalloc != radix->nblk_per_node, "Could not allocate!");
+    paddr_t entry = node->rn_dev_contents[idx];
+    if (!entry) {
+        // We need to allocate this page!
+        ssize_t nalloc = CB(radix, cb_alloc_metadata,
+                            radix->nblk_per_node, &entry);
+        if_then_panic(nalloc != radix->nblk_per_node, "Could not allocate!");
 
-            node->rn_dev_contents[idx] = entry;
-            node->rn_cache_tree[idx].rn_page = entry;
-            node->rn_cache_tree[idx].rn_cache_state = -1;
-            int ret = write_page(radix, node->rn_page, node->rn_dev_contents);
-            if (ret) return NULL;
-        }
-        int err = create_radix_node(radix, entry, node->rn_depth + 1, child);
+        node->rn_dev_contents[idx] = entry;
+        child->rn_page = entry;
+        child->rn_cache_state = -1;
+        int ret = write_page(radix, node->rn_page, node->rn_dev_contents);
+        if (ret) return NULL;
+
+        int err = create_radix_node(radix, entry, child->rn_depth, child);
         if (err) return NULL;
     }
 
@@ -210,10 +206,48 @@ int radixtree_init(const idx_spec_t* idx_spec, idx_struct_t* idx_struct,
     return 0;
 }
 
+// TODO might want to have a max lookup field.
 ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
-                         paddr_t *paddr) 
+                         paddr_t *paddr_ret) 
 {
-    return -ENOENT;
+    GET_RADIX(idx_struct);
+    // First two levels are just based on the inum.
+    size_t l1 = ((size_t)inum) >> radix->ent_shift;
+    size_t l2 = ((size_t)inum) & radix->ent_idx_mask;
+
+    radix_node_t *l2_node = index_node(radix, radix->cached_tree, l1);
+    radix_node_t *l3_node = index_node(radix, l2_node, l2);
+
+    // The following will change as we iterate.
+    size_t l3_current = laddr >> radix->ent_shift;
+    radix_node_t *l4_node = index_node(radix, l3_node, l3_current);
+
+    size_t ncontiguous = 0;
+    paddr_t last_paddr = 0;
+    for (laddr_t l = 0; ; ++l) {
+        size_t l3 = (laddr + l) >> radix->ent_shift;
+        size_t l4 = (laddr + l) & radix->ent_idx_mask;
+        if (l3 != l3_current) {
+            l3_current = l3;
+            l4_node = index_node(radix, l3_node, l3_current);
+        }
+        
+        paddr_t paddr;
+        int err = lookup_entry(radix, l4_node, l4, &paddr);
+        if (err) return err;
+
+        if (last_paddr != 0 && paddr != 1 + last_paddr) {
+            return ncontiguous;
+        } else if (paddr == 0) {
+            return ncontiguous;
+        } else {
+            if (last_paddr == 0) *paddr_ret = paddr;
+            last_paddr = paddr;
+            ncontiguous++;
+        }
+    }
+
+    return ncontiguous;
 }
 
 ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
