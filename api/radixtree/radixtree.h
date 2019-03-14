@@ -15,6 +15,8 @@ typedef struct radix_node {
     paddr_t rn_page;
     // How deep the node is in the tree. Radix tree has fixed depth.
     size_t rn_depth;
+    // Number of valid entries in this page. If 0, should deallocate.
+    size_t rn_nvalid;
     // The contents of this page on the device.
     paddr_t *rn_dev_contents;
     // Status of cache: 0, uptodate, 1, dirty, -1, invalid

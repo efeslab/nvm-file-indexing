@@ -288,7 +288,31 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
                          size_t npages) 
 {
-    return -ENOENT;
+    GET_RADIX(idx_struct);
+    // First two levels are just based on the inum.
+    size_t l1 = ((size_t)inum) >> radix->ent_shift;
+    size_t l2 = ((size_t)inum) & radix->ent_idx_mask;
+
+    radix_node_t *l2_node = index_node(radix, radix->cached_tree, l1);
+    radix_node_t *l3_node = index_node(radix, l2_node, l2);
+
+    // The following will change as we iterate.
+    size_t l3_current = laddr >> radix->ent_shift;
+    radix_node_t *l4_node = index_node(radix, l3_node, l3_current);
+
+    for (laddr_t l = 0; l < npages; ++l) {
+        size_t l3 = (laddr + l) >> radix->ent_shift;
+        size_t l4 = (laddr + l) & radix->ent_idx_mask;
+        if (l3 != l3_current) {
+            l3_current = l3;
+            l4_node = index_node(radix, l3_node, l3_current);
+        }
+
+        int err = insert_entry(radix, l4_node, l4, 0);
+        if (err) return err;
+    }
+
+    return npages;
 }
 
 idx_fns_t radixtree_fns = {

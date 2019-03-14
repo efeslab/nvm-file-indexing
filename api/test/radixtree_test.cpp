@@ -52,6 +52,26 @@ TEST_F(RadixTreeFixture, LookupSingle) {
     ASSERT_EQ(npages, check_size);
 }
 
+TEST_F(RadixTreeFixture, RemoveSingle) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1;
+
+    ssize_t ret = radixtree_create(&radixtree, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    ssize_t check_size = radixtree_remove(&radixtree, inum, lblk, npages);
+    ASSERT_EQ(npages, check_size);
+
+    paddr_t check_paddr = 0;
+    check_size = radixtree_lookup(&radixtree, inum, lblk, &check_paddr);
+    ASSERT_NE(pblk, check_paddr);
+    ASSERT_NE(npages, check_size);
+    ASSERT_LE(check_size, 0);
+}
+
 #if 0
 TEST_F(RadixTreeFixture, InsertRepeat) {
     inum_t inum   = 0;
@@ -99,25 +119,6 @@ TEST_F(RadixTreeFixture, LookupMulti) {
     }
 }
 
-TEST_F(RadixTreeFixture, EraseSingle) {
-    inum_t inum   = 0;
-    laddr_t lblk  = 0;
-    paddr_t pblk  = 0;
-    size_t npages = 1;
-
-    ssize_t ret = radixtree_create(&radixtree, inum, lblk, npages, &pblk);
-    ASSERT_EQ(npages, ret);
-    ASSERT_GT(pblk, 0);
-
-    ssize_t check_size = radixtree_remove(&radixtree, inum, lblk, npages);
-    ASSERT_EQ(npages, check_size);
-
-    paddr_t check_paddr = 0;
-    check_size = radixtree_lookup(&radixtree, inum, lblk, &check_paddr);
-    ASSERT_NE(pblk, check_paddr);
-    ASSERT_NE(npages, check_size);
-    ASSERT_LE(check_size, 0);
-}
 
 TEST_F(RadixTreeFixture, EraseRecreate) {
     inum_t inum   = 0;
