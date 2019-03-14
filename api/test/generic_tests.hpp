@@ -4,6 +4,7 @@
 #include "extents/extents.h"
 #include "hashtable/hashtable.h"
 #include "levelhash/levelhash.h"
+#include "radixtree/radixtree.h"
 
 class GenericTestFixture : public TestFixture,
                            public ::testing::WithParamInterface<idx_fns_t*>  {
@@ -19,7 +20,7 @@ class GenericTestFixture : public TestFixture,
             idx_fns = GetParam();
 
             if (idx_fns->im_init) {
-                metadata_loc = device.allocate(1);
+                metadata_loc = device.allocate(2) + 1;
                 init_err = idx_fns->im_init(&idx_spec, &idx_struct,
                                             &metadata_loc);
                 init_err |= idx_fns->im_init(&idx_spec, &idx_other,

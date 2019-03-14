@@ -106,6 +106,9 @@ static radix_node_t* index_node(radixtree_meta_t *radix,
     if_then_panic(node->rn_depth >= radix->max_depth, 
                   "Cannot index further!\n");
 
+    int rerr = read_radix_node(radix, node);
+    if (rerr) return NULL;
+
     radix_node_t *child = &(node->rn_cache_tree[idx]);
 
     paddr_t entry = node->rn_dev_contents[idx];
@@ -120,7 +123,9 @@ static radix_node_t* index_node(radixtree_meta_t *radix,
         child->rn_cache_state = -1;
         int ret = write_page(radix, node->rn_page, node->rn_dev_contents);
         if (ret) return NULL;
+    }
 
+    if (!child->rn_dev_contents) {
         int err = create_radix_node(radix, entry, child->rn_depth, child);
         if (err) return NULL;
     }
@@ -134,6 +139,9 @@ static int insert_entry(radixtree_meta_t *radix, radix_node_t *node,
     if_then_panic(node->rn_depth != radix->max_depth, 
                   "Don't use this for data blocks!\n");
 
+    int rerr = read_radix_node(radix, node);
+    if (rerr) return rerr;
+
     node->rn_dev_contents[idx] = entry;
     node->rn_cache_state = 1;
     return write_radix_node(radix, node);
@@ -145,7 +153,9 @@ static int lookup_entry(radixtree_meta_t *radix, radix_node_t *node,
     if_then_panic(node->rn_depth != radix->max_depth, 
                   "Don't use this for data blocks!\n");
 
-    // TODO read!
+    int rerr = read_radix_node(radix, node);
+    if (rerr) return rerr;
+
     *entry = node->rn_dev_contents[idx];
     return 0;
 }
@@ -221,7 +231,8 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     // The following will change as we iterate.
     size_t l3_current = laddr >> radix->ent_shift;
     radix_node_t *l4_node = index_node(radix, l3_node, l3_current);
-
+    
+    *paddr_ret = 0; 
     size_t ncontiguous = 0;
     paddr_t last_paddr = 0;
     for (laddr_t l = 0; ; ++l) {
