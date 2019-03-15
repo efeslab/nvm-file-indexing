@@ -169,6 +169,8 @@ int reread_metadata(level_hash_t *level) {
     int ret = read_metadata(level->idx_spec, &(level->range), &dhash);
     if (ret) return -EIO;
 
+    if (dhash.init_magic != MAGIC) return -EINVAL;
+
     bool resized = false;
     if (level->level_size != dhash.level_size) {
         resized = true;
@@ -514,12 +516,27 @@ void level_shrink(level_hash_t *level)
         return;
     }
 
-    if (level->level_size - 1 <= 1) return;
+    if ((level->level_size - 1) <= 2) return;
+
+    size_t new_size = pow(2, level->level_size - 1);
+    size_t new_buckets_bytes = new_size * sizeof(level_bucket_t);
+    size_t new_buckets_blocks = new_buckets_bytes / level->block_size;
+    if(new_buckets_bytes % level->block_size != 0) new_buckets_blocks++;
+
+    paddr_t new_buckets_paddr;
+    ssize_t nalloced = CB(level->idx_spec, cb_alloc_metadata,
+                          new_buckets_blocks, &new_buckets_paddr);
+    if (nalloced != new_buckets_blocks) {
+        ssize_t err = CB(level->idx_spec, cb_dealloc_metadata,
+                         nalloced, new_buckets_paddr);
+        if_then_panic(err != nalloced, "Could not dealloc!");
+        printf("Warning, could not shrink!\n");
+        return;
+    }
 
     level->resize_state = 2;
     level->level_size--;
     //level_bucket_t *newBuckets = alignedmalloc(pow(2, level->level_size - 1)*sizeof(level_bucket_t));
-    size_t new_size = pow(2, level->level_size - 1);
 
     level_bucket_t *newBuckets = ZALLOC(level->idx_spec, new_size*sizeof(level_bucket_t));
     level_bucket_t *interimBuckets = level->buckets[0];
@@ -532,18 +549,10 @@ void level_shrink(level_hash_t *level)
     level->addr_capacity = pow(2, level->level_size);
     level->total_capacity = pow(2, level->level_size) + pow(2, level->level_size - 1);
 
-    size_t new_buckets_bytes = new_size * sizeof(level_bucket_t);
-    size_t new_buckets_blocks = new_buckets_bytes / level->block_size;
-    if(new_buckets_bytes % level->block_size != 0) new_buckets_blocks++;
 
     int8_t *new_cache_state = ZALLOC(level->idx_spec, level->addr_capacity*sizeof(int8_t));
 
     if_then_panic(!newBuckets || !new_cache_state, "could not alloc for shrink!");
-
-    paddr_t new_buckets_paddr;
-    ssize_t nalloced = CB(level->idx_spec, cb_alloc_metadata,
-                          new_buckets_blocks, &new_buckets_paddr);
-    if_then_panic(nalloced != new_buckets_blocks, "could not alloc metadata!");
 
     size_t interimDevSize = level->dev_sizes[0];
     level->dev_sizes[0] = level->dev_sizes[1];

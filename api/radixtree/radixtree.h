@@ -20,7 +20,7 @@ typedef struct radix_node {
     // The contents of this page on the device.
     paddr_t *rn_dev_contents;
     // Status of cache: 0, uptodate, 1, dirty, -1, invalid
-    int rn_cache_state;
+    int8_t *rn_cache_state;
     // The in-memory cached structures.
     struct radix_node *rn_cache_tree;
 } radix_node_t;

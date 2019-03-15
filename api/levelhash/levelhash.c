@@ -80,7 +80,6 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
     LEVELMETA(level_idx, lh);
     if (reread_metadata(lh)) return -EIO;
 
-    // TODO this is inefficient but correct.
     for (size_t blk = 0; blk < nblk; ++blk) {
         size_t idx;
         size_t full_range;
