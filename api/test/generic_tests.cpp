@@ -4,6 +4,16 @@
 
 using namespace std;
 
+INSTANTIATE_TEST_CASE_P(AllStructures, 
+                        GenericTestFixture,
+                        ::testing::Values(&extent_tree_fns, 
+                                          &hash_fns, 
+                                          &levelhash_fns,
+                                          &radixtree_fns));
+INSTANTIATE_TEST_CASE_P(OnlyLevelHashing, 
+                        GenericTestFixture,
+                        ::testing::Values(&levelhash_fns));
+
 TEST_P(GenericTestFixture, InitNoError) {
     ASSERT_EQ(0, init_err);
 }
@@ -259,9 +269,47 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveSome) {
     device.deallocate();
 }
 
-INSTANTIATE_TEST_CASE_P(AllStructures, 
-                        GenericTestFixture,
-                        ::testing::Values(&extent_tree_fns, 
-                                          &hash_fns, 
-                                          &levelhash_fns,
-                                          &radixtree_fns));
+/*******************************************************************************
+ * Section: Tests on small "slab" inserts (some blocks contiguous).
+ ******************************************************************************/
+
+TEST_P(GenericTestFixture, SmallSlab_InsertPersistThenRemoveAll) {
+    inum_t inum = 17;
+    size_t npages = 100;
+    size_t inc = 10;
+    paddr_t lblk = 0;
+
+    for (laddr_t l = lblk; l < (laddr_t)npages + lblk; l += inc) {
+        paddr_t pblk;
+        ssize_t ret = FN(&idx_struct, im_create,
+                         &idx_struct, inum, l, inc, &pblk);
+
+        ASSERT_EQ(inc, ret) << "Insert: " << l << ": " << pblk;
+        ASSERT_NE(0, pblk);
+    }
+
+
+    for (laddr_t l = lblk; l < (laddr_t)npages + lblk; ++l) {
+        paddr_t lookup_pblk;
+        ssize_t ret = FN(&idx_other, im_lookup,
+                         &idx_other, inum, l, &lookup_pblk);
+
+        ASSERT_EQ(ret, inc - (l % inc) ) << "lookup " << l;
+    }
+
+    ssize_t ret = FN(&idx_struct, im_remove, &idx_struct, inum, lblk, npages);
+    ASSERT_EQ(ret, npages) << "Remove error: " << strerror(-ret);
+
+    // Do another lookup, make sure they are all gone.
+    for (laddr_t l = 0; l < (laddr_t)npages + lblk; ++l) {
+        paddr_t lookup_pblk;
+        ssize_t ret = FN(&idx_other, im_lookup,
+                         &idx_other, inum, l, &lookup_pblk);
+
+        ASSERT_LE(ret, 0);
+        ASSERT_EQ(0, lookup_pblk);
+    }
+
+    device.deallocate();
+}
+

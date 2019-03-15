@@ -43,6 +43,7 @@ typedef struct on_device_level_hash {  //
     uint64_t s_seed;                   // Two randomized seeds for hash functions
     size_t   block_size;               // size of block on underlying device.
 } dev_level_hash_t;
+_Static_assert(sizeof(dev_level_hash_t) <= 64, "level bucket is too big!");
 #pragma pack(pop)
 
 typedef struct level_bucket            // A bucket
