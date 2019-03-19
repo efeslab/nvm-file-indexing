@@ -286,6 +286,7 @@ TEST_P(GenericTestFixture, SmallSlab_InsertPersistThenRemoveAll) {
 
         ASSERT_EQ(inc, ret) << "Insert: " << l << ": " << pblk;
         ASSERT_NE(0, pblk);
+        device.allocate(1); // Ensure the ranges are not contiguous.
     }
 
 
