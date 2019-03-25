@@ -11,9 +11,10 @@ extern "C" {
 #endif
 
 #include "common/common.h"
-#include "hashtable/hashtable.h"
 #include "extents/extents.h"
+#include "hashtable/hashtable.h"
 #include "levelhash/levelhash.h"
+#include "radixtree/radixtree.h"
 
 #ifdef __cplusplus
 }
