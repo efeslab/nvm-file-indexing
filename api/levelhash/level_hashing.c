@@ -134,7 +134,7 @@ int mark_new_bucket_dirty(level_hash_t *level,
 int persist_dirty_bucket(level_hash_t *level, int l, uint64_t bucket_idx) {
     int ret = 0;
 
-    if (level->do_cache && level->cache_state[l] > 0){
+    if (level->do_cache && level->cache_state[l][bucket_idx] > 0){
         ret = do_bucket_write(level, l, bucket_idx);
         level->cache_state[l][bucket_idx] = 0;
     } 
