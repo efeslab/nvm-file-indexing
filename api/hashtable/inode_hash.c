@@ -174,10 +174,30 @@ ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     return ret;
 }
 
+int hashtable_set_caching(idx_struct_t *idx_struct, bool enable) {
+    NVMHASH(idx_struct, ht);
+    ht->do_cache = enable;
+    return 0;
+}
+
+int hashtable_persist_updates(idx_struct_t *idx_struct) {
+    NVMHASH(idx_struct, ht);
+    return nvm_persist(ht); 
+}
+
+int hashtable_invalidate_caches(idx_struct_t *idx_struct) {
+    NVMHASH(idx_struct, ht);
+    return nvm_invalidate(ht);
+}
+
 idx_fns_t hash_fns = {
     .im_init          = hashtable_initialize,
     .im_init_prealloc = NULL,
     .im_lookup        = hashtable_lookup,
     .im_create        = hashtable_create,
-    .im_remove        = hashtable_remove
+    .im_remove        = hashtable_remove,
+
+    .im_set_caching   = hashtable_set_caching,
+    .im_persist       = hashtable_persist_updates,
+    .im_invalidate    = hashtable_invalidate_caches
 };
