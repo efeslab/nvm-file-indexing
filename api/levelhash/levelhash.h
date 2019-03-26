@@ -26,6 +26,9 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
 ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, size_t nblk);
 
+int levelhash_set_caching(idx_struct_t*, bool);
+int levelhash_persist_updates(idx_struct_t*);
+int levelhash_invalidate_caches(idx_struct_t*);
 
 void levelhash_set_stats(idx_struct_t* level_idx, bool enable);
 void levelhash_print_stats(idx_struct_t* level_idx);

@@ -1,4 +1,4 @@
-#include "generic_tests.hpp"
+#include "cache_tests.hpp"
 
 #include <map>
 
@@ -10,22 +10,16 @@ INSTANTIATE_TEST_CASE_P(AllStructures,
                                           &hash_fns, 
                                           &levelhash_fns,
                                           &radixtree_fns));
+#endif
 INSTANTIATE_TEST_CASE_P(OnlyLevelHashing, 
-                        GenericTestFixture,
+                        CachingTestFixture,
                         ::testing::Values(&levelhash_fns));
 
-TEST_P(GenericTestFixture, InitNoError) {
+TEST_P(CachingTestFixture, InitNoError) {
     ASSERT_EQ(0, init_err);
 }
 
-void printme(const map<laddr_t, paddr_t>& m) {
-    cout << "Printing map, size " << m.size() << endl;
-    for (const auto& i : m) {
-        cout << i.first << " \u2192 " << i.second << endl;
-    }
-}
-
-TEST_P(GenericTestFixture, InsertPersistCheckEach) {
+TEST_P(CachingTestFixture, InsertCacheOnly) {
     inum_t inum = 17;
     size_t npages = 50;
 
@@ -39,25 +33,117 @@ TEST_P(GenericTestFixture, InsertPersistCheckEach) {
         mapping[lblk] = pblk;
         ASSERT_EQ(1, ret) << "Insert: " << lblk << ": " << pblk;
 
-        // Make sure no entries go missing during insert.
-        for (laddr_t l = 0; l <= lblk; ++l) {
-            ASSERT_EQ(1, mapping.count(l)) << "This should never happen";
+    }
 
-            paddr_t p;
-            ssize_t r = FN(&idx_other, im_lookup,
-                           &idx_other, inum, l, &p);
+    // The other idx struct should not see inserts, but the original should.
+    for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+        ASSERT_EQ(1, mapping.count(lblk)) << "This should never happen";
 
+        paddr_t p;
+        ssize_t ret = FN(&idx_other, im_lookup, &idx_other, inum, lblk, &p);
 
-            ASSERT_LE(1, r) << strerror(-r) << " on lblk " << l 
-                                            << " after insertion of " << lblk;
-            ASSERT_LE(ret, npages - l);
-            ASSERT_TRUE(mapping[l] == p);
-        }
+        ASSERT_LT(ret, 1) << "updates should only reside in cache!" << endl; 
+
+        ret = FN(&idx_struct, im_lookup, &idx_struct, inum, lblk, &p);
+        ASSERT_GE(ret, 1) << "cannot find cached updates!" << endl;
+        ASSERT_TRUE(mapping[lblk] == p) << "cached update is wrong!";
     }
 
     device.deallocate();
 }
 
+TEST_P(CachingTestFixture, InsertCacheFlush) {
+    inum_t inum = 17;
+    size_t npages = 50;
+
+    map<laddr_t, paddr_t> mapping;
+
+    for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+        paddr_t pblk;
+        ssize_t ret = FN(&idx_struct, im_create,
+                         &idx_struct, inum, lblk, 1, &pblk);
+
+        mapping[lblk] = pblk;
+        ASSERT_EQ(1, ret) << "Insert: " << lblk << ": " << pblk;
+
+    }
+
+    ASSERT_FALSE(FN(&idx_struct, im_persist, &idx_struct)) << 
+        "Persisting failed!" << endl;
+
+    // Both structures should now see the updates.
+    for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+        ASSERT_EQ(1, mapping.count(lblk)) << "This should never happen";
+
+        paddr_t p;
+        ssize_t ret = FN(&idx_other, im_lookup, &idx_other, inum, lblk, &p);
+
+        ASSERT_GE(ret, 1) << "cannot find cached updates!" << endl;
+        ASSERT_TRUE(mapping[lblk] == p) << "cached update is wrong!";
+
+        ret = FN(&idx_struct, im_lookup, &idx_struct, inum, lblk, &p);
+        ASSERT_GE(ret, 1) << "cannot find cached updates!" << endl;
+        ASSERT_TRUE(mapping[lblk] == p) << "cached update is wrong!";
+    }
+
+    device.deallocate();
+}
+
+TEST_P(CachingTestFixture, InsertBothCached) {
+    inum_t inum = 17;
+    size_t npages = 50;
+
+    map<laddr_t, paddr_t> mapping;
+
+    FN(&idx_other, im_set_caching, &idx_other, true);
+
+    for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+        // Do this to make the other have a "valid" cache.
+        paddr_t p;
+        ssize_t ret = FN(&idx_other, im_lookup, &idx_other, inum, lblk, &p);
+
+        ASSERT_LT(ret, 1) << "entry shouldn't even exist yet!" << endl; 
+
+        // Then do the actual insert.
+        paddr_t pblk;
+        ret = FN(&idx_struct, im_create, &idx_struct, inum, lblk, 1, &pblk);
+
+        mapping[lblk] = pblk;
+        ASSERT_EQ(1, ret) << "Insert: " << lblk << ": " << pblk;
+    }
+
+    ASSERT_FALSE(FN(&idx_struct, im_persist, &idx_struct)) << 
+        "Persisting failed!" << endl;
+
+    // The other idx struct should not see inserts, since it has not invalidated
+    for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+        ASSERT_EQ(1, mapping.count(lblk)) << "This should never happen";
+
+        paddr_t p;
+        ssize_t ret = FN(&idx_other, im_lookup, &idx_other, inum, lblk, &p);
+
+        ASSERT_LT(ret, 1) << "updates should only reside in cache!" << endl; 
+
+        ret = FN(&idx_struct, im_lookup, &idx_struct, inum, lblk, &p);
+        ASSERT_GE(ret, 1) << "cannot find cached updates!" << endl;
+        ASSERT_TRUE(mapping[lblk] == p) << "cached update is wrong!";
+    }
+
+    ASSERT_FALSE(FN(&idx_other, im_invalidate, &idx_other)) << 
+        "Invalidation failed!" << endl;
+
+    for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+
+        paddr_t p;
+        ssize_t ret = FN(&idx_other, im_lookup, &idx_other, inum, lblk, &p);
+
+        ASSERT_GE(ret, 1) << "cannot find after invalidation!" << endl;
+        ASSERT_TRUE(mapping[lblk] == p) << "did not reread properly!";
+    }
+
+    device.deallocate();
+}
+#if 0
 TEST_P(GenericTestFixture, InsertPersistCheckEnd) {
     inum_t inum = 17;
     size_t npages = 1000;

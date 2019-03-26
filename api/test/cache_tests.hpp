@@ -37,12 +37,18 @@ class CachingTestFixture : public TestFixture,
                 init_err |= idx_fns->im_init_prealloc(&idx_spec, &inode_space,
                                                      &idx_other);
             }
+
+            FN(&idx_struct, im_set_caching, &idx_struct, true);
+            FN(&idx_other, im_set_caching, &idx_other, false);
         }
 
         void TearDown() override {
             TestFixture::TearDown();
             // Deallocate all blocks to reset everything.
             device.deallocate();
+            // Invalidate caches.
+            FN(&idx_struct, im_invalidate, &idx_struct);
+            FN(&idx_other, im_invalidate, &idx_other);
         }
 
         idx_fns_t *idx_fns = nullptr;

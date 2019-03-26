@@ -70,6 +70,17 @@ typedef struct nvm_api_extent_header {
     uint16_t eh_depth;      /* has tree real underlying blocks? */
     uint32_t eh_generation; /* generation of the tree */
 } extent_header_t;
+
+typedef struct nvm_api_extent_tree_cache_node {
+    int8_t cn_status;
+    // The buffer of the leaf data -- use this for the path objects too!
+    size_t cn_raw_size;
+    char *cn_raw;
+    // The index into the above buffer is the same for the cache nodes.
+
+    struct nvm_api_extent_tree_cache_node *cn_nodes;
+} extent_cache_t;
+
 /*
  * Array of ext_path contains path to some extent.
  * It works as a cursor for a given key (logical block).
@@ -83,11 +94,13 @@ typedef struct nvm_api_extent_tree_path {
     extent_leaf_t *p_ext;
     extent_branch_t *p_idx;
     extent_header_t *p_hdr;
-    char *p_raw;
     paddr_t p_pblk;
+    char *p_raw;
     // CACHING
     int8_t p_cache_state;
+    extent_cache_t *p_node;
 } extent_path_t;
+
 /*******************************************************************************
  * Section: More API-centric things.
  ******************************************************************************/
@@ -104,15 +117,6 @@ static void print_ext_stats(ext_stats_t *s) {
 
 #define MAX_DEPTH 10
 
-typedef struct nvm_api_extent_tree_cache_node {
-    int8_t cn_status;
-    // The buffer of the leaf data -- use this for the path objects too!
-    size_t cn_raw_size;
-    char *cn_raw;
-    // The index into the above buffer is the same for the cache nodes.
-
-    struct nvm_api_extent_tree_cache_node *cn_nodes;
-} extent_cache_t;
 
 typedef struct nvm_api_extent_tree_metadata {
     paddr_range_t et_direct_range;

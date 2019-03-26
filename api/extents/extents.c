@@ -309,7 +309,7 @@ int __ext_dirty(const char *where, unsigned int line,
         err = write_ext_direct_data(ext_idx);
     }
 
-#ifdef REUSE_PREVIOUS_PATH
+#if 0 && defined(REUSE_PREVIOUS_PATH)
     inode->invalidate_path = 1;
 #endif
     return err;
@@ -469,6 +469,9 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
     }
 
     path[0].p_hdr = eh;
+    if (ext_meta->et_cached) {
+        path[0].p_node = ext_meta->et_direct_cache;
+    }
     // buffer_head of root is always NULL.
     //path[0].p_bh = NULL;
 
@@ -2459,7 +2462,7 @@ out:
     }
 
     *new_paddr = newblock;
-#ifdef REUSE_PREVIOUS_PATH
+#if 0 && defined(REUSE_PREVIOUS_PATH)
     if (inode->invalidate_path) {
         inode->invalidate_path = 0;
         ext_drop_refs(inode->previous_path);
@@ -2551,15 +2554,19 @@ ssize_t extent_tree_remove(idx_struct_t *ext_idx,
     return size;
 }
 
-int extent_tree_set_caching(idx_struct_t* idx_struct, bool enable) {
+int extent_tree_set_caching(idx_struct_t* ext_idx, bool enable) {
+    EXTMETA(ext_idx, ext_meta);
+    ext_meta->et_cached = enable;
     return 0;
 }
 
 int extent_tree_persist_updates(idx_struct_t* idx_struct) {
+    // Traverse all nodes and write them back.
     return 0;
 }
 
 int extent_tree_invalidate_caches(idx_struct_t* idx_struct) {
+    // Traverse all nodes and invalidate them.
     return 0;
 }
 

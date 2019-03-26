@@ -167,12 +167,16 @@ static inline int write_ext_direct_data(const idx_struct_t *ext_idx)
 static inline int read_ext_direct_data(const idx_struct_t *ext_idx) 
 {
     EXTMETA(ext_idx, ext_meta);
-    ssize_t nmeta = CB(ext_idx, cb_read,
-                       ext_meta->et_direct_range.pr_start,
-                       ext_meta->et_direct_range.pr_blk_offset,
-                       ext_meta->et_direct_range.pr_nbytes,
-                       (char*)ext_meta->et_direct_data);
-    if(nmeta != ext_meta->et_direct_range.pr_nbytes) return -EIO;
+    if (!ext_meta->et_cached || ext_meta->et_direct_data_cache_state < 0) {
+        ssize_t nmeta = CB(ext_idx, cb_read,
+                           ext_meta->et_direct_range.pr_start,
+                           ext_meta->et_direct_range.pr_blk_offset,
+                           ext_meta->et_direct_range.pr_nbytes,
+                           (char*)ext_meta->et_direct_data);
+        if(nmeta != ext_meta->et_direct_range.pr_nbytes) return -EIO;
+
+        ext_meta->et_direct_data_cache_state = 0;
+    }
 
     return 0;
 }

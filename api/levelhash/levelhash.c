@@ -6,6 +6,11 @@ idx_fns_t levelhash_fns = {
     .im_lookup        = levelhash_lookup,
     .im_create        = levelhash_create,
     .im_remove        = levelhash_remove,
+
+    .im_set_caching   = levelhash_set_caching,
+    .im_persist       = levelhash_persist_updates,
+    .im_invalidate    = levelhash_invalidate_caches,
+
     .im_set_stats     = levelhash_set_stats,
     .im_print_stats   = levelhash_print_stats
 };
@@ -136,6 +141,21 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
     return (ssize_t) nblk;
 }
 
+int levelhash_set_caching(idx_struct_t* level_idx, bool enable) {
+    LEVELMETA(level_idx, lh);
+    lh->do_cache = enable;
+    return 0;
+}
+
+int levelhash_persist_updates(idx_struct_t* level_idx) {
+    LEVELMETA(level_idx, lh);
+    return level_persist(lh);
+}
+
+int levelhash_invalidate_caches(idx_struct_t* level_idx) {
+    LEVELMETA(level_idx, lh);
+    return level_cache_invalidate(lh);
+}
 
 void levelhash_set_stats(idx_struct_t* level_idx, bool enable) {}
 void levelhash_print_stats(idx_struct_t* level_idx) {}

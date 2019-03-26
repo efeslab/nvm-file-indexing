@@ -57,6 +57,7 @@ _Static_assert(sizeof(level_bucket_t) <= 64, "level bucket is too big!");
 typedef struct level_hash {            // A Level hash table
     level_bucket_t *buckets[2];        // The top level and bottom level in the Level hash table
     int8_t *cache_state[2];            // API: Tri-state (-1 for not present, 0 for clean, 1 dirty)
+    int8_t meta_cache_state;           // API: Cache state for metadata.
     paddr_t dev_levels[2];             // API: Device location for the blocks.
     size_t  dev_sizes[2];
     uint64_t level_item_num[2];        // The numbers of items stored in the top and bottom levels respectively
