@@ -15,6 +15,10 @@ INSTANTIATE_TEST_CASE_P(OnlyLevelHashing,
                         CachingTestFixture,
                         ::testing::Values(&levelhash_fns));
 
+INSTANTIATE_TEST_CASE_P(OnlyGlobalHashTable, 
+                        CachingTestFixture,
+                        ::testing::Values(&hash_fns));
+
 TEST_P(CachingTestFixture, InitNoError) {
     ASSERT_EQ(0, init_err);
 }
