@@ -17,8 +17,6 @@
 #define EXT_DATA_VALID1 0x8  /* first half contains valid data */
 #define EXT_DATA_VALID2 0x10 /* second half contains valid data */
 
-#define CONFIG_EXTENT_TEST
-
 #define BUG_ON(x) 0
 
 /*
@@ -118,7 +116,7 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     size_t ents_root = ext_space_root(ext_idx);
     ext_meta->et_direct_data = ZALLOC(idx_spec,
             (ents_root * sizeof(extent_leaf_t)) + sizeof(extent_header_t));
-    if (NULL == ext_meta->et_direct_data) return -ENOMEM;
+    if (NULL == ext_meta->et_direct_data) { return -ENOMEM; }
 
     ext_meta->et_stats = ZALLOC(idx_spec, sizeof(*(ext_meta->et_stats)));
     if (NULL == ext_meta->et_stats) return -ENOMEM;
@@ -148,6 +146,12 @@ int extent_tree_init(const idx_spec_t *idx_spec,
         if (write_ext_direct_data(ext_idx)) return -EIO;
     }
 
+    // Caching:
+    ext_meta->et_cached = false;
+    ext_meta->et_direct_data_cache_state = 0;
+    ext_meta->et_direct_cache = ZALLOC(idx_spec, (ents_root * sizeof(extent_leaf_t)));
+    if (NULL == ext_meta->et_direct_cache) { return -ENOMEM; }
+
     return 0;
 }
 
@@ -155,7 +159,7 @@ int extent_tree_init(const idx_spec_t *idx_spec,
  * read_extent_tree_block:
  * Get a buffer_head by fs_bread, and read fresh data from the storage.
  */
-static char *read_extent_tree_block(idx_struct_t *ext_idx,
+static int read_extent_tree_block(idx_struct_t *ext_idx, char *buf,
                                     paddr_t pblk, int depth)
 {
     EXTMETA(ext_idx, ext_meta);
@@ -163,14 +167,11 @@ static char *read_extent_tree_block(idx_struct_t *ext_idx,
     if (ext_meta->et_enable_stats) {
         START_TIMING();
     }
-    char *buf;
     device_info_t devinfo;
     int err = CB(ext_idx, cb_get_dev_info, &devinfo);
-    if (err) return (char*)ERR_PTR(err);
+    if (err) return err;
 
     if_then_panic(depth >= MAX_DEPTH, "not enough buffers!");
-    buf = ext_meta->et_buffers[depth];
-    //buf = (char*)MALLOC(ext_idx, devinfo.di_block_size);
 
     uint64_t second_tsc = _asm_rdtscp();
     ssize_t nbytes = CB(ext_idx, cb_read,
@@ -179,26 +180,20 @@ static char *read_extent_tree_block(idx_struct_t *ext_idx,
         UPDATE_STAT(ext_meta->et_stats, read_from_device, second_tsc);
     }
 
-    if (nbytes < 0) goto errout;
     if (nbytes != devinfo.di_block_size) {
-        err = -EIO;
-        goto errout;
+        return -EIO;
     }
 
     if (depth >= 0) {
         err = ext_check(ext_idx, ext_header_from_block(buf), depth, pblk);
-        if (err) goto errout;
+        if (err) return err;
     }
 
     if (ext_meta->et_enable_stats) {
         UPDATE_TIMING(ext_meta->et_stats, read_metadata_blocks);
     }
 
-    return buf;
-
-errout:
-    //FREE(ext_idx, buf);
-    return (char*)ERR_PTR(err);
+    return 0;
 }
 
 int ext_check_inode(idx_struct_t *ext_idx)
@@ -489,10 +484,10 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
 
         i--;
 
-        buf = read_extent_tree_block(ext_idx, path[ppos].p_block, i);
+        buf = ext_meta->et_buffers[i];
+        ret = read_extent_tree_block(ext_idx, buf, path[ppos].p_block, i);
 
-        if (unlikely(IS_ERR(buf))) {
-            ret = PTR_ERR(buf);
+        if (unlikely(ret)) {
             goto err;
         }
 
@@ -1119,6 +1114,7 @@ static int ext_search_right(idx_struct_t *ext_idx,
         extent_leaf_t **ret_ex)
 {
     //struct buffer_head *bh = NULL;
+    EXTMETA(ext_idx, ext_meta);
     char *buf;
     extent_header_t *eh;
     extent_branch_t *ix;
@@ -1186,9 +1182,10 @@ got_index:
     block = idx_pblock(ix);
     while (++depth < path->p_depth) {
         /* subtract from p_depth to get proper eh_depth */
-        buf = read_extent_tree_block(ext_idx, block, path->p_depth - depth);
-        if (IS_ERR(buf)) {
-            return PTR_ERR(buf);
+        buf = ext_meta->et_buffers[path->p_depth - depth];
+        int rerr = read_extent_tree_block(ext_idx, buf, block, path->p_depth - depth);
+        if (rerr) {
+            return rerr;
         }
 
         eh = ext_header_from_block(buf);
@@ -1198,10 +1195,9 @@ got_index:
         //FREE(ext_idx, buf);
     }
 
-    buf = read_extent_tree_block(ext_idx, block, path->p_depth - depth);
-    if (IS_ERR(buf)) {
-        return PTR_ERR(buf);
-    }
+    buf = ext_meta->et_buffers[path->p_depth - depth];
+    int rerr = read_extent_tree_block(ext_idx, buf, block, path->p_depth - depth);
+    if (rerr) return rerr;
 
     eh = ext_header_from_block(buf);
     ex = EXT_FIRST_EXTENT(eh);
@@ -2055,7 +2051,7 @@ static int inline ext_more_to_rm(extent_path_t *path)
 
 int ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
 {
-    //struct super_block *sb = get_inode_sb(handle->dev, inode);
+    EXTMETA(ext_idx, ext_meta);
     int depth = ext_tree_depth(ext_idx);
     extent_path_t *path;
     int i = 0, err = 0;
@@ -2188,21 +2184,15 @@ int ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
             path[i].p_idx--;
         }
 
-        //lsm_debug("level %d - index, first 0x%p, cur 0x%p\n",
-        //        i, EXT_FIRST_INDEX(path[i].p_hdr),
-        //        path[i].p_idx);
-
         if (ext_more_to_rm(path + i)) {
             char *buf;
             /* go to the next level */
-            ////lsm_debug("move to level %d (block %lx)\n",
-            //      i + 1, idx_pblock(path[i].p_idx));
             memset(path + i + 1, 0, sizeof(*path));
 
-            buf = read_extent_tree_block(ext_idx,
-                    idx_pblock(path[i].p_idx),
-                    path[0].p_depth - (i + 1));
-            if (IS_ERR(buf)) {
+            buf = ext_meta->et_buffers[path[0].p_depth - (i + 1)];
+            int rerr = read_extent_tree_block(ext_idx, buf,
+                    idx_pblock(path[i].p_idx), path[0].p_depth - (i + 1));
+            if (rerr) {
                 /* should we reset i_size? */
                 err = -EIO;
                 break;
@@ -2328,251 +2318,6 @@ static laddr_t ext_determine_hole(idx_struct_t *ext_idx,
         BUG_ON(1);
     }
     return len;
-}
-/* Core interface API to get/allocate blocks of an inode
- *
- * return > 0, number of of blocks already mapped/allocated
- *          if create == 0 and these are pre-allocated blocks
- *              buffer head is unmapped
- *          otherwise blocks are mapped
- *
- * return = 0, if plain look up failed (blocks have not been allocated)
- *          buffer head is unmapped
- *
- * return < 0, error case.
- *
- */
-int ext_get_blocks(idx_struct_t *ext_idx, map_blocks_t *map, int flags)
-{
-    extent_path_t *path = NULL;
-    extent_leaf_t newex, *ex;
-    int goal, err = 0, depth;
-    laddr_t allocated = 0;
-    paddr_t next, newblock;
-    int create;
-
-    create = flags & GET_BLOCKS_CREATE_DATA;
-
-#ifdef REUSE_PREVIOUS_PATH
-    if (create) {
-        ext_drop_refs(inode->previous_path); free(inode->previous_path); //TODO: for continue debug
-        inode->previous_path = NULL;
-        goto find_ext_path;
-    }
-
-    if (!inode->previous_path || (map->m_flags & MAP_LOG_ALLOC))
-        goto find_ext_path;
-
-    extent_path_t * _path = inode->previous_path;
-    depth = ext_tree_depth(ext_idx);
-    ex = _path[depth].p_ext;
-    if (ex) {
-        laddr_t ee_block = le32_to_cpu(ex->ee_block);
-        paddr_t ee_start = ext_pblock(ex);
-        unsigned short ee_len;
-
-        /*
-         * unwritten extents are treated as holes, except that
-         * we split out initialized portions during a write.
-         */
-        ee_len = ext_get_real_len(ex);
-
-        /* find extent covers block. simply return the extent */
-        if (in_range(map->m_lblk, ee_block, ee_len)) {
-            allocated = ee_len + ee_block - map->m_lblk;
-
-            if (!ext_is_unwritten(ex)) {
-                newblock = map->m_lblk - ee_block + ee_start;
-                inode->invalidate_path = 0;
-                goto out;
-            }
-        }
-    }
-
-    ext_drop_refs(_path);
-    free(_path);
-    inode->previous_path = NULL;
-
-#endif
-find_ext_path:
-
-    /* find extent for this block */
-    path = find_extent(ext_idx, map->m_lblk, NULL, 0);
-    if (IS_ERR(path)) {
-        err = PTR_ERR(path);
-        path = NULL;
-        goto out2;
-    }
-
-    depth = ext_tree_depth(ext_idx);
-
-    /*
-     * consistent leaf must not be empty
-     * this situations is possible, though, _during_ tree modification
-     * this is why assert can't be put in ext_find_extent()
-     */
-    BUG_ON(path[depth].p_ext == NULL && depth != 0);
-
-    ex = path[depth].p_ext;
-    if (ex) {
-        laddr_t ee_block = le32_to_cpu(ex->ee_block);
-        paddr_t ee_start = ext_pblock(ex);
-        unsigned short ee_len;
-
-        /*
-         * unwritten extents are treated as holes, except that
-         * we split out initialized portions during a write.
-         */
-        ee_len = ext_get_real_len(ex);
-
-        /* find extent covers block. simply return the extent */
-        if (in_range(map->m_lblk, ee_block, ee_len)) {
-            /* number of remain blocks in the extent */
-            allocated = ee_len + ee_block - map->m_lblk;
-
-            // Delete original block and update extent tree for log-structured updates
-            // and garbage collection of SSD.
-            // FIXME: this is slightly inefficient since it searches ext_path repeatedly
-            // Deletion of original block and allocating new block could be merged
-            // by a new API.
-            if (map->m_flags & MAP_LOG_ALLOC) {
-                int ret;
-                ret = ext_truncate(ext_idx, map->m_lblk,
-                        map->m_lblk + map->m_len - 1);
-                // Set flags to block allocator to do log-structured allocation.
-                //flags &= ~GET_BLOCKS_CREATE_DATA;
-                //flags |= GET_BLOCKS_CREATE_DATA_LOG;
-                assert(ret == 0);
-
-                // TODO: optimize this! Figure out a way to reuse the path
-                ext_drop_refs(ext_idx, path);
-                FREE(ext_idx, path);
-                path = find_extent(ext_idx, map->m_lblk, NULL, 0);
-                assert(!IS_ERR(path));
-            } else if (ext_is_unwritten(ex)) {
-                if (create) {
-                    newblock = map->m_lblk - ee_block + ee_start;
-                    err = ext_convert_to_initialized(ext_idx,
-                            &path, map->m_lblk , allocated, flags);
-                    if (err) {
-                        goto out2;
-                    }
-                } else {
-                    newblock = 0;
-                }
-                goto out;
-            } else {
-                newblock = map->m_lblk - ee_block + ee_start;
-                goto out;
-            }
-        }
-    }
-
-    /*
-     * requested block isn't allocated yet
-     * we couldn't try to create block if create flag is zero
-     */
-    if (!create) {
-        laddr_t hole_start, hole_len;
-
-        hole_start = map->m_lblk;
-        hole_len = ext_determine_hole(ext_idx, path, &hole_start);
-
-        /* Update hole_len to reflect hole size after map->m_lblk */
-        if (hole_start != map->m_lblk)
-            hole_len -= map->m_lblk - hole_start;
-
-        map->m_pblk = 0;
-        map->m_len = min_t(unsigned int, map->m_len, hole_len);
-        err = 0;
-        goto out2;
-    }
-
-    /* find next allocated block so that we know how many
-     * blocks we can allocate without ovelapping next extent */
-    next = ext_next_allocated_block(path);
-    BUG_ON(next <= map->m_lblk);
-
-    allocated = next - map->m_lblk;
-
-    if ((flags & GET_BLOCKS_PRE_IO) &&
-            map->m_len > EXT_UNWRITTEN_MAX_LEN)
-        map->m_len = EXT_UNWRITTEN_MAX_LEN;
-
-    if (allocated > map->m_len)
-        allocated = map->m_len;
-
-    //goal = ext_find_goal(inode, path, map->m_lblk);
-
-    /*
-    newblock = new_data_blocks(ext_idx,
-            goal, flags, &allocated, &err);
-    */
-    ssize_t nalloc = CB(ext_idx, cb_alloc_data, allocated, &newblock);
-
-    if (!newblock || nalloc < 0) {
-        goto out2;
-    }
-
-    allocated = nalloc;
-
-    /* try to insert new extent into found leaf and return */
-    newex.ee_block = cpu_to_le32(map->m_lblk);
-    ext_store_pblock(&newex, newblock);
-    newex.ee_len = cpu_to_le16(allocated);
-
-    /* if it's fallocate, mark ex as unwritten */
-    if (flags & GET_BLOCKS_PRE_IO) {
-        ext_mark_unwritten(&newex);
-    }
-
-    err = ext_insert_extent(ext_idx, &path, &newex,
-            flags & GET_BLOCKS_PRE_IO);
-
-    if (err) {
-        /* free data blocks we just allocated */
-        (void)CB(ext_idx, cb_dealloc_data, le16_to_cpu(newex.ee_len),
-                                           ext_pblock(&newex));
-        goto out2;
-    }
-
-    //mark_inode_dirty(inode);
-
-    /* previous routine could use block we allocated */
-    if (ext_is_unwritten(&newex))
-        newblock = 0;
-    else
-        newblock = ext_pblock(&newex);
-
-out:
-    if (allocated > map->m_len)
-        allocated = map->m_len;
-
-    //ext_show_leaf(inode, path);
-
-    map->m_pblk = newblock;
-    map->m_len = allocated;
-#ifdef REUSE_PREVIOUS_PATH
-    if (inode->invalidate_path) {
-        inode->invalidate_path = 0;
-        ext_drop_refs(inode->previous_path); free(inode->previous_path); //TODO: for continue debug
-        inode->previous_path = NULL;
-    }
-    else {
-        inode->previous_path = path;
-        path = NULL;
-    }
-
-#endif
-out2:
-    if (path) {
-        /* write back tree changes (internal/leaf nodes) */
-        ext_drop_refs(ext_idx, path);
-        FREE(ext_idx, path);
-    }
-
-
-    return err ? err : allocated;
 }
 
 int ext_truncate(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
@@ -2806,6 +2551,18 @@ ssize_t extent_tree_remove(idx_struct_t *ext_idx,
     return size;
 }
 
+int extent_tree_set_caching(idx_struct_t* idx_struct, bool enable) {
+    return 0;
+}
+
+int extent_tree_persist_updates(idx_struct_t* idx_struct) {
+    return 0;
+}
+
+int extent_tree_invalidate_caches(idx_struct_t* idx_struct) {
+    return 0;
+}
+
 void extent_tree_set_stats(idx_struct_t *ext_idx, bool enable) {
     EXTMETA(ext_idx, ext_meta);
     ext_meta->et_enable_stats = enable;
@@ -2823,6 +2580,11 @@ idx_fns_t extent_tree_fns = {
     .im_lookup        = extent_tree_lookup,
     .im_create        = extent_tree_create,
     .im_remove        = extent_tree_remove,
+
+    .im_set_caching   = extent_tree_set_caching,
+    .im_persist       = extent_tree_persist_updates,
+    .im_invalidate    = extent_tree_invalidate_caches,
+
     .im_set_stats     = extent_tree_set_stats,
     .im_print_stats   = extent_tree_print_stats
 };

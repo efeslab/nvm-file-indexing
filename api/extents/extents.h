@@ -25,6 +25,14 @@ ssize_t extent_tree_lookup(idx_struct_t *idx_struct, inum_t inum,
 ssize_t extent_tree_remove(idx_struct_t *idx_struct,
                            inum_t inum, laddr_t laddr, size_t size);
 
+int extent_tree_set_caching(idx_struct_t* idx_struct, bool enable);
+int extent_tree_persist_updates(idx_struct_t* idx_struct);
+int extent_tree_invalidate_caches(idx_struct_t* idx_struct);
+
+void extent_tree_set_stats(idx_struct_t *ext_idx, bool enable);
+
+void extent_tree_print_stats(idx_struct_t *ext_idx);
+
 extern idx_fns_t extent_tree_fns;
 
 #ifdef __cplusplus

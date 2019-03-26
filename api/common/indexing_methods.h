@@ -49,8 +49,9 @@ typedef ssize_t (*remove_index_fn_t)(idx_struct_t*, inum_t, laddr_t, size_t);
  * Specifies how indices are persisted or potentially cached.
  */
 
-int persist_updates();
-int clear_caches();
+typedef int (*set_caching_fn_t)(idx_struct_t*, bool);
+typedef int (*persist_updates_fn_t)(idx_struct_t*);
+typedef int (*invalidate_caches_fn_t)(idx_struct_t*);
 
 /*
  * Section: Profiling (and statistics)
@@ -72,6 +73,11 @@ typedef struct indexing_functions {
     lookup_index_fn_t         im_lookup;
     create_index_fn_t         im_create;
     remove_index_fn_t         im_remove;
+
+    set_caching_fn_t          im_set_caching;
+    persist_updates_fn_t      im_persist;
+    invalidate_caches_fn_t    im_invalidate;
+
     set_stats_t               im_set_stats;
     print_stats_t             im_print_stats;
 } idx_fns_t;
