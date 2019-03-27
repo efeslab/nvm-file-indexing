@@ -50,9 +50,9 @@ uint64_t blocks;
 #define pthread_rwlock_rdlock(x) do { printf("rdlk\n"); pthread_rwlock_rdlock(x); } while (0)
 #define pthread_rwlock_wrlock(x) do { printf("wrlk\n"); pthread_rwlock_wrlock(x); } while (0)
 #define pthread_rwlock_unlock(x) do { printf("unlk\n"); pthread_rwlock_unlock(x); } while (0)
-#elif 0
-#define pthread_rwlock_rdlock(x) if (0 != pthread_rwlock_tryrdlock(x)) printf("WUT\n")
-#define pthread_rwlock_wrlock(x) if (0 != pthread_rwlock_trywrlock(x)) printf("WUT\n")
+#elif 1
+#define pthread_rwlock_rdlock(x) if_then_panic(0 != pthread_rwlock_tryrdlock(x), "Could not acquire rdlock!")
+#define pthread_rwlock_wrlock(x) if_then_panic(0 != pthread_rwlock_trywrlock(x), "Could not acquire wrlock!")
 #endif
 
 
@@ -736,11 +736,13 @@ nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
     step++;
     uint32_t new_idx = (node_index + step) & hash_table->mask;
     //uint32_t new_idx = (node_index + step) % hash_table->mod;
+
     pthread_rwlock_unlock(hash_table->locks + node_index);
     pthread_rwlock_wrlock(hash_table->locks + new_idx);
 
+    nvm_read_entry(hash_table, new_idx, &cur, false);
+
     node_index = new_idx;
-    nvm_read_entry(hash_table, node_index, &cur, false);
   }
 
   if (HASH_ENT_IS_VALID(*cur)) {

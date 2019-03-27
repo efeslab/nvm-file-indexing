@@ -296,7 +296,7 @@ static inline int nvm_persist(nvm_hash_idx_t *ht) {
 
             paddr_t paddr = ht->data + BLK_NUM(ht, idx);
             ssize_t size  = sizeof(*ht->cache) * (end - idx);
-            off_t offset  = BLK_IDX(ht, idx) * size;
+            off_t offset  = BLK_IDX(ht, idx) * sizeof(*ht->cache);
 
             ssize_t ret = CB(ht, cb_write, 
                              paddr, offset, size, (char*)&(ht->cache[idx]));
