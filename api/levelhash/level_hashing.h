@@ -79,7 +79,7 @@ typedef struct level_hash {            // A Level hash table
 
 int read_metadata(const idx_spec_t *idx_spec, 
                   const paddr_range_t *loc, 
-                  dev_level_hash_t *dhash);
+                  dev_level_hash_t **dhash);
 
 int reread_metadata(level_hash_t *level);
 int write_metadata(level_hash_t *level);

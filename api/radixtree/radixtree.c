@@ -428,10 +428,26 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     return npages;
 }
 
+int radixtree_set_caching(idx_struct_t *idx_struct, bool enable) {
+    return 0;
+}
+
+int radixtree_persist(idx_struct_t *idx_struct) {
+    return 0;
+}
+
+int radixtree_invalidate(idx_struct_t *idx_struct) {
+    return 0;
+}
+
 idx_fns_t radixtree_fns = {
     .im_init          = radixtree_init,
     .im_init_prealloc = NULL,
     .im_lookup        = radixtree_lookup,
     .im_create        = radixtree_create,
-    .im_remove        = radixtree_remove
+    .im_remove        = radixtree_remove,
+
+    .im_set_caching   = radixtree_set_caching,
+    .im_persist       = radixtree_persist,
+    .im_invalidate    = radixtree_invalidate
 };

@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#include "synchronization.h"
 #include "indexing_structure.h"
 #include "util.h"
 #include "kerncompat.h"

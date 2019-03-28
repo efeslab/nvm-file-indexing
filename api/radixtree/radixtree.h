@@ -7,6 +7,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <pthread.h>
 #include "common/common.h"
 
 typedef struct radix_node {
