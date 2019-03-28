@@ -4,13 +4,6 @@
 
 using namespace std;
 #if 0
-INSTANTIATE_TEST_CASE_P(AllStructures, 
-                        GenericTestFixture,
-                        ::testing::Values(&extent_tree_fns, 
-                                          &hash_fns, 
-                                          &levelhash_fns,
-                                          &radixtree_fns));
-#endif
 INSTANTIATE_TEST_CASE_P(OnlyLevelHashing, 
                         CachingTestFixture,
                         ::testing::Values(&levelhash_fns));
@@ -18,6 +11,7 @@ INSTANTIATE_TEST_CASE_P(OnlyLevelHashing,
 INSTANTIATE_TEST_CASE_P(OnlyGlobalHashTable, 
                         CachingTestFixture,
                         ::testing::Values(&hash_fns));
+#endif
 
 TEST_P(CachingTestFixture, InitNoError) {
     ASSERT_EQ(0, init_err);

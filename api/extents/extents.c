@@ -159,7 +159,7 @@ int extent_tree_init(const idx_spec_t *idx_spec,
  * read_extent_tree_block:
  * Get a buffer_head by fs_bread, and read fresh data from the storage.
  */
-static int read_extent_tree_block(idx_struct_t *ext_idx, char *buf,
+static int read_extent_tree_block(idx_struct_t *ext_idx, char **buf,
                                     paddr_t pblk, int depth)
 {
     EXTMETA(ext_idx, ext_meta);
@@ -174,18 +174,25 @@ static int read_extent_tree_block(idx_struct_t *ext_idx, char *buf,
     if_then_panic(depth >= MAX_DEPTH, "not enough buffers!");
 
     uint64_t second_tsc = _asm_rdtscp();
+#if 0
     ssize_t nbytes = CB(ext_idx, cb_read,
                         pblk, 0, devinfo.di_block_size, buf);
+#else
+    err = CB(ext_idx, cb_get_addr, pblk, 0, buf);
+#endif
     if (ext_meta->et_enable_stats) {
         UPDATE_STAT(ext_meta->et_stats, read_from_device, second_tsc);
     }
-
+#if 0
     if (nbytes != devinfo.di_block_size) {
         return -EIO;
     }
+#else 
+    if (err) return -EIO;
+#endif
 
     if (depth >= 0) {
-        err = ext_check(ext_idx, ext_header_from_block(buf), depth, pblk);
+        err = ext_check(ext_idx, ext_header_from_block(*buf), depth, pblk);
         if (err) return err;
     }
 
@@ -295,13 +302,14 @@ int __ext_dirty(const char *where, unsigned int line,
         /* path points to block */
         extent_block_csum_set(ext_idx, ext_header_from_block(path->p_raw));
         //fs_mark_buffer_dirty(path->p_bh);
-
+#if 0 
         ssize_t nwrite = CB(ext_idx, cb_write,
                             path->p_pblk,
                             0,
                             device_block_size(ext_idx),
                             path->p_raw);
         if (nwrite != device_block_size(ext_idx)) err = -EIO;
+#endif
     } else {
         //printf("write direct\n");
         /* path points to leaf/index in inode body */
@@ -487,8 +495,7 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
 
         i--;
 
-        buf = ext_meta->et_buffers[i];
-        ret = read_extent_tree_block(ext_idx, buf, path[ppos].p_block, i);
+        ret = read_extent_tree_block(ext_idx, &buf, path[ppos].p_block, i);
 
         if (unlikely(ret)) {
             goto err;
@@ -683,12 +690,18 @@ static int ext_split(idx_struct_t *ext_idx,
         goto cleanup;
     }
     */
+#if 0
     buf = ZALLOC(ext_idx, device_block_size(ext_idx));
 
     if (NULL == buf) {
         err = -ENOMEM;
         goto cleanup;
     }
+#else
+    err = CB(ext_idx, cb_get_addr, newblock, 0, &buf);
+    if (err) goto cleanup;
+#endif
+
 
     //TODO: call sync dirty buffer
     //bh = write(inode->i_sb, newblock);
@@ -727,13 +740,14 @@ static int ext_split(idx_struct_t *ext_idx,
     }
 
     extent_block_csum_set(ext_idx, neh);
-
+#if 0
     ssize_t nwrite = CB(ext_idx, cb_write,
                         newblock, 0, device_block_size(ext_idx), buf);
 
     if (nwrite < 0 || nwrite != device_block_size(ext_idx)) {
         goto cleanup;
     }
+#endif
 
     /*
     set_buffer_uptodate(bh);
@@ -779,12 +793,17 @@ static int ext_split(idx_struct_t *ext_idx,
             goto cleanup;
         }
         */
+#if 0
         buf = ZALLOC(ext_idx, device_block_size(ext_idx));
 
         if (NULL == buf) {
             err = -ENOMEM;
             goto cleanup;
         }
+#else
+        err = CB(ext_idx, cb_get_addr, newblock, 0, &buf);
+        if (err) goto cleanup;
+#endif
 
         neh = ext_header_from_block(buf);
         neh->eh_entries = cpu_to_le16(1);
@@ -821,12 +840,14 @@ static int ext_split(idx_struct_t *ext_idx,
 
         err = handle_dirty_metadata(ext_idx, bh);
         */
+#if 0
         ssize_t nwrite = CB(ext_idx, cb_write,
                             newblock, 0, device_block_size(ext_idx), buf);
 
         if (nwrite < 0 || nwrite != device_block_size(ext_idx)) {
             goto cleanup;
         }
+#endif
 
         //fs_brelse(bh);
         //bh = NULL;
@@ -906,12 +927,13 @@ static int ext_grow_indepth(idx_struct_t *ext_idx, unsigned int flags)
         return nalloc;
     }
     //printf("block %lu is now metadata!\n", newblock);
-
-    //bh = fs_get_bh(handle->dev, newblock, &ret);
+#if 0
     buf = ZALLOC(ext_idx, device_block_size(ext_idx));
-    //bh = extents_bwrite(inode->i_sb, newblock);
     if (!buf) return -ENOMEM;
-    //lock_buffer(bh);
+#else
+    err = CB(ext_idx, cb_get_addr, newblock, 0, &buf);
+    if (err) goto out;
+#endif
 
     /*
     err = journal_get_create_access(handle, bh);
@@ -935,10 +957,11 @@ static int ext_grow_indepth(idx_struct_t *ext_idx, unsigned int flags)
     }
     neh->eh_magic = cpu_to_le16(EXT_MAGIC);
     extent_block_csum_set(ext_idx, neh);
-
+#if 0
     ssize_t nwrite = CB(ext_idx, cb_write,
                         newblock, 0, device_block_size(ext_idx), buf);
     if_then_panic(nwrite != device_block_size(ext_idx), "wat");
+#endif
     /*
     set_buffer_uptodate(bh);
     unlock_buffer(bh);
@@ -1185,8 +1208,7 @@ got_index:
     block = idx_pblock(ix);
     while (++depth < path->p_depth) {
         /* subtract from p_depth to get proper eh_depth */
-        buf = ext_meta->et_buffers[path->p_depth - depth];
-        int rerr = read_extent_tree_block(ext_idx, buf, block, path->p_depth - depth);
+        int rerr = read_extent_tree_block(ext_idx, &buf, block, path->p_depth - depth);
         if (rerr) {
             return rerr;
         }
@@ -1198,8 +1220,7 @@ got_index:
         //FREE(ext_idx, buf);
     }
 
-    buf = ext_meta->et_buffers[path->p_depth - depth];
-    int rerr = read_extent_tree_block(ext_idx, buf, block, path->p_depth - depth);
+    int rerr = read_extent_tree_block(ext_idx, &buf, block, path->p_depth - depth);
     if (rerr) return rerr;
 
     eh = ext_header_from_block(buf);
@@ -2192,8 +2213,8 @@ int ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
             /* go to the next level */
             memset(path + i + 1, 0, sizeof(*path));
 
-            buf = ext_meta->et_buffers[path[0].p_depth - (i + 1)];
-            int rerr = read_extent_tree_block(ext_idx, buf,
+            //buf = ext_meta->et_buffers[path[0].p_depth - (i + 1)];
+            int rerr = read_extent_tree_block(ext_idx, &buf,
                     idx_pblock(path[i].p_idx), path[0].p_depth - (i + 1));
             if (rerr) {
                 /* should we reset i_size? */

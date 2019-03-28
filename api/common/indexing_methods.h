@@ -50,6 +50,7 @@ typedef ssize_t (*remove_index_fn_t)(idx_struct_t*, inum_t, laddr_t, size_t);
  */
 
 typedef int (*set_caching_fn_t)(idx_struct_t*, bool);
+typedef int (*set_locking_fn_t)(idx_struct_t*, bool);
 typedef int (*persist_updates_fn_t)(idx_struct_t*);
 typedef int (*invalidate_caches_fn_t)(idx_struct_t*);
 
@@ -75,6 +76,7 @@ typedef struct indexing_functions {
     remove_index_fn_t         im_remove;
 
     set_caching_fn_t          im_set_caching;
+    set_locking_fn_t          im_set_locking;
     persist_updates_fn_t      im_persist;
     invalidate_caches_fn_t    im_invalidate;
 

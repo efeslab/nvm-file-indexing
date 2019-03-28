@@ -29,7 +29,6 @@
 #include <assert.h>
 #include <string.h>  /* memset */
 #include <stdint.h>
-#include <pthread.h>
 
 #include "ghash.h"
 
@@ -50,7 +49,7 @@ uint64_t blocks;
 #define pthread_rwlock_rdlock(x) do { printf("rdlk\n"); pthread_rwlock_rdlock(x); } while (0)
 #define pthread_rwlock_wrlock(x) do { printf("wrlk\n"); pthread_rwlock_wrlock(x); } while (0)
 #define pthread_rwlock_unlock(x) do { printf("unlk\n"); pthread_rwlock_unlock(x); } while (0)
-#elif 1
+#elif 0
 #define pthread_rwlock_rdlock(x) if_then_panic(0 != pthread_rwlock_tryrdlock(x), "Could not acquire rdlock!")
 #define pthread_rwlock_wrlock(x) if_then_panic(0 != pthread_rwlock_trywrlock(x), "Could not acquire wrlock!")
 #endif
@@ -187,7 +186,7 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
 
   //node_index = hash_value % hash_table->mod;
   node_index = hash_value & hash_table->mask;
-  pthread_rwlock_rdlock(hash_table->locks + node_index);
+  if (hash_table->do_lock) pthread_rwlock_rdlock(hash_table->locks + node_index);
 
   nvm_read_entry(hash_table, node_index, &cur, force);
   //cur = hash_table->cache[BLK_NUM(node_index)][BLK_IDX(node_index)];
@@ -195,7 +194,7 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
   while (!HASH_ENT_IS_EMPTY(*cur)) {
     if (cur->key == key && HASH_ENT_IS_VALID(*cur)) {
       *ent_return = cur;
-      pthread_rwlock_unlock(hash_table->locks + node_index);
+      if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
       //pthread_rwlock_unlock(hash_table->cache_lock);
       return node_index;
     } else if (HASH_ENT_IS_TOMBSTONE(*cur) && !have_tombstone) {
@@ -206,21 +205,23 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
     step++;
     uint32_t new_idx = (node_index + step) & hash_table->mask;
     //uint32_t new_idx = (node_index + step) % hash_table->mod;
-    pthread_rwlock_unlock(hash_table->locks + node_index);
-    pthread_rwlock_rdlock(hash_table->locks + new_idx);
-
+    if (hash_table->do_lock) {
+      pthread_rwlock_unlock(hash_table->locks + node_index);
+      pthread_rwlock_rdlock(hash_table->locks + new_idx);
+    }
     node_index = new_idx;
     nvm_read_entry(hash_table, node_index, &cur, force);
   }
 
   if (have_tombstone) {
     nvm_read_entry(hash_table, first_tombstone, ent_return, false);
-    pthread_rwlock_unlock(hash_table->locks + node_index);
+    if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
+      //pthread_rwlock_unlock(hash_table->cache_lock);
     return first_tombstone;
   }
 
   nvm_read_entry(hash_table, node_index, ent_return, false);
-  pthread_rwlock_unlock(hash_table->locks + node_index);
+  if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
 
   //pthread_rwlock_unlock(hash_table->cache_lock);
   return node_index;
@@ -254,7 +255,7 @@ int nvm_hash_table_update(nvm_hash_idx_t *hash_table,
 
   //node_index = hash_value % hash_table->mod;
   node_index = hash_value & hash_table->mask;
-  pthread_rwlock_rdlock(hash_table->locks + node_index);
+  if (hash_table->do_lock) pthread_rwlock_rdlock(hash_table->locks + node_index);
 
   nvm_read_entry(hash_table, node_index, &cur, false);
   //cur = hash_table->cache[BLK_NUM(node_index)][BLK_IDX(node_index)];
@@ -262,7 +263,7 @@ int nvm_hash_table_update(nvm_hash_idx_t *hash_table,
   while (!HASH_ENT_IS_EMPTY(*cur)) {
     if (cur->key == key && HASH_ENT_IS_VALID(*cur)) {
       nvm_hash_table_update_internal(hash_table, cur, node_index, new_range);
-      pthread_rwlock_unlock(hash_table->locks + node_index);
+      if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
       //pthread_rwlock_unlock(hash_table->cache_lock);
       return 1;
     } 
@@ -270,14 +271,15 @@ int nvm_hash_table_update(nvm_hash_idx_t *hash_table,
     step++;
     uint32_t new_idx = (node_index + step) & hash_table->mask;
     //uint32_t new_idx = (node_index + step) % hash_table->mod;
-    pthread_rwlock_unlock(hash_table->locks + node_index);
-    pthread_rwlock_rdlock(hash_table->locks + new_idx);
-
+    if (hash_table->do_lock) {
+      pthread_rwlock_unlock(hash_table->locks + node_index);
+      pthread_rwlock_rdlock(hash_table->locks + new_idx);
+    }
     node_index = new_idx;
     nvm_read_entry(hash_table, node_index, &cur, false);
   }
 
-  pthread_rwlock_unlock(hash_table->locks + node_index);
+  if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
 
   //pthread_rwlock_unlock(hash_table->cache_lock);
   return 0;
@@ -445,6 +447,7 @@ nvm_hash_table_new(hash_func_t       hash_func,
 
   // -- CACHING
   ht->do_cache = false;
+  ht->do_lock  = false;
   // cache lock
   ht->cache_lock = MALLOC(idx_spec, sizeof(pthread_rwlock_t));
   assert(ht->cache_lock);
@@ -618,7 +621,7 @@ nvm_hash_table_insert_internal (nvm_hash_idx_t *hash_table,
 
   //node_index = hash_value % hash_table->mod;
   node_index = hash_value & hash_table->mask;
-  pthread_rwlock_wrlock(hash_table->locks + node_index);
+  if (hash_table->do_lock) pthread_rwlock_wrlock(hash_table->locks + node_index);
 
   nvm_read_entry(hash_table, node_index, &cur, false);
 
@@ -630,27 +633,27 @@ nvm_hash_table_insert_internal (nvm_hash_idx_t *hash_table,
       first_tombstone = node_index;
       have_tombstone = TRUE;
     } else {
-      pthread_rwlock_unlock(hash_table->locks + node_index);
+      if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
     }
 
     step++;
     uint32_t new_idx = (node_index + step) & hash_table->mask;
     //uint32_t new_idx = (node_index + step) % hash_table->mod;
-    pthread_rwlock_wrlock(hash_table->locks + new_idx);
+    if (hash_table->do_lock) pthread_rwlock_wrlock(hash_table->locks + new_idx);
 
     node_index = new_idx;
     nvm_read_entry(hash_table, node_index, &cur, false);
   }
 
   if (have_tombstone) {
-    pthread_rwlock_unlock(hash_table->locks + node_index);
+    if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
     node_index = first_tombstone;
   }
 
   int res = nvm_hash_table_insert_node(
       hash_table, node_index, hash_value, key, value, index, size);
 
-  pthread_rwlock_unlock(hash_table->locks + node_index);
+  if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
 
   //pthread_rwlock_unlock(hash_table->cache_lock);
   return res;
@@ -724,7 +727,7 @@ nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
   //pthread_rwlock_rdlock(hash_table->cache_lock);
   //node_index = hash_value % hash_table->mod;
   node_index = hash_value & hash_table->mask;
-  pthread_rwlock_wrlock(hash_table->locks + node_index);
+  if (hash_table->do_lock) pthread_rwlock_wrlock(hash_table->locks + node_index);
 
   nvm_read_entry(hash_table, node_index, &cur, false);
 
@@ -737,8 +740,10 @@ nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
     uint32_t new_idx = (node_index + step) & hash_table->mask;
     //uint32_t new_idx = (node_index + step) % hash_table->mod;
 
-    pthread_rwlock_unlock(hash_table->locks + node_index);
-    pthread_rwlock_wrlock(hash_table->locks + new_idx);
+    if (hash_table->do_lock) {
+      pthread_rwlock_unlock(hash_table->locks + node_index);
+      pthread_rwlock_wrlock(hash_table->locks + new_idx);
+    }
 
     nvm_read_entry(hash_table, new_idx, &cur, false);
 
@@ -747,11 +752,11 @@ nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
 
   if (HASH_ENT_IS_VALID(*cur)) {
       nvm_hash_table_remove_node(hash_table, node_index, old_pblk, old_idx, old_size);
-      pthread_rwlock_unlock(hash_table->locks + node_index);
+      if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
       return 1;
   }
 
-  pthread_rwlock_unlock(hash_table->locks + node_index);
+  if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
 
   //pthread_rwlock_unlock(hash_table->cache_lock);
   return HASH_ENT_IS_VALID(*cur);

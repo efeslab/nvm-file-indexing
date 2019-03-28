@@ -31,6 +31,7 @@ extern "C" {
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 // from common
 #include "common/common.h"
@@ -122,6 +123,7 @@ typedef struct nvm_hashtable_index {
     pthread_mutex_t *metalock;
 
     // -- CACHING
+    bool do_lock;
     bool do_cache;
     pthread_rwlock_t *cache_lock;
     int8_t* cache_state;
@@ -178,18 +180,24 @@ extern uint64_t blocks;
 static void
 nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t **ret, bool force) {
 
-    if (!ht->do_cache || ht->cache_state[idx] < 0) {
-        paddr_t block  = ht->data + BLK_NUM(ht, idx);
-        off_t   offset = BLK_IDX(ht, idx) * sizeof(*ht->cache);
+    paddr_t block  = ht->data + BLK_NUM(ht, idx);
+    off_t   offset = BLK_IDX(ht, idx) * sizeof(**ret);
+
+    if (!ht->do_cache) {
+        ssize_t err = CB(ht, cb_get_addr, block, offset, (char**)ret);
+        if_then_panic(err, "Could not get device address!");
+                        
+    } else if (ht->do_cache && ht->cache_state[idx] < 0) {
         ssize_t err = CB(ht, cb_read, 
                          block, offset, sizeof(*ht->cache), (char*)&(ht->cache[idx]));
 
         if_then_panic(sizeof(*ht->cache) != err, "Did not read enough bytes!");
 
         ht->cache_state[idx] = 0;
+
+        *ret = &(ht->cache[idx]);
     }
 
-    *ret = &(ht->cache[idx]);
 
     reads++;
 }
@@ -263,7 +271,8 @@ nvm_write_metadata(nvm_hash_idx_t *ht) {
 static inline void
 nvm_update(nvm_hash_idx_t *ht, paddr_t idx) {
 
-    if (!ht->do_cache) {
+    if (ht->do_cache) {
+#if 0
         paddr_t paddr = ht->data + BLK_NUM(ht, idx);
         ssize_t size  = sizeof(*ht->cache);
         off_t offset  = BLK_IDX(ht, idx) * size;
@@ -272,13 +281,19 @@ nvm_update(nvm_hash_idx_t *ht, paddr_t idx) {
                          paddr, offset, size, (char*)&(ht->cache[idx]));
 
         if_then_panic(ret != size, "did not write full entry!");
+#endif
+        ht->cache_state[idx] = 1;
     }
+    // This is a no-op for non-cached, as it reads directly from the device.
 
-    ht->cache_state[idx] = 1;
 }
 
 static inline int nvm_invalidate(nvm_hash_idx_t *ht) {
+    if (unlikely(!ht->do_cache)) return 0;
+
+    pthread_rwlock_wrlock(ht->cache_lock);
     memset(ht->cache_state, -1, ht->nvram_size);
+    pthread_rwlock_unlock(ht->cache_lock);
     return 0;
 }
 
@@ -286,6 +301,9 @@ static inline int nvm_invalidate(nvm_hash_idx_t *ht) {
  * The more interesting function. Find ranges and write them all back at once.
  */
 static inline int nvm_persist(nvm_hash_idx_t *ht) {
+    if (unlikely(!ht->do_cache)) return 0;
+
+    pthread_rwlock_wrlock(ht->cache_lock);
     for (paddr_t idx = 0; idx < ht->nvram_size; ++idx) {
         if (ht->cache_state[idx] > 0) {
             paddr_t end = idx;
@@ -300,11 +318,15 @@ static inline int nvm_persist(nvm_hash_idx_t *ht) {
 
             ssize_t ret = CB(ht, cb_write, 
                              paddr, offset, size, (char*)&(ht->cache[idx]));
-            if(ret != size) return -EIO;
+            if(ret != size) {
+                pthread_rwlock_unlock(ht->cache_lock);
+                return -EIO;
+            }
 
             idx = end;
         } 
     }
+    pthread_rwlock_unlock(ht->cache_lock);
 
     return 0;
 }

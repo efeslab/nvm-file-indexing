@@ -180,6 +180,12 @@ int hashtable_set_caching(idx_struct_t *idx_struct, bool enable) {
     return 0;
 }
 
+int hashtable_set_locking(idx_struct_t *idx_struct, bool enable) {
+    NVMHASH(idx_struct, ht);
+    ht->do_lock = enable;
+    return 0;
+}
+
 int hashtable_persist_updates(idx_struct_t *idx_struct) {
     NVMHASH(idx_struct, ht);
     return nvm_persist(ht); 
@@ -198,6 +204,7 @@ idx_fns_t hash_fns = {
     .im_remove        = hashtable_remove,
 
     .im_set_caching   = hashtable_set_caching,
+    .im_set_locking   = hashtable_set_locking,
     .im_persist       = hashtable_persist_updates,
     .im_invalidate    = hashtable_invalidate_caches
 };
