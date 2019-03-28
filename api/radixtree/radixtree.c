@@ -67,6 +67,12 @@ static int write_entry(radixtree_meta_t *radix,
     return 0;
 }
 
+static int get_page(radixtree_meta_t *radix, paddr_t page, paddr_t **page_ptr) {
+    ssize_t err = CB(radix, cb_get_addr,
+                     page, 0, (char**)page_ptr);
+    return (int)err;
+}
+
 // Returns -EIO if could not read, 0 if no metadata, 1 if metadata.
 static int read_metadata(radixtree_meta_t *radix) {
     ondev_radix_meta_t ondev;
@@ -103,8 +109,14 @@ static int create_radix_node(radixtree_meta_t *radix, paddr_t page,
                              int depth, radix_node_t *node);
 
 static int read_radix_node(radixtree_meta_t *radix, radix_node_t *node) {
-    int err = read_page(radix, node->rn_page, node->rn_dev_contents);
-    if (err) return err;
+    int err = 0;
+    if (radix->cached) {
+        err = read_page(radix, node->rn_page, node->rn_dev_contents);
+        if (err) return err;
+    } else {
+        err = get_page(radix, node->rn_page, &(node->rn_dev_contents));
+        if (err) return err;
+    }
 
     for (size_t i = 0; i < radix->ents_per_node; ++i) {
         radix_node_t *n = &(node->rn_cache_tree[i]);
@@ -125,17 +137,23 @@ static int create_radix_node(radixtree_meta_t *radix, paddr_t page,
 
     node->rn_page = page;
     node->rn_depth = depth;
-    node->rn_dev_contents = ZALLOC(radix, radix->node_nbytes);
     node->rn_cache_tree = ZALLOC(radix, radix->ents_per_node * sizeof(*node));
-    node->rn_cache_state = ZALLOC(radix, radix->ents_per_node * sizeof(int8_t));
-    if (!node->rn_dev_contents || 
-        !node->rn_cache_tree ||
-        !node->rn_cache_state) {
-        return -ENOMEM;
+    if (!node->rn_cache_tree) return -ENOMEM;
+
+    if (radix->cached) {
+        node->rn_dev_contents = ZALLOC(radix, radix->node_nbytes);
+        node->rn_cache_state = ZALLOC(radix, radix->ents_per_node * sizeof(int8_t));
+        if (!node->rn_dev_contents || 
+            !node->rn_cache_tree ||
+            !node->rn_cache_state) {
+            return -ENOMEM;
+        }
     }
 
     if (page > 0) {
-        memset(node->rn_cache_state, -1, radix->ents_per_node); 
+        if (radix->cached) {
+            memset(node->rn_cache_state, -1, radix->ents_per_node); 
+        }
         return read_radix_node(radix, node);
     }
 
@@ -143,6 +161,8 @@ static int create_radix_node(radixtree_meta_t *radix, paddr_t page,
 }
 
 static int write_radix_node(radixtree_meta_t *radix, radix_node_t *node) {
+    if (!radix->cached) return 0;
+
     int ret = write_page(radix, node->rn_page, node->rn_dev_contents);
     if (ret) return ret;
 }
@@ -151,9 +171,11 @@ static int read_radix_node_entry(radixtree_meta_t *radix,
                                  radix_node_t *node, size_t idx) 
 {
     int err = 0;
-    if (!radix->cached || node->rn_cache_state[idx] < 0) {
-        int err = read_entry(radix, node->rn_page, idx, node->rn_dev_contents);
+    if (radix->cached && node->rn_cache_state[idx] < 0) {
+        err = read_entry(radix, node->rn_page, idx, node->rn_dev_contents);
         if (!err) node->rn_cache_state[idx] = 0;
+    } else {
+        err = get_page(radix, node->rn_page, &(node->rn_dev_contents));
     }
 
     return err;
@@ -163,7 +185,7 @@ static int write_radix_node_entry(radixtree_meta_t *radix,
                                  radix_node_t *node, size_t idx) 
 {
     int err = 0;
-    if (!radix->cached || node->rn_cache_state[idx] > 0) {
+    if (radix->cached && node->rn_cache_state[idx] > 0) {
         int err = write_entry(radix, node->rn_page, idx, node->rn_dev_contents);
         if (!err) node->rn_cache_state[idx] = 0;
     }
@@ -193,7 +215,9 @@ static radix_node_t* index_node(radixtree_meta_t *radix,
         if_then_panic(nalloc != radix->nblk_per_node, "Could not allocate!");
 
         node->rn_dev_contents[idx] = entry;
-        node->rn_cache_state[idx] = -1;
+        if (radix->cached) {
+            node->rn_cache_state[idx] = -1;
+        }
 
         child->rn_page = entry;
         int ret = write_entry(radix, node->rn_page, idx, node->rn_dev_contents);
@@ -218,7 +242,10 @@ static int insert_entry(radixtree_meta_t *radix, radix_node_t *node,
     if (rerr) return rerr;
 
     node->rn_dev_contents[idx] = entry;
-    node->rn_cache_state[1] = 1;
+    if (radix->cached) {
+        node->rn_cache_state[1] = 1;
+    }
+
     return write_radix_node_entry(radix, node, idx);
 }
 
