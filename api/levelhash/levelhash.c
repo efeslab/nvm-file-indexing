@@ -34,7 +34,14 @@ ssize_t levelhash_lookup(idx_struct_t* level_idx, inum_t inum,
     LEVELMETA(level_idx, lh);
     if (reread_metadata(lh)) return -EIO;
 
+    DECLARE_TIMING();
+    if (lh->enable_stats) START_TIMING();
+#if 1
     size_t size = level_dynamic_query(lh, laddr, paddr);
+#else
+    size_t size = level_static_query(lh, laddr, paddr);
+#endif
+    if (lh->enable_stats) UPDATE_TIMING(lh->stats, read_entries);
 
     if (0 == size) return -ENOENT;
 
@@ -157,5 +164,12 @@ int levelhash_invalidate_caches(idx_struct_t* level_idx) {
     return level_cache_invalidate(lh);
 }
 
-void levelhash_set_stats(idx_struct_t* level_idx, bool enable) {}
-void levelhash_print_stats(idx_struct_t* level_idx) {}
+void levelhash_set_stats(idx_struct_t* level_idx, bool enable) {
+    LEVELMETA(level_idx, lh);
+    lh->enable_stats = enable;
+}
+
+void levelhash_print_stats(idx_struct_t* level_idx) {
+    LEVELMETA(level_idx, lh);
+    print_level_stats(lh->stats);
+}
