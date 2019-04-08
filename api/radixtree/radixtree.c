@@ -280,7 +280,7 @@ int radixtree_init(const idx_spec_t* idx_spec, idx_struct_t* idx_struct,
 
     radix->blksz         = di.di_block_size;
     radix->ent_size      = sizeof(paddr_t);
-    radix->ents_per_node = 1 << 16;
+    radix->ents_per_node = 1 << 9; // 8 bits worth
     radix->max_depth     = 4;
     radix->node_nbytes   = radix->ents_per_node * radix->ent_size;
     radix->nblk_per_node = radix->node_nbytes / radix->blksz;
@@ -323,27 +323,39 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
                          paddr_t *paddr_ret) 
 {
     GET_RADIX(idx_struct);
-    // First two levels are just based on the inum.
-    size_t l1 = ((size_t)inum) >> radix->ent_shift;
-    size_t l2 = ((size_t)inum) & radix->ent_idx_mask;
+    size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
+    size_t l2_current = (((size_t)laddr) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
 
-    radix_node_t *l2_node = index_node(radix, radix->cached_tree, l1);
-    radix_node_t *l3_node = index_node(radix, l2_node, l2);
+    radix_node_t *l2_node = index_node(radix, radix->cached_tree, l1_current);
+    radix_node_t *l3_node = index_node(radix, l2_node, l2_current);
 
     // The following will change as we iterate.
-    size_t l3_current = laddr >> radix->ent_shift;
+    size_t l3_current = (laddr >> radix->ent_shift) & radix->ent_idx_mask;
     radix_node_t *l4_node = index_node(radix, l3_node, l3_current);
     
     *paddr_ret = 0; 
     size_t ncontiguous = 0;
     paddr_t last_paddr = 0;
     for (laddr_t l = 0; ; ++l) {
-        size_t l3 = (laddr + l) >> radix->ent_shift;
-        size_t l4 = (laddr + l) & radix->ent_idx_mask;
+        size_t l1 = (((size_t)laddr + l) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
+        if (l1 != l1_current) {
+            l1_current = l1; 
+            l2_node = index_node(radix, radix->cached_tree, l1);
+        }
+
+        size_t l2 = ((laddr + l) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
+        if (l2 != l2_current) {
+            l2_current = l2;
+            l3_node = index_node(radix, l2_node, l2);
+        }
+
+        size_t l3 = ((laddr + l) >> radix->ent_shift) & radix->ent_idx_mask;
         if (l3 != l3_current) {
             l3_current = l3;
             l4_node = index_node(radix, l3_node, l3_current);
         }
+
+        size_t l4 = (laddr + l) & radix->ent_idx_mask;
         
         paddr_t paddr;
         int err = lookup_entry(radix, l4_node, l4, &paddr);
@@ -367,30 +379,45 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
                          size_t npages, paddr_t *paddr)
 {
     GET_RADIX(idx_struct);
-    // First two levels are just based on the inum.
-    size_t l1 = ((size_t)inum) >> radix->ent_shift;
-    size_t l2 = ((size_t)inum) & radix->ent_idx_mask;
-
-    radix_node_t *l2_node = index_node(radix, radix->cached_tree, l1);
-    radix_node_t *l3_node = index_node(radix, l2_node, l2);
 
     // Do block allocation
     ssize_t nalloc = CB(radix, cb_alloc_data, npages, paddr);
     if (nalloc == 0) return -ENOMEM;
     if (nalloc < 0) return nalloc;
 
-    // The following will change as we iterate.
-    size_t l3_current = laddr >> radix->ent_shift;
-    radix_node_t *l4_node = index_node(radix, l3_node, l3_current);
+    size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
+    size_t l2_current = (((size_t)laddr) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
 
-    for (laddr_t l = 0; l < nalloc; ++l) {
-        size_t l3 = (laddr + l) >> radix->ent_shift;
-        size_t l4 = (laddr + l) & radix->ent_idx_mask;
+    radix_node_t *l2_node = index_node(radix, radix->cached_tree, l1_current);
+    radix_node_t *l3_node = index_node(radix, l2_node, l2_current);
+
+    // The following will change as we iterate.
+    size_t l3_current = (laddr >> radix->ent_shift) & radix->ent_idx_mask;
+    radix_node_t *l4_node = index_node(radix, l3_node, l3_current);
+    
+    size_t ncontiguous = 0;
+    paddr_t last_paddr = 0;
+    for (laddr_t l = 0; l < npages; ++l) {
+        size_t l1 = (((size_t)laddr + l) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
+        if (l1 != l1_current) {
+            l1_current = l1; 
+            l2_node = index_node(radix, radix->cached_tree, l1);
+        }
+
+        size_t l2 = ((laddr + l) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
+        if (l2 != l2_current) {
+            l2_current = l2;
+            l3_node = index_node(radix, l2_node, l2);
+        }
+
+        size_t l3 = ((laddr + l) >> radix->ent_shift) & radix->ent_idx_mask;
         if (l3 != l3_current) {
             l3_current = l3;
             l4_node = index_node(radix, l3_node, l3_current);
         }
 
+        size_t l4 = (laddr + l) & radix->ent_idx_mask;
+        
         int err = insert_entry(radix, l4_node, l4, *paddr + (size_t)l);
         if (err) return err;
     }
@@ -402,27 +429,44 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
                          size_t npages) 
 {
     GET_RADIX(idx_struct);
-    // First two levels are just based on the inum.
-    size_t l1 = ((size_t)inum) >> radix->ent_shift;
-    size_t l2 = ((size_t)inum) & radix->ent_idx_mask;
 
-    radix_node_t *l2_node = index_node(radix, radix->cached_tree, l1);
-    radix_node_t *l3_node = index_node(radix, l2_node, l2);
+    size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
+    size_t l2_current = (((size_t)laddr) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
+
+    radix_node_t *l2_node = index_node(radix, radix->cached_tree, l1_current);
+    radix_node_t *l3_node = index_node(radix, l2_node, l2_current);
 
     // The following will change as we iterate.
-    size_t l3_current = laddr >> radix->ent_shift;
+    size_t l3_current = (laddr >> radix->ent_shift) & radix->ent_idx_mask;
     radix_node_t *l4_node = index_node(radix, l3_node, l3_current);
-
+    
+    size_t ncontiguous = 0;
+    paddr_t last_paddr = 0;
     for (laddr_t l = 0; l < npages; ++l) {
-        size_t l3 = (laddr + l) >> radix->ent_shift;
-        size_t l4 = (laddr + l) & radix->ent_idx_mask;
+        size_t l1 = (((size_t)laddr + l) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
+        if (l1 != l1_current) {
+            l1_current = l1; 
+            l2_node = index_node(radix, radix->cached_tree, l1);
+        }
+
+        size_t l2 = ((laddr + l) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
+        if (l2 != l2_current) {
+            l2_current = l2;
+            l3_node = index_node(radix, l2_node, l2);
+        }
+
+        size_t l3 = ((laddr + l) >> radix->ent_shift) & radix->ent_idx_mask;
         if (l3 != l3_current) {
             l3_current = l3;
             l4_node = index_node(radix, l3_node, l3_current);
         }
 
+        size_t l4 = (laddr + l) & radix->ent_idx_mask;
+        
         int err = insert_entry(radix, l4_node, l4, 0);
         if (err) return err;
+
+        // TODO deallocate page if no longer needed
     }
 
     return npages;
