@@ -76,8 +76,12 @@ static int get_page(radixtree_meta_t *radix, paddr_t page, paddr_t **page_ptr) {
 // Returns -EIO if could not read, 0 if no metadata, 1 if metadata.
 static int read_metadata(radixtree_meta_t *radix) {
     ondev_radix_meta_t ondev;
+    paddr_range_t *meta = &(radix->metadata_loc);
+    if_then_panic(meta->pr_nbytes < sizeof(ondev), 
+            "Not enough space for metadata!\n");
     ssize_t ret = CB(radix, cb_read,
-                     radix->metadata_blk, 0, sizeof(ondev), (char*)&ondev);
+                     meta->pr_start, meta->pr_blk_offset, 
+                     sizeof(ondev), (char*)&ondev);
 
     if (ret != sizeof(ondev)) return -EIO;
     if (ondev.magic == RADIX_MAGIC) {
@@ -94,8 +98,13 @@ static int write_metadata(radixtree_meta_t *radix) {
         .top_page = radix->top_page
     };
 
+    paddr_range_t *meta = &(radix->metadata_loc);
+    if_then_panic(meta->pr_nbytes < sizeof(ondev), 
+            "Not enough space for metadata!\n");
+
     ssize_t ret = CB(radix, cb_write,
-                     radix->metadata_blk, 0, sizeof(ondev), (char*)&ondev);
+                     meta->pr_start, meta->pr_blk_offset, 
+                     sizeof(ondev), (char*)&ondev);
 
     if (ret != sizeof(ondev)) return -EIO;
     return 0;
@@ -220,6 +229,7 @@ static radix_node_t* index_node(radixtree_meta_t *radix,
         }
 
         child->rn_page = entry;
+        child->rn_depth = node->rn_depth + 1;
         int ret = write_entry(radix, node->rn_page, idx, node->rn_dev_contents);
         if (ret) return NULL;
     }
@@ -266,10 +276,12 @@ static int lookup_entry(radixtree_meta_t *radix, radix_node_t *node,
 /*******************************************************************************
  * Section: Public API Functions.
  ******************************************************************************/
-int radixtree_init(const idx_spec_t* idx_spec, idx_struct_t* idx_struct, 
-                   paddr_t *metadata_location) {
+int radixtree_init(const idx_spec_t *idx_spec,
+                   const paddr_range_t *metadata_location,
+                   idx_struct_t *idx_struct) 
+{
 
-    if_then_panic(!*metadata_location, "Nowhere to put metadata!\n");
+    if_then_panic(!metadata_location, "Nowhere to put metadata!\n");
     
     radixtree_meta_t *radix = ZALLOC(idx_spec, sizeof(*radix));
     if_then_panic(!radix, "Could not allocate in-memory structure!\n");
@@ -286,9 +298,10 @@ int radixtree_init(const idx_spec_t* idx_spec, idx_struct_t* idx_struct,
     radix->nblk_per_node = radix->node_nbytes / radix->blksz;
     radix->ent_idx_mask  = radix->ents_per_node - 1;
     radix->ent_shift     = (size_t)log2((double)radix->ents_per_node);
-    radix->metadata_blk  = *metadata_location; 
+    radix->metadata_loc  = *metadata_location; 
     radix->idx_callbacks = idx_spec->idx_callbacks;
     radix->idx_mem_man   = idx_spec->idx_mem_man; 
+    radix->cached        = false;
 
     // Check status of metadata.
     int merr = read_metadata(radix);
@@ -320,7 +333,7 @@ int radixtree_init(const idx_spec_t* idx_spec, idx_struct_t* idx_struct,
 
 // TODO might want to have a max lookup field.
 ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
-                         paddr_t *paddr_ret) 
+                         size_t max_ents, paddr_t *paddr_ret) 
 {
     GET_RADIX(idx_struct);
     size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
@@ -362,14 +375,16 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         if (err) return err;
 
         if (last_paddr != 0 && paddr != 1 + last_paddr) {
-            return ncontiguous;
+            break;
         } else if (paddr == 0) {
-            return ncontiguous;
+            break;
         } else {
             if (last_paddr == 0) *paddr_ret = paddr;
             last_paddr = paddr;
             ncontiguous++;
         }
+
+        if (ncontiguous >= max_ents) break;
     }
 
     return ncontiguous;
@@ -485,8 +500,8 @@ int radixtree_invalidate(idx_struct_t *idx_struct) {
 }
 
 idx_fns_t radixtree_fns = {
-    .im_init          = radixtree_init,
-    .im_init_prealloc = NULL,
+    .im_init          = NULL,
+    .im_init_prealloc = radixtree_init,
     .im_lookup        = radixtree_lookup,
     .im_create        = radixtree_create,
     .im_remove        = radixtree_remove,

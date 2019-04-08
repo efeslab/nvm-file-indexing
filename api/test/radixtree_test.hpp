@@ -15,13 +15,22 @@ class RadixTreeFixture : public TestFixture {
     protected:
         void SetUp() override {
             TestFixture::SetUp();
-            // Block 0 is considered taboo.
-            metadata_loc = device.allocate(2) + 1;
-            init_err = radixtree_init(&idx_spec, &radixtree, &metadata_loc);
+            inode_space = {
+                .pr_start      = 1,
+                .pr_blk_offset = 0,
+                .pr_nbytes     = 256
+            };
+
+            init_err = radixtree_init(&idx_spec, &inode_space, &radixtree);
+            // Since the per-inode extent trees don't initially allocate any
+            // space, the first data block allocated could be zero. Since this
+            // could also be an error condition, we will go ahead and allocate a
+            // dummy block here.
+            device.allocate(2);
         }
 
         idx_struct_t radixtree = {};
-        paddr_t metadata_loc;
+        paddr_range_t inode_space = {};
         int init_err = 0;
 };
 

@@ -68,6 +68,7 @@ void TestFixture::SetUp() {
 void TestFixture::TearDown() {
    delete idx_spec.idx_mem_man;
    delete idx_spec.idx_callbacks;
+   device.deallocate();
 }
 
 /*******************************************************************************

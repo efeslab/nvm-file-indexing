@@ -45,7 +45,7 @@ TEST_P(GenericTestFixture, InsertPersistCheckEach) {
 
             paddr_t p;
             ssize_t r = FN(&idx_other, im_lookup,
-                           &idx_other, inum, l, &p);
+                           &idx_other, inum, l, npages - l, &p);
 
 
             ASSERT_LE(1, r) << strerror(-r) << " on lblk " << l 
@@ -79,7 +79,7 @@ TEST_P(GenericTestFixture, InsertPersistCheckEnd) {
 
         paddr_t p;
         ssize_t r = FN(&idx_other, im_lookup,
-                       &idx_other, inum, l, &p);
+                       &idx_other, inum, l, npages - l, &p);
 
 
         ASSERT_LE(1, r) << strerror(-r) << " on lblk " << l;
@@ -107,7 +107,7 @@ TEST_P(GenericTestFixture, InsertPersistThenRemoveAll) {
     for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
         paddr_t pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
-                         &idx_other, inum, lblk, &pblk);
+                         &idx_other, inum, lblk, npages - lblk, &pblk);
 
         ASSERT_LE(1, ret) << strerror(-ret) << " on lblk " << lblk;
         ASSERT_LE(ret, npages - lblk);
@@ -123,7 +123,7 @@ TEST_P(GenericTestFixture, InsertPersistThenRemoveAll) {
     for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
         paddr_t pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
-                         &idx_other, inum, lblk, &pblk);
+                         &idx_other, inum, lblk, 1, &pblk);
 
         ASSERT_LE(ret, 0);
         ASSERT_EQ(0, pblk);
@@ -154,7 +154,7 @@ TEST_P(GenericTestFixture, InsertPersistThenRemoveSome) {
     for (laddr_t lblk = start; lblk < (laddr_t)npages + start; ++lblk) {
         paddr_t pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
-                         &idx_other, inum, lblk, &pblk);
+                         &idx_other, inum, lblk, npages - (lblk - start), &pblk);
 
         ASSERT_LE(1, ret) << strerror(-ret) << " on lblk " << lblk;
         ASSERT_LE(ret, npages - lblk);
@@ -170,7 +170,7 @@ TEST_P(GenericTestFixture, InsertPersistThenRemoveSome) {
     for (laddr_t lblk = start; lblk < (laddr_t)nremain + start; ++lblk) {
         paddr_t pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
-                         &idx_other, inum, lblk, &pblk);
+                         &idx_other, inum, lblk, npages - lblk, &pblk);
 
         ASSERT_LE(1, ret) << strerror(-ret) << " on lblk " << lblk;
         ASSERT_LE(ret, npages - lblk);
@@ -199,7 +199,7 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveAll) {
     for (laddr_t l = lblk; l < (laddr_t)npages + lblk; ++l) {
         paddr_t lookup_pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
-                         &idx_other, inum, l, &lookup_pblk);
+                         &idx_other, inum, l, npages-l, &lookup_pblk);
 
         ASSERT_EQ(ret, npages - l) << "lookup " << l;
         ASSERT_EQ(pblk + l, lookup_pblk);
@@ -212,7 +212,7 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveAll) {
     for (laddr_t l = 0; l < (laddr_t)npages + lblk; ++l) {
         paddr_t lookup_pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
-                         &idx_other, inum, l, &lookup_pblk);
+                         &idx_other, inum, l, 1, &lookup_pblk);
 
         ASSERT_LE(ret, 0);
         ASSERT_EQ(0, lookup_pblk);
@@ -243,7 +243,7 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveSome) {
     for (laddr_t lblk = start; lblk < (laddr_t)npages + start; ++lblk) {
         paddr_t pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
-                         &idx_other, inum, lblk, &pblk);
+                         &idx_other, inum, lblk, npages - lblk, &pblk);
 
         ASSERT_LE(1, ret) << strerror(-ret) << " on lblk " << lblk;
         ASSERT_LE(ret, npages - lblk);
@@ -259,7 +259,7 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveSome) {
     for (laddr_t lblk = start; lblk < (laddr_t)nremain + start; ++lblk) {
         paddr_t pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
-                         &idx_other, inum, lblk, &pblk);
+                         &idx_other, inum, lblk, npages - lblk, &pblk);
 
         ASSERT_LE(1, ret) << strerror(-ret) << " on lblk " << lblk;
         ASSERT_LE(ret, npages - lblk);
@@ -293,7 +293,7 @@ TEST_P(GenericTestFixture, SmallSlab_InsertPersistThenRemoveAll) {
     for (laddr_t l = lblk; l < (laddr_t)npages + lblk; ++l) {
         paddr_t lookup_pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
-                         &idx_other, inum, l, &lookup_pblk);
+                         &idx_other, inum, l, inc - (l % inc), &lookup_pblk);
 
         ASSERT_EQ(ret, inc - (l % inc) ) << "lookup " << l;
     }
@@ -305,7 +305,7 @@ TEST_P(GenericTestFixture, SmallSlab_InsertPersistThenRemoveAll) {
     for (laddr_t l = 0; l < (laddr_t)npages + lblk; ++l) {
         paddr_t lookup_pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
-                         &idx_other, inum, l, &lookup_pblk);
+                         &idx_other, inum, l, 1, &lookup_pblk);
 
         ASSERT_LE(ret, 0);
         ASSERT_EQ(0, lookup_pblk);

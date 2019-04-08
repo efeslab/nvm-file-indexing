@@ -138,7 +138,7 @@ TEST_F(ExtentTreeFixture, InsertDeepPersist) {
     for(size_t i = 0; i < npages; ++i) {
         laddr_t lblk = (laddr_t)i;
         paddr_t pblk;
-        ssize_t ret = extent_tree_lookup(&new_ext, inum, lblk, &pblk);
+        ssize_t ret = extent_tree_lookup(&new_ext, inum, lblk, 1, &pblk);
         ASSERT_EQ(1, ret);
     }
 }
@@ -165,7 +165,7 @@ TEST_F(ExtentTreeFixture, InsertDeepPersistStats) {
     for(size_t i = 0; i < npages; ++i) {
         laddr_t lblk = (laddr_t)i;
         paddr_t pblk;
-        ssize_t ret = extent_tree_lookup(&new_ext, inum, lblk, &pblk);
+        ssize_t ret = extent_tree_lookup(&new_ext, inum, lblk, 1, &pblk);
         ASSERT_EQ(1, ret);
     }
     extent_tree_print_stats(&new_ext);
@@ -201,7 +201,7 @@ TEST_F(ExtentTreeFixture, LookupSingle) {
     ASSERT_GT(pblk, 0);
 
     paddr_t check_paddr;
-    ssize_t check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
+    ssize_t check_size = extent_tree_lookup(&ext_idx, inum, lblk, npages, &check_paddr);
     ASSERT_EQ(pblk, check_paddr);
     ASSERT_EQ(npages, check_size);
 }
@@ -218,7 +218,7 @@ TEST_F(ExtentTreeFixture, LookupMulti) {
 
     for (size_t p = 0; p < npages; ++p) {
         paddr_t check_paddr;
-        ssize_t check_size = extent_tree_lookup(&ext_idx, inum, lblk + p, &check_paddr);
+        ssize_t check_size = extent_tree_lookup(&ext_idx, inum, lblk + p, npages - p, &check_paddr);
         ASSERT_EQ(pblk + p, check_paddr);
         ASSERT_EQ(npages - p, check_size);
     }
@@ -238,7 +238,7 @@ TEST_F(ExtentTreeFixture, RemoveSingle) {
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
+    check_size = extent_tree_lookup(&ext_idx, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
@@ -258,7 +258,7 @@ TEST_F(ExtentTreeFixture, RemoveSingleReinsert) {
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
+    check_size = extent_tree_lookup(&ext_idx, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
@@ -282,7 +282,7 @@ TEST_F(ExtentTreeFixture, EraseMulti) {
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
+    check_size = extent_tree_lookup(&ext_idx, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
@@ -324,7 +324,7 @@ TEST_F(ExtentTreeFixture, EraseDeallocate) {
     ASSERT_EQ(nalloced_meta_only, device.num_allocated());
 
     paddr_t check_paddr = 0;
-    check_size = extent_tree_lookup(&ext_idx, inum, lblk, &check_paddr);
+    check_size = extent_tree_lookup(&ext_idx, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);

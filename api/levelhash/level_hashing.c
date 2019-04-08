@@ -221,7 +221,7 @@ int reread_metadata(level_hash_t *level) {
         level->s_seed = dhash->s_seed;
         level->block_size = dhash->block_size;
 
-        if (resized && level->do_cache) {
+        if (level->do_cache) {
             for (int i = 0; i < 2; ++i) {
                 size_t new_size = pow(2, level->level_size - i);
                 FREE(level->idx_spec, level->buckets[i]);
@@ -235,6 +235,10 @@ int reread_metadata(level_hash_t *level) {
                 if (!level->buckets[i] || !level->cache_state[i]) return -ENOMEM;
 
                 memset(level->cache_state[i], -1, new_size*sizeof(int8_t));
+            }
+        } else {
+            for (int i = 0; i < 2; ++i) {
+                get_buckets(level, i);
             }
         }
 
@@ -378,8 +382,12 @@ level_hash_t *level_init(const idx_spec_t *idx_spec,
         if_then_panic(bot_blocks_alloced != bot_blocks, "could not alloc!");
         level->dev_levels[1] = bot_block_start;
     } else {
-        level->dev_levels[0] = dhash->dev_levels[0];
-        level->dev_levels[1] = dhash->dev_levels[1];
+        for (int i = 0; i < 2; ++i) {
+            level->dev_levels[i] = dhash->dev_levels[i];
+            if (!level->do_cache) {
+                get_buckets(level, i);
+            }
+        }
     }
 
     /*
@@ -440,7 +448,7 @@ void level_expand(level_hash_t *level)
     if (!level->do_cache) {
         (void)CB(level->idx_spec, cb_get_addr, new_buckets_paddr, 0, (char**)&newBuckets);
         new_cache_state = NULL;
-        memset(newBuckets, 0, new_buckets_bytes);
+        //memset(newBuckets, 0, new_buckets_bytes);
     } else {
         newBuckets = ZALLOC(level->idx_spec, new_buckets_bytes);
         new_cache_state = ZALLOC(level->idx_spec, level->addr_capacity*sizeof(int8_t));
@@ -614,7 +622,7 @@ void level_shrink(level_hash_t *level)
     } else {
         (void)CB(level->idx_spec, cb_get_addr, new_buckets_paddr, 0, (char**)&newBuckets);
         new_cache_state = NULL;
-        memset(newBuckets, 0, new_size*sizeof(level_bucket_t));
+        //memset(newBuckets, 0, new_size*sizeof(level_bucket_t));
     }
 
     level_bucket_t *interimBuckets = level->buckets[0];
@@ -693,31 +701,54 @@ size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
         s_idx = S_IDX(s_hash, level->addr_capacity); 
 
         for(i = 0; i < 2; i ++){
-            int f_err = ensure_bucket_uptodate(level, i, f_idx);
-            if (f_err) return 0;
+            if (level->do_cache) {
+                int f_err = ensure_bucket_uptodate(level, i, f_idx);
+                if (f_err) return 0;
+            }
+
             for(j = 0; j < ASSOC_NUM; j ++){
-                if (level->enable_stats) level->stats->nchecked++;
+                DECLARE_TIMING();
+                if (level->enable_stats) {
+                    START_TIMING();
+                    level->stats->nchecked++;
+                }
+
                 if (level->buckets[i][f_idx].token[j] == 1 &&
                     //strcmp(level->buckets[i][f_idx].slot[j].key, key) == 0)
                     level->buckets[i][f_idx].slot[j].e_key == key)
                 {
                     *value = level->buckets[i][f_idx].slot[j].e_val;
+                    if (level->enable_stats) UPDATE_TIMING(level->stats, per_read);
                     return level->buckets[i][f_idx].slot[j].e_size;
                 }
+
+                if (level->enable_stats) UPDATE_TIMING(level->stats, per_read);
             }
 
-            int s_err = ensure_bucket_uptodate(level, i, s_idx);
-            if (s_err) return 0;
+            if (level->do_cache) {
+                int s_err = ensure_bucket_uptodate(level, i, s_idx);
+                if (s_err) return 0;
+            }
+
             for(j = 0; j < ASSOC_NUM; j ++) {
-                if (level->enable_stats) level->stats->nchecked++;
+                DECLARE_TIMING();
+                if (level->enable_stats) {
+                    START_TIMING();
+                    level->stats->nchecked++;
+                }
+
                 if (level->buckets[i][s_idx].token[j] == 1 &&
                     //strcmp(level->buckets[i][s_idx].slot[j].key, key) == 0)
                     level->buckets[i][s_idx].slot[j].e_key == key) 
                 {
                     *value = level->buckets[i][s_idx].slot[j].e_val;
+                    if (level->enable_stats) UPDATE_TIMING(level->stats, per_read);
                     return level->buckets[i][s_idx].slot[j].e_size;
                 }
+
+                if (level->enable_stats) UPDATE_TIMING(level->stats, per_read);
             }
+
             f_idx = F_IDX(f_hash, level->addr_capacity / 2);
             s_idx = S_IDX(s_hash, level->addr_capacity / 2);
         }
@@ -729,27 +760,43 @@ size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
             int f_err = ensure_bucket_uptodate(level, i-1, f_idx);
             if (f_err) return 0;
             for(j = 0; j < ASSOC_NUM; j ++){
-                if (level->enable_stats) level->stats->nchecked++;
+                DECLARE_TIMING();
+                if (level->enable_stats) {
+                    START_TIMING();
+                    level->stats->nchecked++;
+                }
+
                 if (level->buckets[i-1][f_idx].token[j] == 1 &&
                     //strcmp(level->buckets[i-1][f_idx].slot[j].key, key) == 0)
                     level->buckets[i-1][f_idx].slot[j].e_key == key)
                 {
                     *value = level->buckets[i-1][f_idx].slot[j].e_val;
+                    if (level->enable_stats) UPDATE_TIMING(level->stats, per_read);
                     return level->buckets[i-1][f_idx].slot[j].e_size;
                 }
+
+                if (level->enable_stats) UPDATE_TIMING(level->stats, per_read);
             }
 
             int s_err = ensure_bucket_uptodate(level, i-1, s_idx);
             if (s_err) return 0;
             for(j = 0; j < ASSOC_NUM; j ++){
-                if (level->enable_stats) level->stats->nchecked++;
+                DECLARE_TIMING();
+                if (level->enable_stats) {
+                    START_TIMING();
+                    level->stats->nchecked++;
+                }
+
                 if (level->buckets[i-1][s_idx].token[j] == 1 &&
                     //strcmp(level->buckets[i-1][s_idx].slot[j].key, key) == 0)
                     level->buckets[i-1][s_idx].slot[j].e_key == key)
                 {
                     *value = level->buckets[i-1][s_idx].slot[j].e_val;
+                    if (level->enable_stats) UPDATE_TIMING(level->stats, per_read);
                     return level->buckets[i-1][s_idx].slot[j].e_size;
                 }
+
+                if (level->enable_stats) UPDATE_TIMING(level->stats, per_read);
             }
             f_idx = F_IDX(f_hash, level->addr_capacity);
             s_idx = S_IDX(s_hash, level->addr_capacity);

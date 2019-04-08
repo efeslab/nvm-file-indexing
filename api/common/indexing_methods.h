@@ -34,10 +34,12 @@ typedef int (*init_struct_prealloc_fn_t)(const idx_spec_t*, const paddr_range_t*
  * Lookup Index: Given an inum and a laddr of the file, find paddr of the
  * device that maps to the laddr.
  *
+ * For Lookup, the size_t is the max number of entries to find.
+ *
  * Returns -ERRNO on failure, and the number of contiguous blocks found with
  * paddr on success.
  */
-typedef ssize_t (*lookup_index_fn_t)(idx_struct_t*, inum_t, laddr_t, paddr_t*);
+typedef ssize_t (*lookup_index_fn_t)(idx_struct_t*, inum_t, laddr_t, size_t, paddr_t*);
 
 typedef ssize_t (*create_index_fn_t)(idx_struct_t*, inum_t, laddr_t, size_t, paddr_t*);
 

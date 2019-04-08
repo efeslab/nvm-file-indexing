@@ -2507,7 +2507,7 @@ out2:
 }
 
 ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
-                           laddr_t laddr, paddr_t* paddr)
+                           laddr_t laddr, size_t max, paddr_t* paddr)
 {
     extent_path_t *path = NULL;
     extent_leaf_t newex, *ex;

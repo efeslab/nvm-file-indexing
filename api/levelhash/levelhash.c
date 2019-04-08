@@ -30,7 +30,7 @@ int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents,
 }
 
 ssize_t levelhash_lookup(idx_struct_t* level_idx, inum_t inum, 
-                         laddr_t laddr, paddr_t* paddr) {
+                         laddr_t laddr, size_t max, paddr_t* paddr) {
     LEVELMETA(level_idx, lh);
     if (reread_metadata(lh)) return -EIO;
 
@@ -51,9 +51,10 @@ ssize_t levelhash_lookup(idx_struct_t* level_idx, inum_t inum,
 ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, size_t nblk, paddr_t* paddr) {
     LEVELMETA(level_idx, lh);
-
-    ssize_t already_exists = levelhash_lookup(level_idx, inum, laddr, paddr);
+#if 0
+    ssize_t already_exists = levelhash_lookup(level_idx, inum, laddr, nblk, paddr);
     if (already_exists > 0) return already_exists;
+#endif
 
     nblk = nblk > LH_MAX_SIZE ? LH_MAX_SIZE : nblk;
 

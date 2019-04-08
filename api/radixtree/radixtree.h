@@ -34,7 +34,7 @@ typedef struct ondevice_radixtree_metadata {
 
 typedef struct radixtree_metadata {
     bool cached;
-    paddr_t metadata_blk;
+    paddr_range_t metadata_loc;
     paddr_t top_page;
     radix_node_t *cached_tree;
 
@@ -55,11 +55,12 @@ typedef struct radixtree_metadata {
 
 } radixtree_meta_t;
 
-int radixtree_init(const idx_spec_t *idx_spec, idx_struct_t *idx_struct, 
-                   paddr_t *metadata_location);
+int radixtree_init(const idx_spec_t *idx_spec,
+                   const paddr_range_t *metadata_location,
+                   idx_struct_t *idx_struct);
 
 ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
-                         paddr_t *paddr);
+                         size_t max, paddr_t *paddr);
 
 ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
                          size_t npages, paddr_t *paddr);

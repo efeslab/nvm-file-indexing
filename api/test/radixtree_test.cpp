@@ -19,7 +19,7 @@ TEST_F(RadixTreeFixture, InitNew) {
 
 TEST_F(RadixTreeFixture, InitExists) {
     idx_struct_t idx_copy;
-    int err = radixtree_init(&idx_spec, &idx_copy, &metadata_loc);
+    int err = radixtree_init(&idx_spec, &inode_space, &idx_copy);
     ASSERT_EQ(0, err);
     ASSERT_EQ(0, strncmp((char*)idx_copy.idx_metadata, (char*)radixtree.idx_metadata, 
                 sizeof(radixtree_meta_t)));
@@ -47,7 +47,7 @@ TEST_F(RadixTreeFixture, LookupSingle) {
     ASSERT_GT(pblk, 0);
 
     paddr_t check_paddr = UINT64_MAX;
-    ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk, &check_paddr);
+    ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk, npages, &check_paddr);
     ASSERT_EQ(pblk, check_paddr);
     ASSERT_EQ(npages, check_size);
 }
@@ -66,7 +66,7 @@ TEST_F(RadixTreeFixture, RemoveSingle) {
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = radixtree_lookup(&radixtree, inum, lblk, &check_paddr);
+    check_size = radixtree_lookup(&radixtree, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);

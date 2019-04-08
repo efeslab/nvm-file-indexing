@@ -94,7 +94,7 @@ ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
  * Returns 0 if found, or -errno otherwise.
  */
 ssize_t hashtable_lookup(idx_struct_t *idx_struct, inum_t inum,
-                         laddr_t laddr, paddr_t* paddr) {
+                         laddr_t laddr, size_t max, paddr_t* paddr) {
     trace_me();
     NVMHASH(idx_struct, ht);
 

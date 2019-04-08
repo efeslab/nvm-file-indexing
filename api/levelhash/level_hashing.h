@@ -58,6 +58,8 @@ typedef struct level_hash_stats {
     STAT_FIELD(read_metadata);
     STAT_FIELD(read_entries);
     STAT_FIELD(compute_hash);
+    STAT_FIELD(per_read);
+    STAT_FIELD(per_loop);
     STAT_FIELD(misc_callbacks);
     size_t nchecked;
     size_t nreads;
@@ -68,6 +70,8 @@ static void print_level_stats(level_stats_t *s) {
     PFIELD(s, read_metadata);
     PFIELD(s, compute_hash);
     PFIELD(s, misc_callbacks);
+    PFIELD(s, per_read);
+    PFIELD(s, per_loop);
     PFIELD(s, read_entries);
     printf("\t Ratio: %llu / %llu (%lf)\n", s->nchecked, s->nreads, 
             (double)s->nchecked / (double)s->nreads);

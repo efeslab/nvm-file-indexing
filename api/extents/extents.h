@@ -20,7 +20,7 @@ ssize_t extent_tree_create(idx_struct_t *idx_struct, inum_t inum,
                            laddr_t laddr, size_t size, paddr_t *new_paddr);
 
 ssize_t extent_tree_lookup(idx_struct_t *idx_struct, inum_t inum,
-                           laddr_t laddr, paddr_t* paddr);
+                           laddr_t laddr, size_t max, paddr_t* paddr);
 
 ssize_t extent_tree_remove(idx_struct_t *idx_struct,
                            inum_t inum, laddr_t laddr, size_t size);
