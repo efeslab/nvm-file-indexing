@@ -122,6 +122,7 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     if (NULL == ext_meta->et_stats) return -ENOMEM;
     ext_meta->et_enable_stats = false;
 
+#if 0
     ext_meta->et_buffers = ZALLOC(idx_spec, MAX_DEPTH * sizeof(char*));
     if (NULL == ext_meta->et_buffers) return -ENOMEM;
 
@@ -131,6 +132,7 @@ int extent_tree_init(const idx_spec_t *idx_spec,
         ext_meta->et_buffers[i] = ZALLOC(idx_spec, blksz);
         if (NULL == ext_meta->et_buffers[i]) return -ENOMEM;
     }
+#endif
 
     int read_ret = read_ext_direct_data(ext_idx);
     if (read_ret) return read_ret;

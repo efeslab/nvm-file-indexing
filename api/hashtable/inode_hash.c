@@ -63,6 +63,11 @@ ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t size, paddr_t *paddr) {
     trace_me();
     NVMHASH(idx_struct, ht);
+#ifdef SIMPLE_ENTRIES
+    size = 1;
+#else
+    size = min(size, 255);
+#endif
 
     ssize_t nalloc = CB(idx_struct, cb_alloc_data, size, paddr);
 
@@ -196,6 +201,16 @@ int hashtable_invalidate_caches(idx_struct_t *idx_struct) {
     return nvm_invalidate(ht);
 }
 
+void hashtable_set_stats(idx_struct_t *idx_struct, bool enable) {
+    NVMHASH(idx_struct, ht);
+    if (ht) ht->enable_stats = enable;
+}
+
+void hashtable_print_stats(idx_struct_t *idx_struct) {
+    NVMHASH(idx_struct, ht);
+    if (ht) print_hashtable_stats(&(ht->stats));
+}
+
 idx_fns_t hash_fns = {
     .im_init          = hashtable_initialize,
     .im_init_prealloc = NULL,
@@ -206,5 +221,8 @@ idx_fns_t hash_fns = {
     .im_set_caching   = hashtable_set_caching,
     .im_set_locking   = hashtable_set_locking,
     .im_persist       = hashtable_persist_updates,
-    .im_invalidate    = hashtable_invalidate_caches
+    .im_invalidate    = hashtable_invalidate_caches,
+
+    .im_set_stats     = hashtable_set_stats,
+    .im_print_stats   = hashtable_print_stats
 };

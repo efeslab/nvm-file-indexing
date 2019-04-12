@@ -21,12 +21,13 @@ class RadixTreeFixture : public TestFixture {
                 .pr_nbytes     = 256
             };
 
-            init_err = radixtree_init(&idx_spec, &inode_space, &radixtree);
             // Since the per-inode extent trees don't initially allocate any
             // space, the first data block allocated could be zero. Since this
             // could also be an error condition, we will go ahead and allocate a
             // dummy block here.
             device.allocate(2);
+
+            init_err = radixtree_init(&idx_spec, &inode_space, &radixtree);
         }
 
         idx_struct_t radixtree = {};

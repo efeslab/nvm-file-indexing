@@ -39,19 +39,34 @@ extern "C" {
 // local includes
 #include "hash_functions.h"
 
+#define SIMPLE_ENTRIES
+#undef SIMPLE_ENTRIES
+
 // For the big hash table, mapping (inode, lblk) -> single block
-#pragma pack(push,2)
 typedef struct hash_index_entry {
+#ifdef SIMPLE_ENTRIES
+    paddr_t key;
+    paddr_t value;
+#else
     paddr_t  key;
-    uint16_t index; // Go backwards to modify size on truncate
-    uint16_t size;
+    uint8_t  index; // Go backwards to modify size on truncate
+    uint8_t  size;
     uint16_t value_hi16;
     uint32_t value_low32;
-    uint16_t padding_[7];
+#endif
 } hash_ent_t;
-_Static_assert(4096 % sizeof(hash_ent_t) == 0, "Entries cross block boundary!");
-#pragma pack(pop)
+_Static_assert(16 % sizeof(hash_ent_t) == 0, "Entries cross block boundary!");
 
+#ifdef SIMPLE_ENTRIES
+#define HASH_ENT_VAL(x) ((x).value)
+#define HASH_ENT_IS_TOMBSTONE(x) ((x).value == (paddr_t)~0)
+#define HASH_ENT_IS_EMPTY(x) ((x).value == 0)
+#define HASH_ENT_IS_VALID(x) (!HASH_ENT_IS_EMPTY(x) && !HASH_ENT_IS_TOMBSTONE(x))
+
+#define HASH_ENT_SET_TOMBSTONE(x) ((x).value = (paddr_t)~0)
+#define HASH_ENT_SET_EMPTY(x) ((x).value = 0)
+#define HASH_ENT_SET_VAL(x,v) ((x).value = v)
+#else
 #define HASH_ENT_VAL(x) (((paddr_t)(x).value_hi16 << 32) | ((paddr_t)(x).value_low32))
 #define HASH_ENT_IS_TOMBSTONE(x) ((x).value_hi16 == (uint16_t)~0 && \
                                   (x).value_low32 == (uint32_t)~0)
@@ -63,6 +78,7 @@ _Static_assert(4096 % sizeof(hash_ent_t) == 0, "Entries cross block boundary!");
 #define HASH_ENT_SET_EMPTY(x) do {(x).value_hi16 = 0; (x).value_low32 = 0;} while(0)
 #define HASH_ENT_SET_VAL(x,v) do {(x).value_hi16 = (uint16_t)(v >> 32); \
                                   (x).value_low32 = (uint32_t)(v);} while(0)
+#endif
 
 //#define RANGE_SIZE (1 << 5) // 32
 #define RANGE_SIZE (1 << 9) // 512 -- 2MB
@@ -93,6 +109,21 @@ typedef struct device_hashtable_metadata {
   paddr_t data_start;
 } dev_hash_metadata_t;
 
+typedef struct hashtable_stats {
+    uint64_t n_lookups;
+    uint64_t n_min_ents_per_lookup;
+    uint64_t n_max_ents_per_lookup;
+    uint64_t n_ents;
+    STAT_FIELD(loop_time);
+} hash_stats_t;
+
+static void print_hashtable_stats(hash_stats_t *s) {
+    printf("hashtable stats: \n");
+    printf("\tAvg. collisions: %.2f\n", (double)s->n_ents / (double)s->n_lookups);
+    printf("\tMin. collisions: %llu\n", s->n_min_ents_per_lookup);
+    printf("\tMax. collisions: %llu\n", s->n_max_ents_per_lookup);
+    PFIELD(s, loop_time);
+}
 
 typedef struct nvm_hashtable_index {
     int             size;
@@ -103,6 +134,7 @@ typedef struct nvm_hashtable_index {
 
     paddr_t         metadata;
     paddr_t         data;
+    char           *data_ptr;
     paddr_t         nvram_size;
     size_t          blksz;
     size_t          range_size;
@@ -129,6 +161,10 @@ typedef struct nvm_hashtable_index {
     int8_t* cache_state;
     // array of entries
     hash_ent_t *cache;
+
+    // -- STATS
+    bool enable_stats;
+    hash_stats_t stats;
 } nvm_hash_idx_t;
 
 
@@ -177,6 +213,7 @@ extern uint64_t blocks;
  * Convenience wrapper for when you need to look up the single value within
  * the block and nothing else. Index is offset from start (bytes).
  */
+#if 0
 static void
 nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t **ret, bool force) {
 
@@ -184,8 +221,12 @@ nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t **ret, bool force) {
     off_t   offset = BLK_IDX(ht, idx) * sizeof(**ret);
 
     if (!ht->do_cache) {
+#if 0
         ssize_t err = CB(ht, cb_get_addr, block, offset, (char**)ret);
         if_then_panic(err, "Could not get device address!");
+#else
+        *ret = (hash_ent_t*)(ht->data_ptr + (BLK_NUM(ht, idx) * ht->blksz) + offset);
+#endif
                         
     } else if (ht->do_cache && ht->cache_state[idx] < 0) {
         ssize_t err = CB(ht, cb_read, 
@@ -201,6 +242,10 @@ nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t **ret, bool force) {
 
     reads++;
 }
+#else
+#define nvm_read_entry(ht, idx, ret, force) \
+    do { *ret = (hash_ent_t*)(ht->data_ptr + (BLK_NUM(ht, idx) * ht->blksz) + (BLK_IDX(ht, idx) * sizeof(**ret))); } while(0)
+#endif
 
 /*
  * Read the hashtable metadata from disk. If the size is zero, then we need to

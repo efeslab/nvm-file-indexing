@@ -58,7 +58,6 @@ typedef struct device_info {
 
 typedef int (*get_dev_info_fn_t)(device_info_t*);
 
-
 typedef struct callback_functions {
     writeback_fn_t      cb_write;
     read_fn_t           cb_read;
