@@ -51,7 +51,7 @@ ssize_t levelhash_lookup(idx_struct_t* level_idx, inum_t inum,
 ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, size_t nblk, paddr_t* paddr) {
     LEVELMETA(level_idx, lh);
-#if 0
+#if 1
     ssize_t already_exists = levelhash_lookup(level_idx, inum, laddr, nblk, paddr);
     if (already_exists > 0) return already_exists;
 #endif

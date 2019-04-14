@@ -312,6 +312,8 @@ static int lookup_entry(radixtree_meta_t *radix, radix_node_t *node,
 static int lookup_dev_entry(radixtree_meta_t *radix, paddr_t node, 
                             size_t idx, paddr_t *entry)
 {
+    *entry = 0;
+
     paddr_t *node_contents;
     int rerr = get_page(radix, node, &node_contents);
     if (rerr) return rerr;
@@ -350,13 +352,12 @@ int radixtree_init(const idx_spec_t *idx_spec,
 
     radix->blksz         = di.di_block_size;
     radix->ent_size      = sizeof(paddr_t);
-    radix->ents_per_node = 1 << 9; // 8 bits worth
+    radix->ents_per_node = 1 << 8; // 8 bits worth
     radix->max_depth     = 4;
-    radix->node_nbytes   = radix->ents_per_node * radix->ent_size;
-    radix->nblk_per_node = radix->node_nbytes / radix->blksz;
-    _Static_assert((1<<9) * 8 == 4096, "Bad assumption!");
-    radix->ent_idx_mask  = radix->ents_per_node - 1;
-    radix->ent_shift     = (size_t)log2((double)radix->ents_per_node);
+    radix->node_nbytes   = di.di_size_blocks;
+    radix->nblk_per_node = 1;
+    radix->ent_idx_mask  = 0xFF;
+    radix->ent_shift     = 8;
     radix->metadata_loc  = *metadata_location; 
     radix->idx_callbacks = idx_spec->idx_callbacks;
     radix->idx_mem_man   = idx_spec->idx_mem_man; 
@@ -460,6 +461,9 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 {
     GET_RADIX(idx_struct);
 
+    ssize_t nexist = radixtree_lookup(idx_struct, inum, laddr, npages, paddr); 
+    if (nexist) return nexist;
+
     // Do block allocation
     ssize_t nalloc = CB(radix, cb_alloc_data, npages, paddr);
     if (nalloc == 0) return -ENOMEM;
@@ -487,7 +491,7 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     
     size_t ncontiguous = 0;
     paddr_t last_paddr = 0;
-    for (laddr_t l = 0; l < npages; ++l) {
+    for (laddr_t l = 0; l < nalloc; ++l) {
         size_t l1 = (((size_t)laddr + l) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
         if (l1 != l1_current) {
             l1_current = l1; 

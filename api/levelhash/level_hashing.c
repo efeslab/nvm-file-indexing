@@ -448,7 +448,7 @@ void level_expand(level_hash_t *level)
     if (!level->do_cache) {
         (void)CB(level->idx_spec, cb_get_addr, new_buckets_paddr, 0, (char**)&newBuckets);
         new_cache_state = NULL;
-        //memset(newBuckets, 0, new_buckets_bytes);
+        memset(newBuckets, 0, new_buckets_bytes);
     } else {
         newBuckets = ZALLOC(level->idx_spec, new_buckets_bytes);
         new_cache_state = ZALLOC(level->idx_spec, level->addr_capacity*sizeof(int8_t));
