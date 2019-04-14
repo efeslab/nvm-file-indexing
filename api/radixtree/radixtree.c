@@ -244,9 +244,19 @@ static radix_node_t* index_node(radixtree_meta_t *radix,
 
 static paddr_t index_dev_node(radixtree_meta_t *radix, paddr_t node, size_t idx) 
 {
-    if_then_panic(idx >= radix->ents_per_node, 
-                  "Bad index calculation! (%llu)\n", idx);
-    if_then_panic(!node, "Can't index nullptr!\n");
+    if (!node) return 0;
+
+    paddr_t *node_contents;
+    int rerr = get_page(radix, node, &node_contents);
+    if (rerr) return 0;
+
+    paddr_t entry = node_contents[idx];
+    return entry;
+}
+
+static paddr_t index_create_dev_node(radixtree_meta_t *radix, paddr_t node, size_t idx) 
+{
+    if (!node) return 0;
 
     paddr_t *node_contents;
     int rerr = get_page(radix, node, &node_contents);
@@ -344,6 +354,7 @@ int radixtree_init(const idx_spec_t *idx_spec,
     radix->max_depth     = 4;
     radix->node_nbytes   = radix->ents_per_node * radix->ent_size;
     radix->nblk_per_node = radix->node_nbytes / radix->blksz;
+    _Static_assert((1<<9) * 8 == 4096, "Bad assumption!");
     radix->ent_idx_mask  = radix->ents_per_node - 1;
     radix->ent_shift     = (size_t)log2((double)radix->ents_per_node);
     radix->metadata_loc  = *metadata_location; 
@@ -355,20 +366,13 @@ int radixtree_init(const idx_spec_t *idx_spec,
     int merr = read_metadata(radix);
     if (merr < 0) return merr;
 
-    if (!merr) {
-        // Need to first allocate the top page.
-        ssize_t nalloc = CB(radix, cb_alloc_metadata, 
-                            radix->nblk_per_node, &(radix->top_page));
-        if (nalloc != radix->nblk_per_node) return -ENOMEM;
-        int werr = write_metadata(radix);
-        if (werr) return werr;
-    }
-
     // Read the top page.
+#if 0
     radix->cached_tree  = ZALLOC(radix, sizeof(*radix->cached_tree));
     if (!radix->cached_tree) return -ENOMEM;
-    err = create_radix_node(radix, radix->top_page, 1, radix->cached_tree);
+    ssize_t err = create_radix_node(radix, radix->top_page, 1, radix->cached_tree);
     if (err) return err;
+#endif
 
     // If all of that is successful, finally set up structure.
     idx_struct->idx_metadata  = (void*)radix;
@@ -379,22 +383,32 @@ int radixtree_init(const idx_spec_t *idx_spec,
     return 0;
 }
 
-// TODO might want to have a max lookup field.
 ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
                          size_t max_ents, paddr_t *paddr_ret) 
 {
     GET_RADIX(idx_struct);
+    *paddr_ret = 0; 
+
+    if (!radix->top_page) {
+        // Check if someone else made this in the interrum.
+        int merr = read_metadata(radix);
+        if (merr < 0) return merr;
+    }
+    if (!radix->top_page) return 0;
+
     size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
     size_t l2_current = (((size_t)laddr) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
 
     paddr_t l2_node = index_dev_node(radix, radix->top_page, l1_current);
+    if (!l2_node) return 0;
     paddr_t l3_node = index_dev_node(radix, l2_node, l2_current);
+    if (!l3_node) return 0;
 
     // The following will change as we iterate.
     size_t l3_current = (laddr >> radix->ent_shift) & radix->ent_idx_mask;
     paddr_t l4_node = index_dev_node(radix, l3_node, l3_current);
+    if (!l4_node) return 0;
     
-    *paddr_ret = 0; 
     size_t ncontiguous = 0;
     paddr_t last_paddr = 0;
     for (laddr_t l = 0; ; ++l) {
@@ -402,18 +416,21 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         if (l1 != l1_current) {
             l1_current = l1; 
             l2_node = index_dev_node(radix, radix->top_page, l1);
+            if (!l2_node) break;
         }
 
         size_t l2 = ((laddr + l) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
         if (l2 != l2_current) {
             l2_current = l2;
             l3_node = index_dev_node(radix, l2_node, l2);
+            if (!l3_node) break;
         }
 
         size_t l3 = ((laddr + l) >> radix->ent_shift) & radix->ent_idx_mask;
         if (l3 != l3_current) {
             l3_current = l3;
             l4_node = index_dev_node(radix, l3_node, l3_current);
+            if (!l4_node) break;
         }
 
         size_t l4 = (laddr + l) & radix->ent_idx_mask;
@@ -448,15 +465,25 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     if (nalloc == 0) return -ENOMEM;
     if (nalloc < 0) return nalloc;
 
+    // Gotta create the top page if it disappeared.
+    if (!radix->top_page) {
+        // Need to first allocate the top page.
+        ssize_t nalloc = CB(radix, cb_alloc_metadata, 
+                            radix->nblk_per_node, &(radix->top_page));
+        if (nalloc != radix->nblk_per_node) return -ENOMEM;
+        int werr = write_metadata(radix);
+        if (werr) return werr;
+    }
+
     size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
     size_t l2_current = (((size_t)laddr) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
 
-    paddr_t l2_node = index_dev_node(radix, radix->top_page, l1_current);
-    paddr_t l3_node = index_dev_node(radix, l2_node, l2_current);
+    paddr_t l2_node = index_create_dev_node(radix, radix->top_page, l1_current);
+    paddr_t l3_node = index_create_dev_node(radix, l2_node, l2_current);
 
     // The following will change as we iterate.
     size_t l3_current = (laddr >> radix->ent_shift) & radix->ent_idx_mask;
-    paddr_t l4_node = index_dev_node(radix, l3_node, l3_current);
+    paddr_t l4_node = index_create_dev_node(radix, l3_node, l3_current);
     
     size_t ncontiguous = 0;
     paddr_t last_paddr = 0;
@@ -464,19 +491,19 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         size_t l1 = (((size_t)laddr + l) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
         if (l1 != l1_current) {
             l1_current = l1; 
-            l2_node = index_dev_node(radix, radix->top_page, l1);
+            l2_node = index_create_dev_node(radix, radix->top_page, l1);
         }
 
         size_t l2 = ((laddr + l) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
         if (l2 != l2_current) {
             l2_current = l2;
-            l3_node = index_dev_node(radix, l2_node, l2);
+            l3_node = index_create_dev_node(radix, l2_node, l2);
         }
 
         size_t l3 = ((laddr + l) >> radix->ent_shift) & radix->ent_idx_mask;
         if (l3 != l3_current) {
             l3_current = l3;
-            l4_node = index_dev_node(radix, l3_node, l3_current);
+            l4_node = index_create_dev_node(radix, l3_node, l3_current);
         }
 
         size_t l4 = (laddr + l) & radix->ent_idx_mask;
@@ -505,7 +532,9 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     
     size_t ncontiguous = 0;
     paddr_t last_paddr = 0;
-    for (laddr_t l = 0; l < npages; ++l) {
+    // Go backwards so if we hit zero, we know we can free us up some metadata.
+    for (laddr_t n = npages; n > 0; --n) {
+        laddr_t l = n - 1;
         size_t l1 = (((size_t)laddr + l) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
         if (l1 != l1_current) {
             l1_current = l1; 
@@ -525,11 +554,50 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         }
 
         size_t l4 = (laddr + l) & radix->ent_idx_mask;
-        
-        int err = insert_dev_entry(radix, l4_node, l4, 0);
+
+        paddr_t old_ent;
+        int err = lookup_dev_entry(radix, l4_node, l4, &old_ent);
+        if (err) return err;
+        ssize_t dealloc_ret = CB(radix, cb_dealloc_data, 1, old_ent);
+        if_then_panic(dealloc_ret != 1, "Could not remove data page!");
+
+        err = insert_dev_entry(radix, l4_node, l4, 0);
         if (err) return err;
 
-        // TODO deallocate page if no longer needed
+        // De-allocate pages if no longer needed
+        if (l4 == 0) {
+
+            ssize_t ndealloc = CB(radix, cb_dealloc_metadata, 1, l4_node);
+            if_then_panic(ndealloc != 1, "Could not deallocate!");
+
+            err = insert_dev_entry(radix, l3_node, l3, 0);
+            if (err) return err;
+
+            if (l3 == 0) {
+
+                ndealloc = CB(radix, cb_dealloc_metadata, 1, l3_node);
+                if_then_panic(ndealloc != 1, "Could not deallocate!");
+
+                err = insert_dev_entry(radix, l2_node, l2, 0);
+                if (err) return err;
+
+                if (l2 == 0) {
+                    ndealloc = CB(radix, cb_dealloc_metadata, 1, l2_node);
+                    if_then_panic(ndealloc != 1, "Could not deallocate!");
+
+                    err = insert_dev_entry(radix, radix->top_page, l1, 0);
+                    if (err) return err;
+
+                    if (l1 == 0) {
+                        ndealloc = CB(radix, cb_dealloc_metadata, 1, radix->top_page);
+                        if_then_panic(ndealloc != 1, "Could not deallocate!");
+
+                        radix->top_page = 0;
+                        if_then_panic(write_metadata(radix), "Could not update metadata!");
+                    }
+                }
+            }
+        }
     }
 
     return npages;

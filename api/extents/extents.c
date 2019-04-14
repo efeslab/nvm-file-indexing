@@ -154,6 +154,7 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     ext_meta->et_direct_cache = ZALLOC(idx_spec, (ents_root * sizeof(extent_leaf_t)));
     if (NULL == ext_meta->et_direct_cache) { return -ENOMEM; }
 
+
     return 0;
 }
 

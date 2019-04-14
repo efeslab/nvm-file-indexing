@@ -57,6 +57,8 @@ TEST_F(RadixTreeFixture, RemoveSingle) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
+    
+    ssize_t nalloc_start = device.num_allocated();
 
     ssize_t ret = radixtree_create(&radixtree, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -70,6 +72,7 @@ TEST_F(RadixTreeFixture, RemoveSingle) {
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
+    ASSERT_EQ(nalloc_start, device.num_allocated());
 }
 
 #if 0

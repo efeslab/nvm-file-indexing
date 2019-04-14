@@ -181,8 +181,8 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
                           bool           force) {
   uint32_t node_index;
   uint32_t hash_value;
-  //uint32_t first_tombstone = 0;
-  //int have_tombstone = FALSE;
+  uint32_t first_tombstone = 0;
+  int have_tombstone = FALSE;
   *ent_return = NULL;
 #ifdef SEQ_STEP
   uint32_t step = 1;
@@ -232,7 +232,7 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
 
     DECLARE_TIMING();
     START_TIMING();
-#if 1
+#if 0
   if (HASH_ENT_IS_EMPTY(*cur)) goto end;
 
     if (likely(cur->key == key && HASH_ENT_IS_VALID(*cur))) {
@@ -262,7 +262,7 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
       have_tombstone = TRUE;
     }
     */
-#if 0
+#if 1
 #ifndef seq_step
     step++;
 #endif
@@ -324,12 +324,10 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
 #endif
       return node_index;
     }
-    /*
     else if (unlikely(HASH_ENT_IS_TOMBSTONE(*cur) && !have_tombstone)) {
       first_tombstone = node_index;
       have_tombstone = TRUE;
     }
-    */
 #ifndef SEQ_STEP
     step++;
 #endif
@@ -350,7 +348,6 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
   }
 
 end:
-  /*
   if (have_tombstone) {
     nvm_read_entry(hash_table, first_tombstone, ent_return, false);
 #if 1
@@ -359,7 +356,6 @@ end:
 #endif
     return first_tombstone;
   }
-  */
 
   nvm_read_entry(hash_table, node_index, ent_return, false);
 #if 1
@@ -469,27 +465,41 @@ static simd64_t bitmask = {.a = {
     0x0000FFFFFFFFFFFF
 }};
 
-static simd64_t offsets1 = {.a = {
-    0 * sizeof(hash_ent_t),
-    1 * sizeof(hash_ent_t),
-    2 * sizeof(hash_ent_t),
-    3 * sizeof(hash_ent_t),
-    4 * sizeof(hash_ent_t),
-    5 * sizeof(hash_ent_t),
-    6 * sizeof(hash_ent_t),
-    7 * sizeof(hash_ent_t),
-}};
+#define OFFSETS(n) \
+static simd64_t offsets ## n = {.a = { \
+    ((n * 8) + 0) * sizeof(hash_ent_t), \
+    ((n * 8) + 1) * sizeof(hash_ent_t), \
+    ((n * 8) + 2) * sizeof(hash_ent_t), \
+    ((n * 8) + 3) * sizeof(hash_ent_t), \
+    ((n * 8) + 4) * sizeof(hash_ent_t), \
+    ((n * 8) + 5) * sizeof(hash_ent_t), \
+    ((n * 8) + 6) * sizeof(hash_ent_t), \
+    ((n * 8) + 7) * sizeof(hash_ent_t), \
+}}
 
-static simd64_t offsets2 = {.a = {
-    0 * sizeof(hash_ent_t),
-    1 * sizeof(hash_ent_t),
-    2 * sizeof(hash_ent_t),
-    3 * sizeof(hash_ent_t),
-    4 * sizeof(hash_ent_t),
-    5 * sizeof(hash_ent_t),
-    6 * sizeof(hash_ent_t),
-    7 * sizeof(hash_ent_t),
-}};
+OFFSETS(0);
+OFFSETS(1);
+OFFSETS(2);
+OFFSETS(3);
+OFFSETS(4);
+
+#define VOFFSETS(n) \
+static simd64_t voffsets ## n = {.a = { \
+    ((n * 8) + 0) * sizeof(hash_ent_t) + 8, \
+    ((n * 8) + 1) * sizeof(hash_ent_t) + 8, \
+    ((n * 8) + 2) * sizeof(hash_ent_t) + 8, \
+    ((n * 8) + 3) * sizeof(hash_ent_t) + 8, \
+    ((n * 8) + 4) * sizeof(hash_ent_t) + 8, \
+    ((n * 8) + 5) * sizeof(hash_ent_t) + 8, \
+    ((n * 8) + 6) * sizeof(hash_ent_t) + 8, \
+    ((n * 8) + 7) * sizeof(hash_ent_t) + 8, \
+}}
+
+VOFFSETS(0);
+VOFFSETS(1);
+VOFFSETS(2);
+VOFFSETS(3);
+VOFFSETS(4);
 
 static uint32_t
 nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
@@ -522,6 +532,10 @@ nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
     __builtin_prefetch((void*)( ((char*)cur) + CL(1) ));
     __builtin_prefetch((void*)( ((char*)cur) + CL(2) ));
     __builtin_prefetch((void*)( ((char*)cur) + CL(3) ));
+    __builtin_prefetch((void*)( ((char*)cur) + CL(4) ));
+    __builtin_prefetch((void*)( ((char*)cur) + CL(5) ));
+    __builtin_prefetch((void*)( ((char*)cur) + CL(6) ));
+    __builtin_prefetch((void*)( ((char*)cur) + CL(7) ));
 
     int inc = 0;
 #if 1
@@ -529,27 +543,20 @@ nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
     SIM_TYPE inval = _mm512_set1_epi64(0);
 
     simd64_t keys;
-    simd64_t offsets, val_offsets;
     keys.v = _mm512_set1_epi64(key);
     //offsets.v = _mm512_set1_epi64(0);
     //val_offsets.v = _mm512_set1_epi64(0);
-    for (int i = 0; i < SIM_W; ++i) {
-        offsets.a[i] = i * sizeof(hash_ent_t);
-        val_offsets.a[i] = (i * sizeof(hash_ent_t)) + 8;
-    }
 
-    while (inc < 5) {
         simd64_t ent_keys, ent_vals;
 #if 1
-        inc++;
 
-        ent_keys.v = _mm512_i64gather_epi64(offsets.v, (void*)cur, 1);
+        ent_keys.v = _mm512_i64gather_epi64(offsets0.v, (void*)cur, 1);
 
         __mmask8 res = _mm512_cmpeq_epi64_mask(keys.v,
-                            _mm512_i64gather_epi64(offsets.v, (void*)cur, 1));
+                            _mm512_i64gather_epi64(offsets0.v, (void*)cur, 1));
 
         // Now also mask which entries are valid
-        ent_vals.v = _mm512_i64gather_epi64(val_offsets.v, (void*)cur, 1);
+        ent_vals.v = _mm512_i64gather_epi64(voffsets0.v, (void*)cur, 1);
         ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
 
 
@@ -561,13 +568,112 @@ nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
 
         if (countSetBits(res) == 1) {
             // Find the one remaining thing
-            uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets.v);
+            uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets0.v);
             *ent_return = (hash_ent_t*)(((char*)cur) + offset);
             return node_index + (uint32_t)offset;
         } 
 
-        offsets.v = _mm512_add_epi64(offsets.v, incr.v);
-        val_offsets.v = _mm512_add_epi64(val_offsets.v, incr.v);
+        //---------------------------------------------------------------------
+
+        ent_keys.v = _mm512_i64gather_epi64(offsets1.v, (void*)cur, 1);
+
+        res = _mm512_cmpeq_epi64_mask(keys.v,
+                            _mm512_i64gather_epi64(offsets1.v, (void*)cur, 1));
+
+        // Now also mask which entries are valid
+        ent_vals.v = _mm512_i64gather_epi64(voffsets1.v, (void*)cur, 1);
+        ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
+
+
+        is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
+        is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
+
+        // Remove things from the res mask
+        res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
+
+        if (countSetBits(res) == 1) {
+            // Find the one remaining thing
+            uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets1.v);
+            *ent_return = (hash_ent_t*)(((char*)cur) + offset);
+            return node_index + (uint32_t)offset;
+        } 
+
+        //---------------------------------------------------------------------
+
+        ent_keys.v = _mm512_i64gather_epi64(offsets2.v, (void*)cur, 1);
+
+        res = _mm512_cmpeq_epi64_mask(keys.v,
+                            _mm512_i64gather_epi64(offsets2.v, (void*)cur, 1));
+
+        // Now also mask which entries are valid
+        ent_vals.v = _mm512_i64gather_epi64(voffsets2.v, (void*)cur, 1);
+        ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
+
+
+        is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
+        is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
+
+        // Remove things from the res mask
+        res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
+
+        if (countSetBits(res) == 1) {
+            // Find the one remaining thing
+            uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets2.v);
+            *ent_return = (hash_ent_t*)(((char*)cur) + offset);
+            return node_index + (uint32_t)offset;
+        } 
+
+        //---------------------------------------------------------------------
+
+        ent_keys.v = _mm512_i64gather_epi64(offsets3.v, (void*)cur, 1);
+
+        res = _mm512_cmpeq_epi64_mask(keys.v,
+                            _mm512_i64gather_epi64(offsets3.v, (void*)cur, 1));
+
+        // Now also mask which entries are valid
+        ent_vals.v = _mm512_i64gather_epi64(voffsets3.v, (void*)cur, 1);
+        ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
+
+
+        is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
+        is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
+
+        // Remove things from the res mask
+        res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
+
+        if (countSetBits(res) == 1) {
+            // Find the one remaining thing
+            uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets3.v);
+            *ent_return = (hash_ent_t*)(((char*)cur) + offset);
+            return node_index + (uint32_t)offset;
+        } 
+
+        //---------------------------------------------------------------------
+
+        ent_keys.v = _mm512_i64gather_epi64(offsets4.v, (void*)cur, 1);
+
+        res = _mm512_cmpeq_epi64_mask(keys.v,
+                            _mm512_i64gather_epi64(offsets4.v, (void*)cur, 1));
+
+        // Now also mask which entries are valid
+        ent_vals.v = _mm512_i64gather_epi64(voffsets4.v, (void*)cur, 1);
+        ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
+
+
+        is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
+        is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
+
+        // Remove things from the res mask
+        res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
+
+        if (countSetBits(res) == 1) {
+            // Find the one remaining thing
+            uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets4.v);
+            *ent_return = (hash_ent_t*)(((char*)cur) + offset);
+            return node_index + (uint32_t)offset;
+        } 
+
+        return 0;
 #else
         for (int i = 0; i < SIM_W; ++i) {
             offsets.a[i] = simd_offsets[(inc * SIM_W) + i];
@@ -611,7 +717,6 @@ nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
             return 0;
         }
 #endif
-    }
 #endif
 
     return 0;

@@ -18,7 +18,7 @@ struct MockDevice {
 
     void set_range(paddr_t block, size_t nblocks, bool is_allocated) {
         for (paddr_t i = block; i < block + nblocks; ++i) {
-            ASSERT_NE(allocated_[i], is_allocated);
+            ASSERT_NE((bool)allocated_[i], is_allocated);
             allocated_[i] = is_allocated;
             if (!is_allocated) {
                 memset(raw_device_.data() + (i * blksz_), 0, blksz_);
