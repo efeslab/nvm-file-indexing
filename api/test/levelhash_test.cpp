@@ -99,7 +99,7 @@ TEST_F(LevelHashingFixture, LevelPersist) {
 TEST_F(LevelHashingFixture, LevelExpandIteratively) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
-    size_t npages = 1000;
+    size_t npages = 100;
     size_t npage_inc = 1;
 
     set<paddr_t> prev_paddrs;
@@ -116,7 +116,7 @@ TEST_F(LevelHashingFixture, LevelExpandIteratively) {
 TEST_F(LevelHashingFixture, LevelExpandIterativelyAndLookup) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
-    size_t npages = 1000;
+    size_t npages = 100;
     size_t npage_inc = 1;
 
     map<laddr_t, paddr_t> prev_paddrs;
@@ -140,7 +140,7 @@ TEST_F(LevelHashingFixture, LevelExpandIterativelyAndLookup) {
 
 TEST_F(LevelHashingFixture, LevelExpandIterativelyAndLookupHuge) {
     paddr_t pblk  = 0;
-    size_t npages = 10000;
+    size_t npages = 100;
     size_t npage_inc = 1;
 
     map<laddr_t, paddr_t> prev_paddrs;
@@ -164,7 +164,7 @@ TEST_F(LevelHashingFixture, LevelExpandIterativelyAndLookupHuge) {
 TEST_F(LevelHashingFixture, LevelExpandIterativelyAndLookupPersistent) {
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
-    size_t npages = 1000;
+    size_t npages = 100;
     size_t npage_inc = 1;
 
     map<laddr_t, paddr_t> prev_paddrs;
@@ -227,7 +227,7 @@ TEST_F(LevelHashingFixture, LevelExpandIterativelyUnfavorableAlloc) {
 
 TEST_F(LevelHashingFixture, LevelExpandSlab) {
     paddr_t pblk  = 0;
-    size_t npages = 1000;
+    size_t npages = 100;
 
     ssize_t ret = levelhash_create(&level_idx, 0, 0, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -236,7 +236,7 @@ TEST_F(LevelHashingFixture, LevelExpandSlab) {
 
 TEST_F(LevelHashingFixture, LevelLookupAfterExpand) {
     paddr_t pblk  = 0;
-    size_t npages = 1000;
+    size_t npages = 100;
 
     ssize_t ret = levelhash_create(&level_idx, 0, 0, npages, &pblk);
     ASSERT_EQ(npages, ret);
@@ -252,7 +252,7 @@ TEST_F(LevelHashingFixture, LevelLookupAfterExpand) {
 
 TEST_F(LevelHashingFixture, LevelLookupAfterExpandAcrossIndices) {
     paddr_t pblk  = 0;
-    size_t npages = 1000;
+    size_t npages = 100;
 
     idx_struct_t test_idx;
     int init_again = levelhash_init(&idx_spec, &inode_space, &test_idx);
@@ -276,7 +276,7 @@ TEST_F(LevelHashingFixture, LevelLookupAfterExpandAcrossIndices) {
 
 TEST_F(LevelHashingFixture, LevelShrinkSlab) {
     paddr_t pblk  = 0;
-    size_t npages = 1000;
+    size_t npages = 100;
 
     ssize_t ret = levelhash_create(&level_idx, 0, 0, npages, &pblk);
     ASSERT_EQ(npages, ret);

@@ -13,7 +13,7 @@
 #define _Static_assert static_assert
 #endif
 
-#define ASSOC_NUM 3                       // The number of slots in a bucket
+#define ASSOC_NUM 4                       // The number of slots in a bucket
 //#define KEY_LEN 16                        // The maximum length of a key
 //#define VALUE_LEN 15                      // The maximum length of a value
 #define KEY_LEN sizeof(laddr_t)
@@ -23,13 +23,13 @@
 typedef struct entry {                    // A slot storing a key-value item 
     //uint8_t key[KEY_LEN];
     //uint8_t value[VALUE_LEN];
+    uint8_t e_idx;
+    uint8_t e_size;
     laddr_t e_key;
-    uint16_t e_idx;
-    uint16_t e_size;
     paddr_t e_val;
 } entry_t;
 
-#define LH_MAX_SIZE UINT16_MAX
+#define LH_MAX_SIZE UINT8_MAX
 
 #define MAGIC 0xcafebabe
 typedef struct on_device_level_hash {  //
