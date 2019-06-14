@@ -268,8 +268,10 @@ static paddr_t index_create_dev_node(radixtree_meta_t *radix, paddr_t node, size
         ssize_t nalloc = CB(radix, cb_alloc_metadata,
                             radix->nblk_per_node, &entry);
         if_then_panic(nalloc != radix->nblk_per_node, "Could not allocate!");
+        if_then_panic(idx % 2, "You ruined it Scott!\n");
 
         node_contents[idx] = entry;
+        node_contents[idx + 1] = entry;
     }
 
     return entry;
@@ -399,6 +401,7 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
     size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
     size_t l2_current = (((size_t)laddr) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
+    if (l1_current % 2) l2_current += 256;
 
     paddr_t l2_node = index_dev_node(radix, radix->top_page, l1_current);
     if (!l2_node) return 0;
@@ -407,6 +410,7 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
     // The following will change as we iterate.
     size_t l3_current = (laddr >> radix->ent_shift) & radix->ent_idx_mask;
+    if (l2_current % 2) l3_current += 256;
     paddr_t l4_node = index_dev_node(radix, l3_node, l3_current);
     if (!l4_node) return 0;
     
@@ -421,6 +425,7 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         }
 
         size_t l2 = ((laddr + l) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
+        if (l1 % 2) l2 += 256;
         if (l2 != l2_current) {
             l2_current = l2;
             l3_node = index_dev_node(radix, l2_node, l2);
@@ -428,6 +433,7 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         }
 
         size_t l3 = ((laddr + l) >> radix->ent_shift) & radix->ent_idx_mask;
+        if (l2 % 2) l3 += 256;
         if (l3 != l3_current) {
             l3_current = l3;
             l4_node = index_dev_node(radix, l3_node, l3_current);
@@ -435,6 +441,7 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         }
 
         size_t l4 = (laddr + l) & radix->ent_idx_mask;
+        if (l3 % 2) l4 += 256;
         
         paddr_t paddr;
         int err = lookup_dev_entry(radix, l4_node, l4, &paddr);
@@ -481,12 +488,14 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
     size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
     size_t l2_current = (((size_t)laddr) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
+    if (l1_current % 2) l2_current += 256;
 
     paddr_t l2_node = index_create_dev_node(radix, radix->top_page, l1_current);
     paddr_t l3_node = index_create_dev_node(radix, l2_node, l2_current);
 
     // The following will change as we iterate.
     size_t l3_current = (laddr >> radix->ent_shift) & radix->ent_idx_mask;
+    if (l2_current % 2) l3_current += 256;
     paddr_t l4_node = index_create_dev_node(radix, l3_node, l3_current);
     
     size_t ncontiguous = 0;
@@ -499,18 +508,21 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         }
 
         size_t l2 = ((laddr + l) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
+        if (l1 % 2) l2 += 256;
         if (l2 != l2_current) {
             l2_current = l2;
             l3_node = index_create_dev_node(radix, l2_node, l2);
         }
 
         size_t l3 = ((laddr + l) >> radix->ent_shift) & radix->ent_idx_mask;
+        if (l2 % 2) l3 += 256;
         if (l3 != l3_current) {
             l3_current = l3;
             l4_node = index_create_dev_node(radix, l3_node, l3_current);
         }
 
         size_t l4 = (laddr + l) & radix->ent_idx_mask;
+        if (l3 % 2) l4 += 256;
         
         int err = insert_dev_entry(radix, l4_node, l4, *paddr + (size_t)l);
         if (err) return err;
@@ -526,12 +538,14 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
     size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
     size_t l2_current = (((size_t)laddr) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
+    if (l1_current % 2) l2_current += 256;
 
     paddr_t l2_node = index_dev_node(radix, radix->top_page, l1_current);
     paddr_t l3_node = index_dev_node(radix, l2_node, l2_current);
 
     // The following will change as we iterate.
     size_t l3_current = (laddr >> radix->ent_shift) & radix->ent_idx_mask;
+    if (l2_current % 2) l3_current += 256;
     paddr_t l4_node = index_dev_node(radix, l3_node, l3_current);
     
     size_t ncontiguous = 0;
@@ -546,22 +560,27 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         }
 
         size_t l2 = ((laddr + l) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
+        if (l1 % 2) l2 += 256;
         if (l2 != l2_current) {
             l2_current = l2;
             l3_node = index_dev_node(radix, l2_node, l2);
         }
 
         size_t l3 = ((laddr + l) >> radix->ent_shift) & radix->ent_idx_mask;
+        if (l2 % 2) l3 += 256;
         if (l3 != l3_current) {
             l3_current = l3;
             l4_node = index_dev_node(radix, l3_node, l3_current);
         }
 
         size_t l4 = (laddr + l) & radix->ent_idx_mask;
+        if (l3 % 2) l4 += 256;
 
         paddr_t old_ent;
         int err = lookup_dev_entry(radix, l4_node, l4, &old_ent);
         if (err) return err;
+        if (!old_ent) break;
+
         ssize_t dealloc_ret = CB(radix, cb_dealloc_data, 1, old_ent);
         if_then_panic(dealloc_ret != 1, "Could not remove data page!");
 
@@ -583,6 +602,7 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
                 if_then_panic(ndealloc != 1, "Could not deallocate!");
 
                 err = insert_dev_entry(radix, l2_node, l2, 0);
+                err = insert_dev_entry(radix, l2_node, l2 + 1, 0);
                 if (err) return err;
 
                 if (l2 == 0) {
@@ -590,6 +610,7 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
                     if_then_panic(ndealloc != 1, "Could not deallocate!");
 
                     err = insert_dev_entry(radix, radix->top_page, l1, 0);
+                    err = insert_dev_entry(radix, radix->top_page, l1 + 1, 0);
                     if (err) return err;
 
                     if (l1 == 0) {

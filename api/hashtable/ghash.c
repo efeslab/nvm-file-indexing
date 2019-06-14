@@ -901,6 +901,7 @@ nvm_hash_table_new(hash_func_t       hash_func,
          metadata_location);
 #endif
   //max_entries *= 1.1;
+  //max_entries *= 100;
 
   ht->hash_func          = hash_func ? hash_func : nvm_idx_direct_hash;
   ht->ref_count          = 1;

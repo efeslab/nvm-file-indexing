@@ -598,7 +598,8 @@ void level_shrink(level_hash_t *level)
         ssize_t err = CB(level->idx_spec, cb_dealloc_metadata,
                          nalloced, new_buckets_paddr);
         if_then_panic(err != nalloced, "Could not dealloc!");
-        printf("Warning, could not shrink!\n");
+        //printf("Warning, could not shrink!\IAsked for %llu blocks, got %llu\n",
+        //        new_buckets_blocks, nalloced);
         return;
     }
 
