@@ -212,7 +212,7 @@ void nvm_hash_table_lookup(PMEMobjpool *pop, paddr_t key,
 int nvm_hash_table_contains(PMEMobjpool *pop,
                           paddr_t key);
 
-unsigned nvm_hash_table_size(nvm_hash_idx_t *hash_table);
+unsigned nvm_hash_table_size(PMEMobjpool *pop);
 
 
 extern uint64_t reads;

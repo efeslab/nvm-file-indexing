@@ -772,7 +772,7 @@ static void nvm_hash_table_remove_node (PMEMobjpool  *pop,
     entries = D_RO(ht)->entries;
     *pblk = D_RO(entries)[i].value;
     D_RW(entries)[i].value = (paddr_t) ~0;
-    D_RW(ht)->nnodes = D_RW(ht)->nnodes - 1;
+    D_RW(ht)->nnodes = D_RO(ht)->nnodes - 1;
   } TX_END
   /* Erect tombstone */
 
@@ -967,6 +967,7 @@ nvm_hash_table_insert_node(PMEMobjpool *pop,
       TX_ADD(ht);
       D_RW(entries)[node_index].key = new_key;
       D_RW(entries)[node_index].value = new_value;
+      D_RW(ht)->nnodes = D_RO(ht)->nnodes + 1;
     } TX_END
 
 #ifndef SIMPLE_ENTRIES
@@ -1306,10 +1307,13 @@ nvm_hash_table_remove (PMEMobjpool *pop,
  *
  * Returns: the number of key/value pairs in the #nvm_hash_idx_t.
  */
-uint32_t nvm_hash_table_size (nvm_hash_idx_t *hash_table) {
-  assert (hash_table != NULL);
-
-  return hash_table->nnodes;
+uint32_t nvm_hash_table_size (PMEMobjpool *pop) {
+  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
+  uint32_t size = 0;
+  TX_BEGIN(pop) {
+    size = D_RO(ht)->nnodes;
+  } TX_END
+  return size;
 }
 
 /*

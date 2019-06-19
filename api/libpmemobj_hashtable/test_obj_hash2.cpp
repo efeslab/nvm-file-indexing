@@ -24,8 +24,18 @@ int main() {
     nvm_hash_table_lookup(pop, badKey, lookupVal, lookupSize);
     cout << "Lookup val: " << *lookupVal << endl;
 
-    cout << "Inserting (1,2)..." << endl;
-    cout << "Success: " << nvm_hash_table_insert(pop, nKey, nVal) << endl;
+    cout << "Inserting (3,6)..." << endl;
+    cout << "Success: " << nvm_hash_table_insert(pop, 3, 6) << endl;
+
+    cout << "Inserting (4,6)..." << endl;
+    cout << "Success: " << nvm_hash_table_insert(pop, 4, 6) << endl;
+
+    cout << "Lookup 4..." << endl;
+    nvm_hash_table_lookup(pop, 4, lookupVal, lookupSize);
+    cout << "Lookup val: " << *lookupVal << endl;
+
+    cout << "ht size: " << nvm_hash_table_size(pop) << endl;
+ 
     
     delete lookupVal;
     delete lookupSize;
