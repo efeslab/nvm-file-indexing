@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(HashTable)
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# set(CMAKE_CXX_STANDARD 11)
+# set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(/usr/local/include)
 include_directories(/usr/local/include/libpmemobj)
@@ -9,17 +9,21 @@ add_subdirectory(common)
 
 file(GLOB hashtable_src
     "*.h"
-    "*.c"
-    "test_obj_hash.cpp"
-    "objghash.cpp"
+    "inode_hash.c"
+    "objghash.c"
+    "test_obj_hash.c"
+    "xxhash.c"
 )
 file(GLOB hashtable_src2
     "*.h"
-    "*.c"
-    "test_obj_hash2.cpp"
-    "objghash.cpp"
+    "inode_hash.c"
+    "objghash.c"
+    "test_obj_hash2.c"
+    "xxhash.c"
 )
-
+# list(REMOVE_ITEM hashtable_src "test_obj_hash2.c")
+# list(REMOVE_ITEM hashtable_src2 "test_obj_hash.c")
+message(${hashtable_src})
 set(EXE_NAME Test1)
 set(EXE_NAME2 Test2)
 add_executable(${EXE_NAME} ${hashtable_src})
