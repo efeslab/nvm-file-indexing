@@ -4,9 +4,6 @@
 [submodule "filesystems/strata"]
 	path = filesystems/strata
 	url = https://github.com/Dahca/strata.git
-[submodule "filesystems/linux-nova"]
-	path = filesystems/linux-nova
-	url = https://github.com/efeslab/linux-nova.git
 [submodule "api/test/googletest"]
 	path = api/test/googletest
 	url = https://github.com/google/googletest.git
