@@ -7,6 +7,7 @@
 #include "xxhash.h"
 
 typedef laddr_t (*hash_func_t)(paddr_t key);
+typedef laddr_t (hash_func_tv)(paddr_t key);
 
 // https://gist.github.com/badboy/6267743
 static inline laddr_t nvm_idx_hash6432shift(paddr_t key) {

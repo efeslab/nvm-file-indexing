@@ -1,3 +1,4 @@
+//finished new and lookup, insert, update, next is remove
 /* GLIB - Library of useful routines for C programming
  * Copyright (C) 1995-1997  Peter Mattis, Spencer Kimball and Josh MacDonald
  *
@@ -29,7 +30,7 @@
 #include <assert.h>
 #include <string.h>  /* memset */
 #include <stdint.h>
-
+#include <libpmemobj.h>
 #include <emmintrin.h>
 #include <immintrin.h>
 
@@ -174,157 +175,83 @@ nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
                                  uint32_t       *hash_return, 
                                  int start);
 static inline uint32_t
-nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
+nvm_hash_table_lookup_node (PMEMobjpool    *pop,
                           paddr_t        key,
-                          hash_ent_t  **ent_return,
-                          uint32_t      *hash_return,
-                          bool           force) {
+                          hash_ent_t  *ent_return,
+                          uint32_t      *hash_return/*,
+                          bool           force*/) {
+
   uint32_t node_index;
   uint32_t hash_value;
+  uint32_t mod;
   uint32_t first_tombstone = 0;
   int have_tombstone = FALSE;
-  *ent_return = NULL;
+  TOID(nvm_hash_idx_t) hash_table = POBJ_ROOT(pop, nvm_hash_idx_t);
+  TOID(hash_ent_t) entries;
 #ifdef SEQ_STEP
   uint32_t step = 1;
 #else
   uint32_t step = 0;
 #endif
-  hash_ent_t *buffer;
-  hash_ent_t *cur;
-
-  hash_value = hash_table->hash_func(key);
+  hash_ent_t buffer;
+  hash_ent_t cur;
+TX_BEGIN(pop) {
+  entries = D_RO(hash_table)->entries;
+  hash_value = D_RO(hash_table)->hash_func(key);
+  mod = D_RO(hash_table)->mod;
+  node_index = hash_value % mod;
+  cur = D_RO(entries)[node_index];
+} TX_END
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
   }
 #endif
+// #if 1
+//   if (hash_table->do_lock) pthread_rwlock_rdlock(hash_table->locks + node_index);
+// #endif
 
-  if (hash_table->enable_stats) hash_table->stats.n_lookups++;
   uint64_t count = 0;
 
   //pthread_rwlock_rdlock(hash_table->cache_lock);
 
   *hash_return = hash_value;
 
-  node_index = hash_value % hash_table->mod;
   //node_index = hash_value & hash_table->mask;
-#if 1
-  if (hash_table->do_lock) pthread_rwlock_rdlock(hash_table->locks + node_index);
-#endif
 
-    __builtin_prefetch((void*)((hash_table->data_ptr) + (node_index * 16)));
-
-  nvm_read_entry(hash_table, node_index, &cur, force);
   //cur = hash_table->cache[BLK_NUM(node_index)][BLK_IDX(node_index)];
 
-#define CL(n) (n * 64)
-#if 0
-    __builtin_prefetch((void*)( ((char*)cur) + CL(2) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(1) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(0) ));
-#elif 1
-    for (int i = 0; i < 11; ++i) {
-        __builtin_prefetch((void*)( cur + i ), 0, 3);
-    }
-#endif
+
 
   count++;
 
-    DECLARE_TIMING();
-    START_TIMING();
-#if 0
-  if (HASH_ENT_IS_EMPTY(*cur)) goto end;
-
-    if (likely(cur->key == key && HASH_ENT_IS_VALID(*cur))) {
-      *ent_return = cur;
-#if 1
-      if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
-      //pthread_rwlock_unlock(hash_table->cache_lock);
+  while (!cur.value == 0) {
+    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
       
-      // Only update on valid
-      if (hash_table->enable_stats) {
-          hash_table->stats.n_ents += count;
-          if (!hash_table->stats.n_min_ents_per_lookup) {
-              hash_table->stats.n_min_ents_per_lookup = count;
-          }
 
-          hash_table->stats.n_min_ents_per_lookup = min(count,
-                  hash_table->stats.n_min_ents_per_lookup);
-          hash_table->stats.n_max_ents_per_lookup = max(count,
-                  hash_table->stats.n_max_ents_per_lookup);
-      }
-#endif
-      return node_index;
-    } 
-    /*
-    else if (unlikely(HASH_ENT_IS_TOMBSTONE(*cur) && !have_tombstone)) {
-      first_tombstone = node_index;
-      have_tombstone = TRUE;
-    }
-    */
-#if 1
-#ifndef seq_step
-    step++;
-#endif
-    //uint32_t new_idx = (node_index + step) & hash_table->mask;
-    uint32_t new_idx = (node_index + step) % hash_table->mod;
-#if 1
-    if (unlikely(hash_table->do_lock)) {
-      pthread_rwlock_unlock(hash_table->locks + node_index);
-      pthread_rwlock_rdlock(hash_table->locks + new_idx);
-    }
-#endif
-    node_index = new_idx;
-
-    nvm_read_entry(hash_table, node_index, &cur, force);
-
-    count++;
-#else
-    if (!hash_table->do_lock)
-        return nvm_hash_table_lookup_node_simd(hash_table, key, ent_return, hash_return, 1);
-
-#ifndef SEQ_STEP
-    step++;
-#endif
-    //uint32_t new_idx = (node_index + step) & hash_table->mask;
-    uint32_t new_idx = (node_index + step) % hash_table->mod;
-  pthread_rwlock_unlock(hash_table->locks + node_index);
-  pthread_rwlock_rdlock(hash_table->locks + new_idx);
-    node_index = new_idx;
-
-    nvm_read_entry(hash_table, node_index, &cur, force);
-
-    count++;
-#endif
-#endif
-
-  while (!HASH_ENT_IS_EMPTY(*cur)) {
-    DECLARE_TIMING();
-    START_TIMING();
-    if (likely(cur->key == key && HASH_ENT_IS_VALID(*cur))) {
       *ent_return = cur;
-#if 1
-      if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
-      //pthread_rwlock_unlock(hash_table->cache_lock);
+//       #if 1
+//       if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
+//       //pthread_rwlock_unlock(hash_table->cache_lock);
       
-      // Only update on valid
-      if (hash_table->enable_stats) {
-          hash_table->stats.n_ents += count;
-          if (!hash_table->stats.n_min_ents_per_lookup) {
-              hash_table->stats.n_min_ents_per_lookup = count;
-          }
+//       // Only update on valid
+//       if (hash_table->enable_stats) {
+//           hash_table->stats.n_ents += count;
+//           if (!hash_table->stats.n_min_ents_per_lookup) {
+//               hash_table->stats.n_min_ents_per_lookup = count;
+//           }
 
-          hash_table->stats.n_min_ents_per_lookup = min(count,
-                  hash_table->stats.n_min_ents_per_lookup);
-          hash_table->stats.n_max_ents_per_lookup = max(count,
-                  hash_table->stats.n_max_ents_per_lookup);
+//           hash_table->stats.n_min_ents_per_lookup = min(count,
+//                   hash_table->stats.n_min_ents_per_lookup);
+//           hash_table->stats.n_max_ents_per_lookup = max(count,
+//                   hash_table->stats.n_max_ents_per_lookup);
 
-          UPDATE_TIMING(&(hash_table->stats), loop_time);
-      }
-#endif
+//           UPDATE_TIMING(&(hash_table->stats), loop_time);
+//       }
+//      #endif
       return node_index;
     }
-    else if (unlikely(HASH_ENT_IS_TOMBSTONE(*cur) && !have_tombstone)) {
+    else if (HASH_ENT_IS_TOMBSTONE(cur) && !have_tombstone) {
       first_tombstone = node_index;
       have_tombstone = TRUE;
     }
@@ -332,37 +259,40 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
     step++;
 #endif
     //uint32_t new_idx = (node_index + step) & hash_table->mask;
-    uint32_t new_idx = (node_index + step) % hash_table->mod;
-#if 1
-    if (unlikely(hash_table->do_lock)) {
-      pthread_rwlock_unlock(hash_table->locks + node_index);
-      pthread_rwlock_rdlock(hash_table->locks + new_idx);
-    }
-#endif
+    uint32_t new_idx = (node_index + step) % mod;
+// #if 1
+//     if (unlikely(hash_table->do_lock)) {
+//       pthread_rwlock_unlock(hash_table->locks + node_index);
+//       pthread_rwlock_rdlock(hash_table->locks + new_idx);
+//     }
+// #endif
     node_index = new_idx;
-
-    nvm_read_entry(hash_table, node_index, &cur, force);
+    TX_BEGIN(pop) {
+      cur = D_RO(entries)[node_index];
+    } TX_END
 
     count++;
-      UPDATE_TIMING(&(hash_table->stats), loop_time);
   }
 
 end:
   if (have_tombstone) {
-    nvm_read_entry(hash_table, first_tombstone, ent_return, false);
-#if 1
-    if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
-      //pthread_rwlock_unlock(hash_table->cache_lock);
-#endif
+    TX_BEGIN(pop) {
+      *ent_return = D_RO(entries)[first_tombstone];
+    } TX_END
+// #if 1
+//     if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
+//       //pthread_rwlock_unlock(hash_table->cache_lock);
+// #endif
     return first_tombstone;
   }
 
-  nvm_read_entry(hash_table, node_index, ent_return, false);
-#if 1
-  if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
-#endif
+  TX_BEGIN(pop) {
+      *ent_return = D_RO(entries)[node_index];
+    } TX_END
 
-  //pthread_rwlock_unlock(hash_table->cache_lock);
+// #if 1
+//   if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
+// #endif
   return node_index;
 }
 #pragma GCC pop_options
@@ -501,230 +431,230 @@ VOFFSETS(2);
 VOFFSETS(3);
 VOFFSETS(4);
 
-static uint32_t
-nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
-                                 paddr_t         key,
-                                 hash_ent_t    **ent_return,
-                                 uint32_t       *hash_return, 
-                                 int start) {
-    uint32_t node_index;
-    uint32_t hash_value;
-    hash_ent_t *cur;
+// static uint32_t
+// nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
+//                                  paddr_t         key,
+//                                  hash_ent_t    **ent_return,
+//                                  uint32_t       *hash_return, 
+//                                  int start) {
+//     uint32_t node_index;
+//     uint32_t hash_value;
+//     hash_ent_t *cur;
 
-    hash_value = hash_table->hash_func(key);
-#if 0
-    if (unlikely (!HASH_IS_REAL (hash_value))) {
-        hash_value = 2;
-    }
-#endif
+//     hash_value = hash_table->hash_func(key);
+// #if 0
+//     if (unlikely (!HASH_IS_REAL (hash_value))) {
+//         hash_value = 2;
+//     }
+// #endif
 
-    *hash_return = hash_value;
+//     *hash_return = hash_value;
 
-    //node_index = hash_value & hash_table->mask;
-    node_index = (hash_value + start) % hash_table->mod;
+//     //node_index = hash_value & hash_table->mask;
+//     node_index = (hash_value + start) % hash_table->mod;
 
-    nvm_read_entry(hash_table, node_index, &cur, false);
+//     nvm_read_entry(hash_table, node_index, &cur, false);
 
-    *ent_return = NULL;
-#undef CL
-#define CL(n) (n * 64)
-    __builtin_prefetch((void*)( ((char*)cur) + CL(0) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(1) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(2) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(3) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(4) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(5) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(6) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(7) ));
+//     *ent_return = NULL;
+// #undef CL
+// #define CL(n) (n * 64)
+//     __builtin_prefetch((void*)( ((char*)cur) + CL(0) ));
+//     __builtin_prefetch((void*)( ((char*)cur) + CL(1) ));
+//     __builtin_prefetch((void*)( ((char*)cur) + CL(2) ));
+//     __builtin_prefetch((void*)( ((char*)cur) + CL(3) ));
+//     __builtin_prefetch((void*)( ((char*)cur) + CL(4) ));
+//     __builtin_prefetch((void*)( ((char*)cur) + CL(5) ));
+//     __builtin_prefetch((void*)( ((char*)cur) + CL(6) ));
+//     __builtin_prefetch((void*)( ((char*)cur) + CL(7) ));
 
-    int inc = 0;
-#if 1
-    SIM_TYPE tombstone = bitmask.v;
-    SIM_TYPE inval = _mm512_set1_epi64(0);
+//     int inc = 0;
+// #if 1
+//     SIM_TYPE tombstone = bitmask.v;
+//     SIM_TYPE inval = _mm512_set1_epi64(0);
 
-    simd64_t keys;
-    keys.v = _mm512_set1_epi64(key);
-    //offsets.v = _mm512_set1_epi64(0);
-    //val_offsets.v = _mm512_set1_epi64(0);
+//     simd64_t keys;
+//     keys.v = _mm512_set1_epi64(key);
+//     //offsets.v = _mm512_set1_epi64(0);
+//     //val_offsets.v = _mm512_set1_epi64(0);
 
-        simd64_t ent_keys, ent_vals;
-#if 1
+//         simd64_t ent_keys, ent_vals;
+// #if 1
 
-        ent_keys.v = _mm512_i64gather_epi64(offsets0.v, (void*)cur, 1);
+//         ent_keys.v = _mm512_i64gather_epi64(offsets0.v, (void*)cur, 1);
 
-        __mmask8 res = _mm512_cmpeq_epi64_mask(keys.v,
-                            _mm512_i64gather_epi64(offsets0.v, (void*)cur, 1));
+//         __mmask8 res = _mm512_cmpeq_epi64_mask(keys.v,
+//                             _mm512_i64gather_epi64(offsets0.v, (void*)cur, 1));
 
-        // Now also mask which entries are valid
-        ent_vals.v = _mm512_i64gather_epi64(voffsets0.v, (void*)cur, 1);
-        ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
-
-
-        __mmask8 is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
-        __mmask8 is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
-
-        // Remove things from the res mask
-        res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
-
-        if (countSetBits(res) == 1) {
-            // Find the one remaining thing
-            uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets0.v);
-            *ent_return = (hash_ent_t*)(((char*)cur) + offset);
-            return node_index + (uint32_t)offset;
-        } 
-
-        //---------------------------------------------------------------------
-
-        ent_keys.v = _mm512_i64gather_epi64(offsets1.v, (void*)cur, 1);
-
-        res = _mm512_cmpeq_epi64_mask(keys.v,
-                            _mm512_i64gather_epi64(offsets1.v, (void*)cur, 1));
-
-        // Now also mask which entries are valid
-        ent_vals.v = _mm512_i64gather_epi64(voffsets1.v, (void*)cur, 1);
-        ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
+//         // Now also mask which entries are valid
+//         ent_vals.v = _mm512_i64gather_epi64(voffsets0.v, (void*)cur, 1);
+//         ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
 
 
-        is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
-        is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
+//         __mmask8 is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
+//         __mmask8 is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
 
-        // Remove things from the res mask
-        res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
+//         // Remove things from the res mask
+//         res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
 
-        if (countSetBits(res) == 1) {
-            // Find the one remaining thing
-            uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets1.v);
-            *ent_return = (hash_ent_t*)(((char*)cur) + offset);
-            return node_index + (uint32_t)offset;
-        } 
+//         if (countSetBits(res) == 1) {
+//             // Find the one remaining thing
+//             uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets0.v);
+//             *ent_return = (hash_ent_t*)(((char*)cur) + offset);
+//             return node_index + (uint32_t)offset;
+//         } 
 
-        //---------------------------------------------------------------------
+//         //---------------------------------------------------------------------
 
-        ent_keys.v = _mm512_i64gather_epi64(offsets2.v, (void*)cur, 1);
+//         ent_keys.v = _mm512_i64gather_epi64(offsets1.v, (void*)cur, 1);
 
-        res = _mm512_cmpeq_epi64_mask(keys.v,
-                            _mm512_i64gather_epi64(offsets2.v, (void*)cur, 1));
+//         res = _mm512_cmpeq_epi64_mask(keys.v,
+//                             _mm512_i64gather_epi64(offsets1.v, (void*)cur, 1));
 
-        // Now also mask which entries are valid
-        ent_vals.v = _mm512_i64gather_epi64(voffsets2.v, (void*)cur, 1);
-        ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
-
-
-        is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
-        is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
-
-        // Remove things from the res mask
-        res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
-
-        if (countSetBits(res) == 1) {
-            // Find the one remaining thing
-            uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets2.v);
-            *ent_return = (hash_ent_t*)(((char*)cur) + offset);
-            return node_index + (uint32_t)offset;
-        } 
-
-        //---------------------------------------------------------------------
-
-        ent_keys.v = _mm512_i64gather_epi64(offsets3.v, (void*)cur, 1);
-
-        res = _mm512_cmpeq_epi64_mask(keys.v,
-                            _mm512_i64gather_epi64(offsets3.v, (void*)cur, 1));
-
-        // Now also mask which entries are valid
-        ent_vals.v = _mm512_i64gather_epi64(voffsets3.v, (void*)cur, 1);
-        ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
+//         // Now also mask which entries are valid
+//         ent_vals.v = _mm512_i64gather_epi64(voffsets1.v, (void*)cur, 1);
+//         ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
 
 
-        is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
-        is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
+//         is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
+//         is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
 
-        // Remove things from the res mask
-        res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
+//         // Remove things from the res mask
+//         res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
 
-        if (countSetBits(res) == 1) {
-            // Find the one remaining thing
-            uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets3.v);
-            *ent_return = (hash_ent_t*)(((char*)cur) + offset);
-            return node_index + (uint32_t)offset;
-        } 
+//         if (countSetBits(res) == 1) {
+//             // Find the one remaining thing
+//             uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets1.v);
+//             *ent_return = (hash_ent_t*)(((char*)cur) + offset);
+//             return node_index + (uint32_t)offset;
+//         } 
 
-        //---------------------------------------------------------------------
+//         //---------------------------------------------------------------------
 
-        ent_keys.v = _mm512_i64gather_epi64(offsets4.v, (void*)cur, 1);
+//         ent_keys.v = _mm512_i64gather_epi64(offsets2.v, (void*)cur, 1);
 
-        res = _mm512_cmpeq_epi64_mask(keys.v,
-                            _mm512_i64gather_epi64(offsets4.v, (void*)cur, 1));
+//         res = _mm512_cmpeq_epi64_mask(keys.v,
+//                             _mm512_i64gather_epi64(offsets2.v, (void*)cur, 1));
 
-        // Now also mask which entries are valid
-        ent_vals.v = _mm512_i64gather_epi64(voffsets4.v, (void*)cur, 1);
-        ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
+//         // Now also mask which entries are valid
+//         ent_vals.v = _mm512_i64gather_epi64(voffsets2.v, (void*)cur, 1);
+//         ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
 
 
-        is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
-        is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
+//         is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
+//         is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
 
-        // Remove things from the res mask
-        res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
+//         // Remove things from the res mask
+//         res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
 
-        if (countSetBits(res) == 1) {
-            // Find the one remaining thing
-            uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets4.v);
-            *ent_return = (hash_ent_t*)(((char*)cur) + offset);
-            return node_index + (uint32_t)offset;
-        } 
+//         if (countSetBits(res) == 1) {
+//             // Find the one remaining thing
+//             uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets2.v);
+//             *ent_return = (hash_ent_t*)(((char*)cur) + offset);
+//             return node_index + (uint32_t)offset;
+//         } 
 
-        return 0;
-#else
-        for (int i = 0; i < SIM_W; ++i) {
-            offsets.a[i] = simd_offsets[(inc * SIM_W) + i];
-            val_offsets.a[i] = simd_offsets[(inc * SIM_W) + i] + 8;
-        }
-        inc++;
+//         //---------------------------------------------------------------------
 
-        keys.v = _mm_set1_epi64x(key);
+//         ent_keys.v = _mm512_i64gather_epi64(offsets3.v, (void*)cur, 1);
 
-        ent_keys.v = _mm_i64gather_epi64((int64_t*)cur, offsets.v, 1);
-        //ent_keys.v = _mm512_i64gather_epi64(offsets.v, (void*)cur, 1);
+//         res = _mm512_cmpeq_epi64_mask(keys.v,
+//                             _mm512_i64gather_epi64(offsets3.v, (void*)cur, 1));
 
-        __mmask8 res = _mm_cmpeq_epi64_mask(keys.v, ent_keys.v);
+//         // Now also mask which entries are valid
+//         ent_vals.v = _mm512_i64gather_epi64(voffsets3.v, (void*)cur, 1);
+//         ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
 
-        // Now also mask which entries are valid
-        //ent_vals.v = _mm_i64gather_epi64(val_offsets.v, (void*)cur, 1);
-        ent_vals.v = _mm_i64gather_epi64((void*)cur, val_offsets.v, 1);
-        //SIM_TYPE bitmask = _mm_set1_epi64(0x0000FFFFFFFFFFFF);
-        SIM_TYPE bitmask = _mm_set1_epi64x(0x0000FFFFFFFFFFFF);
-        //ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask);
-        ent_vals.v = _mm_and_si128(ent_vals.v, bitmask);
 
-        SIM_TYPE tombstone = bitmask;
-        SIM_TYPE inval = _mm_set1_epi64x(0);
+//         is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
+//         is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
 
-        __mmask8 is_tomb = _mm_cmpeq_epi64_mask(ent_vals.v, tombstone);
-        __mmask8 is_empty = _mm_cmpeq_epi64_mask(ent_vals.v, inval);
+//         // Remove things from the res mask
+//         res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
 
-        // Remove things from the res mask
-        res = _kandn_mask8(is_tomb, res);
-        res = _kandn_mask8(is_empty, res);
+//         if (countSetBits(res) == 1) {
+//             // Find the one remaining thing
+//             uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets3.v);
+//             *ent_return = (hash_ent_t*)(((char*)cur) + offset);
+//             return node_index + (uint32_t)offset;
+//         } 
 
-        if (countSetBits(res) == 1) {
-            // Find the one remaining thing
-            //uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets.v);
-            offsets.v = _mm_maskz_compress_epi64(res, offsets.v);
-            uint64_t offset = offsets.a[0];
-            *ent_return = (hash_ent_t*)(((char*)cur) + offset);
-            return node_index + (uint32_t)offset;
-        } else if (countSetBits(is_tomb) == 0) {
-            return 0;
-        }
-#endif
-#endif
+//         //---------------------------------------------------------------------
 
-    return 0;
-}
+//         ent_keys.v = _mm512_i64gather_epi64(offsets4.v, (void*)cur, 1);
+
+//         res = _mm512_cmpeq_epi64_mask(keys.v,
+//                             _mm512_i64gather_epi64(offsets4.v, (void*)cur, 1));
+
+//         // Now also mask which entries are valid
+//         ent_vals.v = _mm512_i64gather_epi64(voffsets4.v, (void*)cur, 1);
+//         ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask.v);
+
+
+//         is_tomb = _mm512_cmpeq_epi64_mask(ent_vals.v, tombstone);
+//         is_empty = _mm512_cmpeq_epi64_mask(ent_vals.v, inval);
+
+//         // Remove things from the res mask
+//         res = _kandn_mask8(is_tomb, _kandn_mask8(is_empty, res));
+
+//         if (countSetBits(res) == 1) {
+//             // Find the one remaining thing
+//             uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets4.v);
+//             *ent_return = (hash_ent_t*)(((char*)cur) + offset);
+//             return node_index + (uint32_t)offset;
+//         } 
+
+//         return 0;
+// #else
+//         for (int i = 0; i < SIM_W; ++i) {
+//             offsets.a[i] = simd_offsets[(inc * SIM_W) + i];
+//             val_offsets.a[i] = simd_offsets[(inc * SIM_W) + i] + 8;
+//         }
+//         inc++;
+
+//         keys.v = _mm_set1_epi64x(key);
+
+//         ent_keys.v = _mm_i64gather_epi64((int64_t*)cur, offsets.v, 1);
+//         //ent_keys.v = _mm512_i64gather_epi64(offsets.v, (void*)cur, 1);
+
+//         __mmask8 res = _mm_cmpeq_epi64_mask(keys.v, ent_keys.v);
+
+//         // Now also mask which entries are valid
+//         //ent_vals.v = _mm_i64gather_epi64(val_offsets.v, (void*)cur, 1);
+//         ent_vals.v = _mm_i64gather_epi64((void*)cur, val_offsets.v, 1);
+//         //SIM_TYPE bitmask = _mm_set1_epi64(0x0000FFFFFFFFFFFF);
+//         SIM_TYPE bitmask = _mm_set1_epi64x(0x0000FFFFFFFFFFFF);
+//         //ent_vals.v = _mm512_and_epi64(ent_vals.v, bitmask);
+//         ent_vals.v = _mm_and_si128(ent_vals.v, bitmask);
+
+//         SIM_TYPE tombstone = bitmask;
+//         SIM_TYPE inval = _mm_set1_epi64x(0);
+
+//         __mmask8 is_tomb = _mm_cmpeq_epi64_mask(ent_vals.v, tombstone);
+//         __mmask8 is_empty = _mm_cmpeq_epi64_mask(ent_vals.v, inval);
+
+//         // Remove things from the res mask
+//         res = _kandn_mask8(is_tomb, res);
+//         res = _kandn_mask8(is_empty, res);
+
+//         if (countSetBits(res) == 1) {
+//             // Find the one remaining thing
+//             //uint64_t offset = _mm512_mask_reduce_add_epi64(res, offsets.v);
+//             offsets.v = _mm_maskz_compress_epi64(res, offsets.v);
+//             uint64_t offset = offsets.a[0];
+//             *ent_return = (hash_ent_t*)(((char*)cur) + offset);
+//             return node_index + (uint32_t)offset;
+//         } else if (countSetBits(is_tomb) == 0) {
+//             return 0;
+//         }
+// #endif
+// #endif
+
+//     return 0;
+// }
 
 static void 
-nvm_hash_table_update_internal(nvm_hash_idx_t *hash_table,
-                               hash_ent_t     *ent,
+nvm_hash_table_update_internal(PMEMobjpool *hash_table,
+                               hash_ent_t     ent,
                                uint32_t        node_index,
                                size_t          new_range) 
 {
@@ -734,9 +664,11 @@ nvm_hash_table_update_internal(nvm_hash_idx_t *hash_table,
 #endif
 }
 // Very similar to lookup, but we also update the entry at the end.
-int nvm_hash_table_update(nvm_hash_idx_t *hash_table,
+int nvm_hash_table_update(PMEMobjpool *pop,
                           paddr_t         key,
                           size_t          new_range) {
+  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
+  TOID(hash_ent_t) entries;
   uint32_t node_index;
   uint32_t hash_value;
 #ifdef SEQ_STEP
@@ -744,10 +676,16 @@ int nvm_hash_table_update(nvm_hash_idx_t *hash_table,
 #else
   uint32_t step = 0;
 #endif
-  hash_ent_t *buffer;
-  hash_ent_t *cur;
-
-  hash_value = hash_table->hash_func(key);
+  int mod;
+  hash_ent_t buffer;
+  hash_ent_t cur;
+  TX_BEGIN(pop) {
+    entries = D_RO(ht)->entries;
+    mod = D_RO(ht)->mod;
+    hash_value = D_RO(ht)->hash_func(key);
+    node_index = hash_value % mod;
+    cur = D_RO(entries)[node_index];
+  } TX_END
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
@@ -756,17 +694,17 @@ int nvm_hash_table_update(nvm_hash_idx_t *hash_table,
 
   //pthread_rwlock_rdlock(hash_table->cache_lock);
 
-  node_index = hash_value % hash_table->mod;
+  
   //node_index = hash_value & hash_table->mask;
-  if (hash_table->do_lock) pthread_rwlock_rdlock(hash_table->locks + node_index);
+  //if (hash_table->do_lock) pthread_rwlock_rdlock(hash_table->locks + node_index);
 
-  nvm_read_entry(hash_table, node_index, &cur, false);
+  //nvm_read_entry(hash_table, node_index, &cur, false);
   //cur = hash_table->cache[BLK_NUM(node_index)][BLK_IDX(node_index)];
 
-  while (!HASH_ENT_IS_EMPTY(*cur)) {
-    if (cur->key == key && HASH_ENT_IS_VALID(*cur)) {
-      nvm_hash_table_update_internal(hash_table, cur, node_index, new_range);
-      if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
+  while (!HASH_ENT_IS_EMPTY(cur)) {
+    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
+      nvm_hash_table_update_internal(pop, cur, node_index, new_range);
+      //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
       //pthread_rwlock_unlock(hash_table->cache_lock);
       return 1;
     } 
@@ -774,16 +712,18 @@ int nvm_hash_table_update(nvm_hash_idx_t *hash_table,
     step++;
 #endif
     //uint32_t new_idx = (node_index + step) & hash_table->mask;
-    uint32_t new_idx = (node_index + step) % hash_table->mod;
-    if (hash_table->do_lock) {
-      pthread_rwlock_unlock(hash_table->locks + node_index);
-      pthread_rwlock_rdlock(hash_table->locks + new_idx);
-    }
+    uint32_t new_idx = (node_index + step) % mod;
+    // if (hash_table->do_lock) {
+    //   pthread_rwlock_unlock(hash_table->locks + node_index);
+    //   pthread_rwlock_rdlock(hash_table->locks + new_idx);
+    // }
     node_index = new_idx;
-    nvm_read_entry(hash_table, node_index, &cur, false);
+    TX_BEGIN(pop) {
+      cur = D_RO(entries)[node_index];
+    } TX_END
   }
 
-  if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
+  //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
 
   //pthread_rwlock_unlock(hash_table->cache_lock);
   return 0;
@@ -801,17 +741,17 @@ int nvm_hash_table_update(nvm_hash_idx_t *hash_table,
  * If @notify is %TRUE then the destroy notify functions are called
  * for the key and value of the hash node.
  */
-static void nvm_hash_table_remove_node (nvm_hash_idx_t  *hash_table,
+static void nvm_hash_table_remove_node (PMEMobjpool  *pop,
                                         int              i,
                                         paddr_t         *pblk,
                                         size_t          *old_precursor,
                                         size_t          *old_size) {
-  hash_ent_t *ent;
-
+  hash_ent_t ent;
+  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
+  TOID(hash_ent_t) entries;
   //pthread_rwlock_wrlock(hash_table->locks + i);
-
-  nvm_read_entry(hash_table, i, &ent, true);
-  *pblk = HASH_ENT_VAL(*ent);
+  // nvm_read_entry(hash_table, i, &ent, true);
+  // *pblk = HASH_ENT_VAL(*ent);
 #ifdef SIMPLE_ENTRIES
   *old_size = 1;
   *old_precursor = 0;
@@ -820,16 +760,19 @@ static void nvm_hash_table_remove_node (nvm_hash_idx_t  *hash_table,
   *old_precursor = (size_t)ent->index;
 #endif
 
-  HASH_ENT_SET_TOMBSTONE(*ent);
+  // HASH_ENT_SET_TOMBSTONE(*ent);
 #ifndef SIMPLE_ENTRIES
   ent->size = 0;
   ent->index = 0;
 #endif
-
+  TX_BEGIN(pop) {
+    TX_ADD(ht);
+    entries = D_RO(ht)->entries;
+    *pblk = D_RO(entries)[i].value;
+    D_RW(entries)[i].value = (paddr_t) ~0;
+    D_RW(ht)->nnodes = D_RO(ht)->nnodes - 1;
+  } TX_END
   /* Erect tombstone */
-  nvm_update(hash_table, i);
-
-  hash_table->nnodes--;
 
   //pthread_rwlock_unlock(hash_table->locks + i);
 }
@@ -883,106 +826,87 @@ nvm_hash_table_maybe_resize (nvm_hash_idx_t *hash_table) {
  *
  * Returns: a new #nvm_hash_idx_t
  */
-nvm_hash_idx_t *
+PMEMobjpool *
 nvm_hash_table_new(hash_func_t       hash_func,
-                   size_t            max_entries,
-                   size_t            block_size,
-                   size_t            range_size,
-                   paddr_t           metadata_location,
-                   const idx_spec_t *idx_spec) {
-  nvm_hash_idx_t *ht;
+                   char* filename,
+                   size_t            max_entries
+                   //size_t            block_size,
+                   //size_t            range_size,
+                   //paddr_t           metadata_location,
+                   //const idx_spec_t *idx_spec
+                   ) {
 
-  ht = MALLOC(idx_spec, sizeof(*ht));
+  PMEMobjpool *pop;
+  if(pmemobj_check(filename, POBJ_LAYOUT_NAME(hash_layout)) != 1) {
+    pop = pmemobj_create(filename, POBJ_LAYOUT_NAME(hash_layout), PMEMOBJ_MIN_POOL, 0666);
+  }
+  else {
+    pop = pmemobj_open(filename, POBJ_LAYOUT_NAME(hash_layout));
+    TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
+    TX_BEGIN(pop) {
+      TX_ADD(ht);
+      D_RW(ht)->hash_func = hash_func ? hash_func : nvm_idx_direct_hash;
+    } TX_END
+    
 
-  if_then_panic(ht == NULL, "malloc callback failed!");
-#if 0
-  printf("max_entries %llu, block size %llu, range_size %llu, "
-         "metadata block %llu\n", max_entries, block_size, range_size,
-         metadata_location);
-#endif
-  //max_entries *= 1.1;
-
-  ht->hash_func          = hash_func ? hash_func : nvm_idx_direct_hash;
-  ht->ref_count          = 1;
-  ht->nnodes             = 0;
-  ht->noccupied          = 0;
-  ht->blksz              = block_size;
-  // Number of entries in nvram.
-  ht->nvram_size         = max_entries / range_size;
-  ht->range_size         = range_size;
-  ht->idx_callbacks      = idx_spec->idx_callbacks;
-  ht->idx_mem_man        = idx_spec->idx_mem_man;
-  ht->metadata           = metadata_location;
-
-  memset(&(ht->stats), 0, sizeof(ht->stats));
-  ht->enable_stats = false;
-
-  if (max_entries % range_size) {
-    // If there's a partial range, need to not under-allocate.
-    ht->nvram_size++;
+    return pop;
   }
 
-  //nvm_hash_table_set_shift_from_size(ht, ht->nvram_size);
-  //printf("--------%llx\n", ht->mask);
-  // Make sure the mod size doesn't go out of range.
-  //ht->nvram_size = max(ht->nvram_size, ht->size);
-  ht->mod = ht->nvram_size;
-  printf("--------%llx\n", ht->mod);
-  size_t scaled_size = ht->nvram_size;
+  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
+  TX_BEGIN(pop) {
+    TX_ADD(ht);
+    
+    D_RW(ht)->entries = TX_ALLOC(hash_ent_t, sizeof(hash_ent_t) * max_entries);
+    D_RW(ht)->hash_func = hash_func ? hash_func : nvm_idx_direct_hash;
+    D_RW(ht)->nnodes = 0;
+    D_RW(ht)->noccupied = 0;
+    D_RW(ht)->mod = max_entries;
+    D_RW(ht)->size = max_entries;
+    D_RW(ht)->mask = 127; //deprecated? 6/18/2019
+    
+  } TX_END
 
-  if (max_entries < scaled_size) {
-    max_entries = scaled_size;
-  }
 
-  size_t nblocks = BLK_NUM(ht, scaled_size);
-  if (BLK_IDX(ht, scaled_size)) {
-    // Partial block.
-    nblocks++;
-  }
-  ht->nblocks = nblocks;
+  // // initialize read-writer locks
+  // ht->locks = MALLOC(idx_spec, max_entries * sizeof(pthread_rwlock_t));
+  // assert(ht->locks);
+  // for (size_t i = 0; i < max_entries; ++i) {
+  //   int err = pthread_rwlock_init(ht->locks + i, NULL);
+  //   if_then_panic(err, "Could not init rwlock!");
+  // }
 
-  size_t entries_per_block = block_size / sizeof(hash_ent_t);
+  // // init metadata lock
+  // ht->metalock = MALLOC(idx_spec, sizeof(pthread_mutex_t));
+  // assert(ht->metalock);
+  // pthread_mutex_init(ht->metalock, NULL);
 
-  // initialize read-writer locks
-  ht->locks = MALLOC(idx_spec, max_entries * sizeof(pthread_rwlock_t));
-  assert(ht->locks);
-  for (size_t i = 0; i < max_entries; ++i) {
-    int err = pthread_rwlock_init(ht->locks + i, NULL);
-    if_then_panic(err, "Could not init rwlock!");
-  }
+  //   if (!nvm_read_metadata(ht)) {
+  //       ssize_t nalloc = CB(idx_spec, cb_alloc_metadata, nblocks, &(ht->data));
+  //       if_then_panic(nalloc < nblocks, "no large contiguous region!");
 
-  // init metadata lock
-  ht->metalock = MALLOC(idx_spec, sizeof(pthread_mutex_t));
-  assert(ht->metalock);
-  pthread_mutex_init(ht->metalock, NULL);
+  //       nvm_write_metadata(ht);
+  //   }
 
-    if (!nvm_read_metadata(ht)) {
-        ssize_t nalloc = CB(idx_spec, cb_alloc_metadata, nblocks, &(ht->data));
-        if_then_panic(nalloc < nblocks, "no large contiguous region!");
+  // ssize_t perr = CB(ht, cb_get_addr, ht->data, 0, &(ht->data_ptr));
+  // if_then_panic(perr, "Could not get data_ptr!");
+  // // -- CACHING
+  // ht->do_cache = false;
+  // ht->do_lock  = false;
+  // // cache lock
+  // ht->cache_lock = MALLOC(idx_spec, sizeof(pthread_rwlock_t));
+  // assert(ht->cache_lock);
+  // int err = pthread_rwlock_init(ht->cache_lock, NULL);
+  // if_then_panic(err, "Could not init rwlock!");
 
-        nvm_write_metadata(ht);
-    }
+  // ht->cache = MALLOC(idx_spec, max_entries * sizeof(hash_ent_t));
+  // assert(ht->cache);
 
-  ssize_t perr = CB(ht, cb_get_addr, ht->data, 0, &(ht->data_ptr));
-  if_then_panic(perr, "Could not get data_ptr!");
-  // -- CACHING
-  ht->do_cache = false;
-  ht->do_lock  = false;
-  // cache lock
-  ht->cache_lock = MALLOC(idx_spec, sizeof(pthread_rwlock_t));
-  assert(ht->cache_lock);
-  int err = pthread_rwlock_init(ht->cache_lock, NULL);
-  if_then_panic(err, "Could not init rwlock!");
-
-  ht->cache = MALLOC(idx_spec, max_entries * sizeof(hash_ent_t));
-  assert(ht->cache);
-
-  // allocate cache bitmap -- unset for valid, set for invalid
-  //size_t cache_bitmap_size = (max_entries / BITS_PER_LONG) * sizeof(unsigned long);
-  size_t cache_state_size = max_entries * sizeof(int8_t);
-  ht->cache_state = ZALLOC(ht, cache_state_size);
-  assert(ht->cache_state);
-  memset(ht->cache_state, -1, cache_state_size);
+  // // allocate cache bitmap -- unset for valid, set for invalid
+  // //size_t cache_bitmap_size = (max_entries / BITS_PER_LONG) * sizeof(unsigned long);
+  // size_t cache_state_size = max_entries * sizeof(int8_t);
+  // ht->cache_state = ZALLOC(ht, cache_state_size);
+  // assert(ht->cache_state);
+  // memset(ht->cache_state, -1, cache_state_size);
 
 #if 0
   for (int i = 0; i < nblocks; ++i) {
@@ -993,7 +917,7 @@ nvm_hash_table_new(hash_func_t       hash_func,
   }
 #endif
 
-  return ht;
+  return pop;
 }
 
 /*
@@ -1015,29 +939,39 @@ nvm_hash_table_new(hash_func_t       hash_func,
  * Returns: %TRUE if the key did not exist yet
  */
 static int
-nvm_hash_table_insert_node(nvm_hash_idx_t *hash_table,
+nvm_hash_table_insert_node(PMEMobjpool *pop,
                            uint32_t node_index, uint32_t key_hash,
-                           paddr_t new_key, paddr_t new_value, 
-                           size_t new_index, size_t new_range)
+                           paddr_t new_key, paddr_t new_value
+                           //, size_t new_index, size_t new_range
+                           )
 {
+  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
+  TOID(hash_ent_t) entries;
   int already_exists;
-  hash_ent_t *ent;
-
-  nvm_read_entry(hash_table, node_index, &ent, false);
-  already_exists = HASH_ENT_IS_VALID(*ent);
+  hash_ent_t ent;
+  TX_BEGIN(pop) {
+    // TX_ADD(ht);
+    entries = D_RO(ht)->entries;
+    ent = D_RO(entries)[node_index];
+  } TX_END
+  already_exists = HASH_ENT_IS_VALID(ent);
 
   // todo consider bookkeeping (nnodes, noccupied?)
-  if (unlikely(already_exists)) {
+  if (already_exists) {
     printf("already exists: %lx %lx (trying to insert: %lx %lx)\n",
-        ent->key, HASH_ENT_VAL(*ent), new_key, new_value);
+        ent.key, HASH_ENT_VAL(ent), new_key, new_value);
   } else {
-    ent->key = new_key;
-    HASH_ENT_SET_VAL(*ent, new_value);
+    TX_BEGIN(pop) {
+      TX_ADD(ht);
+      D_RW(entries)[node_index].key = new_key;
+      D_RW(entries)[node_index].value = new_value;
+      D_RW(ht)->nnodes = D_RO(ht)->nnodes + 1;
+    } TX_END
+
 #ifndef SIMPLE_ENTRIES
     ent->index = new_index;
     ent->size = new_range;
 #endif
-    nvm_update(hash_table, node_index);
   }
 
   return !already_exists;
@@ -1052,16 +986,16 @@ nvm_hash_table_insert_node(nvm_hash_idx_t *hash_table,
  * you should either free them first or create the #nvm_hash_idx_t with destroy
  * destruction phase.
  */
-void
-nvm_hash_table_destroy (nvm_hash_idx_t *hash_table)
-{
-  assert (hash_table != NULL);
+// void
+// nvm_hash_table_destroy (nvm_hash_idx_t *hash_table)
+// {
+//   assert (hash_table != NULL);
 
-  for (size_t i = 0; i < hash_table->nvram_size; ++i) {
-    int err = pthread_rwlock_destroy(hash_table->locks + i);
-    if (err) panic("Could not destroy rwlock!");
-  }
-}
+//   for (size_t i = 0; i < hash_table->nvram_size; ++i) {
+//     int err = pthread_rwlock_destroy(hash_table->locks + i);
+//     if (err) panic("Could not destroy rwlock!");
+//   }
+// }
 
 /**
  * nvm_hash_table_lookup:
@@ -1075,13 +1009,16 @@ nvm_hash_table_destroy (nvm_hash_idx_t *hash_table)
  *
  * Returns: (nullable): the associated value, or %NULL if the key is not found
  */
-void nvm_hash_table_lookup(nvm_hash_idx_t *hash_table, paddr_t key,
-    paddr_t *val, paddr_t *size, bool force) {
+void nvm_hash_table_lookup(PMEMobjpool *pop, paddr_t key,
+    paddr_t *val, paddr_t *size/*, bool force*/) {
   uint32_t node_index;
-  uint32_t hash_return;
+  uint32_t *hash_return;
   hash_ent_t *ent;
 
-  assert(hash_table != NULL);
+  hash_return = (uint32_t *)malloc(sizeof(uint32_t));
+  ent = (hash_ent_t*)malloc(sizeof(hash_ent_t));
+
+  assert(pop != NULL);
 #if 0
   if (!hash_table->do_lock) {
       node_index = nvm_hash_table_lookup_node_simd(hash_table, key, &ent, &hash_return, 0);
@@ -1089,12 +1026,10 @@ void nvm_hash_table_lookup(nvm_hash_idx_t *hash_table, paddr_t key,
       node_index = nvm_hash_table_lookup_node(hash_table, key, &ent, &hash_return, force);
   }
 #else
-  node_index = nvm_hash_table_lookup_node(hash_table, key, &ent, &hash_return, force);
+  node_index = nvm_hash_table_lookup_node(pop, key, ent, hash_return/*,force*/);
 #endif
 
   //pthread_rwlock_rdlock(hash_table->locks + node_index);
-
-  if (ent) {
   paddr_t ent_val = HASH_ENT_VAL(*ent);
   *val = !HASH_ENT_IS_TOMBSTONE(*ent) ? ent_val : 0;
 #ifdef SIMPLE_ENTRIES
@@ -1102,10 +1037,9 @@ void nvm_hash_table_lookup(nvm_hash_idx_t *hash_table, paddr_t key,
 #else
   *size = ent->size;
 #endif
-  } else {
-      *val = 0;
-      *size = 1;
-  }
+
+free(ent);
+free(hash_return);
 
   //pthread_rwlock_unlock(hash_table->locks + node_index);
 }
@@ -1129,13 +1063,15 @@ void nvm_hash_table_lookup(nvm_hash_idx_t *hash_table, paddr_t key,
  * Returns: %TRUE if the key did not exist yet
  */
 static inline int
-nvm_hash_table_insert_internal (nvm_hash_idx_t *hash_table,
+nvm_hash_table_insert_internal (PMEMobjpool *pop,
                                 paddr_t    key,
-                                paddr_t    value,
-                                size_t     index,
-                                size_t     size)
+                                paddr_t    value//,
+                                //size_t     index,
+                                //size_t     size
+                                )
 {
-  assert(hash_table != NULL);
+  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
+  TOID(hash_ent_t) entries;
   /*
    * iangneal: for concurrency reasons, we can't do lookup -> insert, as another
    * thread may come in and use the slot we just looked for.
@@ -1145,17 +1081,21 @@ nvm_hash_table_insert_internal (nvm_hash_idx_t *hash_table,
   uint32_t hash_value;
   uint32_t first_tombstone = 0;
   int have_tombstone = FALSE;
+  int mod;
 #ifdef SEQ_STEP
   uint32_t step = 1;
 #else
   uint32_t step = 0;
 #endif
-  hash_ent_t *buffer;
-  hash_ent_t *cur;
-
-  assert (hash_table->ref_count > 0);
-
-  hash_value = hash_table->hash_func(key);
+  hash_ent_t buffer;
+  hash_ent_t cur;
+  TX_BEGIN(pop) {
+    entries = D_RO(ht)->entries;
+    mod = D_RO(ht)->mod;
+    hash_value = D_RO(ht)->hash_func(key);
+    node_index = hash_value % mod;
+    cur = D_RO(entries)[node_index];
+  } TX_END
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
@@ -1163,47 +1103,48 @@ nvm_hash_table_insert_internal (nvm_hash_idx_t *hash_table,
 #endif
   //pthread_rwlock_rdlock(hash_table->cache_lock);
 
-  node_index = hash_value % hash_table->mod;
+  
   //node_index = hash_value & hash_table->mask;
-  if (hash_table->do_lock) pthread_rwlock_wrlock(hash_table->locks + node_index);
+  //if (hash_table->do_lock) pthread_rwlock_wrlock(hash_table->locks + node_index);
 
-  nvm_read_entry(hash_table, node_index, &cur, false);
+  // nvm_read_entry(hash_table, node_index, &cur, false);
 
-    __builtin_prefetch((void*)( ((char*)cur) + 64 ), 1);
-    __builtin_prefetch((void*)( ((char*)cur) + 128 ), 1);
-    __builtin_prefetch((void*)( ((char*)cur) + 192 ), 1);
-    __builtin_prefetch((void*)( ((char*)cur) + 256 ), 1);
+  //   __builtin_prefetch((void*)( ((char*)cur) + 64 ), 1);
+  //   __builtin_prefetch((void*)( ((char*)cur) + 128 ), 1);
+  //   __builtin_prefetch((void*)( ((char*)cur) + 192 ), 1);
+  //   __builtin_prefetch((void*)( ((char*)cur) + 256 ), 1);
 
-  while (!HASH_ENT_IS_EMPTY(*cur)) {
-    if (cur->key == key && HASH_ENT_IS_VALID(*cur)) {
+  while (!HASH_ENT_IS_EMPTY(cur)) {
+    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
       break;
-    } else if (HASH_ENT_IS_TOMBSTONE(*cur) && !have_tombstone) {
+    } else if (HASH_ENT_IS_TOMBSTONE(cur) && !have_tombstone) {
       // keep lock until we decide we don't need it
       first_tombstone = node_index;
       have_tombstone = TRUE;
     } else {
-      if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
+      //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
     }
 #ifndef SEQ_STEP
     step++;
 #endif
     //uint32_t new_idx = (node_index + step) & hash_table->mask;
-    uint32_t new_idx = (node_index + step) % hash_table->mod;
-    if (hash_table->do_lock) pthread_rwlock_wrlock(hash_table->locks + new_idx);
+    uint32_t new_idx = (node_index + step) % mod;
+    //if (hash_table->do_lock) pthread_rwlock_wrlock(hash_table->locks + new_idx);
 
     node_index = new_idx;
-    nvm_read_entry(hash_table, node_index, &cur, false);
+    TX_BEGIN(pop) {
+      cur = D_RO(entries)[node_index];
+    } TX_END
   }
 
   if (have_tombstone) {
-    if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
     node_index = first_tombstone;
   }
 
   int res = nvm_hash_table_insert_node(
-      hash_table, node_index, hash_value, key, value, index, size);
+      pop, node_index, hash_value, key, value);//, index, size);
 
-  if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
+  //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
 
   //pthread_rwlock_unlock(hash_table->cache_lock);
   return res;
@@ -1227,13 +1168,14 @@ nvm_hash_table_insert_internal (nvm_hash_idx_t *hash_table,
  * Returns: %TRUE if the key did not exist yet
  */
 int
-nvm_hash_table_insert (nvm_hash_idx_t *hash_table,
+nvm_hash_table_insert (PMEMobjpool *pop,
                        paddr_t     key,
-                       paddr_t     value,
-                       size_t      index,
-                       size_t      size)
+                       paddr_t     value//,
+                       //size_t      index,
+                       //size_t      size
+                       )
 {
-  return nvm_hash_table_insert_internal(hash_table, key, value, index, size);
+  return nvm_hash_table_insert_internal(pop, key, value);//, index, size);
 }
 
 /*
@@ -1250,7 +1192,7 @@ nvm_hash_table_insert (nvm_hash_idx_t *hash_table,
  * destroy notify handlers only if @notify is %TRUE.
  */
 static int
-nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
+nvm_hash_table_remove_internal (PMEMobjpool *pop,
                                 paddr_t         key,
                                 paddr_t        *old_pblk,
                                 size_t         *old_idx,
@@ -1261,19 +1203,29 @@ nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
    * thread may come in and use the slot we just looked for.
    * This is basically a copy of lookup_node, but with write locks.
    */
+  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
+  TOID(hash_ent_t) entries;
   uint32_t node_index;
   uint32_t hash_value;
+  int mod;
 #ifdef SEQ_STEP
   uint32_t step = 1;
 #else
   uint32_t step = 0;
 #endif
-  hash_ent_t *buffer;
-  hash_ent_t *cur;
+  hash_ent_t buffer;
+  hash_ent_t cur;
 
-  assert (hash_table->ref_count > 0);
-
-  hash_value = hash_table->hash_func(key);
+  
+  TX_BEGIN(pop) {
+    //assert(D_RO(ht)->ref_count > 0);
+    entries = D_RO(ht)->entries;
+    
+    mod = D_RO(ht)->mod;
+    hash_value = D_RO(ht)->hash_func(key);
+    node_index = hash_value % mod;
+    cur = D_RO(entries)[node_index];
+  } TX_END
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
@@ -1281,42 +1233,47 @@ nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
 #endif
 
   //pthread_rwlock_rdlock(hash_table->cache_lock);
-  node_index = hash_value % hash_table->mod;
+  node_index = hash_value % mod;
   //node_index = hash_value & hash_table->mask;
-  if (hash_table->do_lock) pthread_rwlock_wrlock(hash_table->locks + node_index);
+  //if (hash_table->do_lock) pthread_rwlock_wrlock(hash_table->locks + node_index);
 
-  nvm_read_entry(hash_table, node_index, &cur, false);
+  //nvm_read_entry(hash_table, node_index, &cur, false);
 
-  while (!HASH_ENT_IS_EMPTY(*cur)) {
-    if (cur->key == key && HASH_ENT_IS_VALID(*cur)) {
+  while (!HASH_ENT_IS_EMPTY(cur)) {
+    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
       break;
     }
 #ifndef SEQ_STEP
     step++;
 #endif
     //uint32_t new_idx = (node_index + step) & hash_table->mask;
-    uint32_t new_idx = (node_index + step) % hash_table->mod;
+    uint32_t new_idx = (node_index + step) % mod;
 
-    if (hash_table->do_lock) {
-      pthread_rwlock_unlock(hash_table->locks + node_index);
-      pthread_rwlock_wrlock(hash_table->locks + new_idx);
-    }
+    // if (hash_table->do_lock) {
+    //   pthread_rwlock_unlock(hash_table->locks + node_index);
+    //   pthread_rwlock_wrlock(hash_table->locks + new_idx);
+    // }
 
-    nvm_read_entry(hash_table, new_idx, &cur, false);
-
+    //nvm_read_entry(hash_table, new_idx, &cur, false);
+    TX_BEGIN(pop) {
+      cur = D_RO(entries)[new_idx];
+    } TX_END
     node_index = new_idx;
   }
-
-  if (HASH_ENT_IS_VALID(*cur)) {
-      nvm_hash_table_remove_node(hash_table, node_index, old_pblk, old_idx, old_size);
-      if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
+  
+  if (HASH_ENT_IS_VALID(cur)) {
+      nvm_hash_table_remove_node(pop, node_index, old_pblk, old_idx, old_size);
+      //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
       return 1;
   }
 
-  if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
+  //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
 
   //pthread_rwlock_unlock(hash_table->cache_lock);
-  return HASH_ENT_IS_VALID(*cur);
+  TX_BEGIN(pop) {
+    cur = D_RO(entries)[node_index];
+  } TX_END
+  return HASH_ENT_IS_VALID(cur);
 }
 
 /**
@@ -1334,13 +1291,13 @@ nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
  * Returns: %TRUE if the key was found and removed from the #nvm_hash_idx_t
  */
 int
-nvm_hash_table_remove (nvm_hash_idx_t *hash_table,
+nvm_hash_table_remove (PMEMobjpool *pop,
                        paddr_t         key,
                        paddr_t        *removed,
                        size_t         *nprevious,
                        size_t         *ncontiguous)
 {
-  return nvm_hash_table_remove_internal(hash_table, key, removed,
+  return nvm_hash_table_remove_internal(pop, key, removed,
                                         nprevious, ncontiguous);
 }
 
@@ -1353,13 +1310,15 @@ nvm_hash_table_remove (nvm_hash_idx_t *hash_table,
  *
  * Returns: the number of key/value pairs in the #nvm_hash_idx_t.
  */
-uint32_t nvm_hash_table_size (nvm_hash_idx_t *hash_table) {
-  assert (hash_table != NULL);
-
-  return hash_table->nnodes;
+uint32_t nvm_hash_table_size (PMEMobjpool *pop) {
+  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
+  uint32_t size = 0;
+  TX_BEGIN(pop) {
+    size = D_RO(ht)->nnodes;
+  } TX_END
+  return size;
 }
 
 /*
  * Hash functions.
  */
-

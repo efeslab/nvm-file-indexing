@@ -6,4 +6,3 @@
 #include "inode_hash.h"
 
 #endif //__NVMIDX_HASHTABLE_HASHTABLE_H__
-
