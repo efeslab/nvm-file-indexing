@@ -1003,14 +1003,11 @@ nvm_hash_table_insert_node(uint32_t node_index, uint32_t key_hash,
  *
  * Returns: (nullable): the associated value, or %NULL if the key is not found
  */
-void nvm_hash_table_lookup(paddr_t key,
+int nvm_hash_table_lookup(paddr_t key,
     paddr_t *val/*, paddr_t *size, bool force*/) {
   uint32_t node_index;
-  uint32_t *hash_return;
-  hash_ent_t *ent;
-
-  hash_return = (uint32_t *)malloc(sizeof(uint32_t));
-  ent = (hash_ent_t*)malloc(sizeof(hash_ent_t));
+  uint32_t hash_return;
+  hash_ent_t ent;
 
   assert(pop != NULL);
 #if 0
@@ -1020,7 +1017,7 @@ void nvm_hash_table_lookup(paddr_t key,
       node_index = nvm_hash_table_lookup_node(hash_table, key, &ent, &hash_return, force);
   }
 #else
-  node_index = nvm_hash_table_lookup_node(key, ent, hash_return/*,force*/);
+  node_index = nvm_hash_table_lookup_node(key, &ent, &hash_return/*,force*/);
 #endif
 
   //pthread_rwlock_rdlock(hash_table->locks + node_index);
@@ -1034,8 +1031,6 @@ void nvm_hash_table_lookup(paddr_t key,
 //   *size = ent->size;
 // #endif
 
-free(ent);
-free(hash_return);
 return success;
   //pthread_rwlock_unlock(hash_table->locks + node_index);
 }
