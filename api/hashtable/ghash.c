@@ -739,22 +739,22 @@ int nvm_hash_table_update(paddr_t         key,
  * for the key and value of the hash node.
  */
 static void nvm_hash_table_remove_node (int              i,
-                                        paddr_t         *pblk,
+                                        /*paddr_t         *pblk,
                                         size_t          *old_precursor,
-                                        size_t          *old_size) {
+                                        size_t          *old_size*/) {
   hash_ent_t ent;
   TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
   TOID(hash_ent_t) entries;
   //pthread_rwlock_wrlock(hash_table->locks + i);
   // nvm_read_entry(hash_table, i, &ent, true);
   // *pblk = HASH_ENT_VAL(*ent);
-#ifdef SIMPLE_ENTRIES
-  *old_size = 1;
-  *old_precursor = 0;
-#else
-  *old_size = (size_t)ent->size;
-  *old_precursor = (size_t)ent->index;
-#endif
+// #ifdef SIMPLE_ENTRIES
+//   *old_size = 1;
+//   *old_precursor = 0;
+// #else
+//   *old_size = (size_t)ent->size;
+//   *old_precursor = (size_t)ent->index;
+// #endif
 
   // HASH_ENT_SET_TOMBSTONE(*ent);
 #ifndef SIMPLE_ENTRIES
@@ -764,7 +764,7 @@ static void nvm_hash_table_remove_node (int              i,
   TX_BEGIN(pop) {
     TX_ADD(ht);
     entries = D_RO(ht)->entries;
-    *pblk = D_RO(entries)[i].value;
+    //*pblk = D_RO(entries)[i].value;
     D_RW(entries)[i].value = (paddr_t) ~0;
     D_RW(ht)->nnodes = D_RO(ht)->nnodes - 1;
   } TX_END
@@ -1004,7 +1004,7 @@ nvm_hash_table_insert_node(uint32_t node_index, uint32_t key_hash,
  * Returns: (nullable): the associated value, or %NULL if the key is not found
  */
 void nvm_hash_table_lookup(paddr_t key,
-    paddr_t *val, paddr_t *size/*, bool force*/) {
+    paddr_t *val/*, paddr_t *size, bool force*/) {
   uint32_t node_index;
   uint32_t *hash_return;
   hash_ent_t *ent;
@@ -1025,16 +1025,18 @@ void nvm_hash_table_lookup(paddr_t key,
 
   //pthread_rwlock_rdlock(hash_table->locks + node_index);
   paddr_t ent_val = HASH_ENT_VAL(*ent);
-  *val = !HASH_ENT_IS_TOMBSTONE(*ent) ? ent_val : 0;
-#ifdef SIMPLE_ENTRIES
-  *size = 1;
-#else
-  *size = ent->size;
-#endif
+  *val = node_index;
+  int success = !HASH_ENT_IS_TOMBSTONE(*ent);
+
+// #ifdef SIMPLE_ENTRIES
+//   *size = 1;
+// #else
+//   *size = ent->size;
+// #endif
 
 free(ent);
 free(hash_return);
-
+return success;
   //pthread_rwlock_unlock(hash_table->locks + node_index);
 }
 
@@ -1058,7 +1060,7 @@ free(hash_return);
  */
 static inline int
 nvm_hash_table_insert_internal (paddr_t    key,
-                                paddr_t    value//,
+                                paddr_t    *index//,
                                 //size_t     index,
                                 //size_t     size
                                 )
@@ -1135,10 +1137,10 @@ nvm_hash_table_insert_internal (paddr_t    key,
   }
 
   int res = nvm_hash_table_insert_node(
-      node_index, hash_value, key, value);//, index, size);
+      node_index, hash_value, key, 1);//, index, size); // value = 1 which means not empty
 
   //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
-
+  *index = node_index;
   //pthread_rwlock_unlock(hash_table->cache_lock);
   return res;
 }
@@ -1162,12 +1164,12 @@ nvm_hash_table_insert_internal (paddr_t    key,
  */
 int
 nvm_hash_table_insert (paddr_t     key,
-                       paddr_t     value//,
+                       paddr_t     *index//,
                        //size_t      index,
                        //size_t      size
                        )
 {
-  return nvm_hash_table_insert_internal(key, value);//, index, size);
+  return nvm_hash_table_insert_internal(key, index);//, index, size);
 }
 
 /*
@@ -1185,9 +1187,10 @@ nvm_hash_table_insert (paddr_t     key,
  */
 static int
 nvm_hash_table_remove_internal (paddr_t         key,
-                                paddr_t        *old_pblk,
-                                size_t         *old_idx,
-                                size_t         *old_size)
+                                paddr_t        *index//,
+                                //size_t         *old_idx,
+                                //size_t         *old_size
+                                )
 {
   /*
    * iangneal: for concurrency reasons, we can't do lookup -> insert, as another
@@ -1253,8 +1256,9 @@ nvm_hash_table_remove_internal (paddr_t         key,
   }
   
   if (HASH_ENT_IS_VALID(cur)) {
-      nvm_hash_table_remove_node(node_index, old_pblk, old_idx, old_size);
+      nvm_hash_table_remove_node(node_index/*, old_pblk, old_idx, old_size*/);
       //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
+      *index = node_index;
       return 1;
   }
 
@@ -1264,6 +1268,7 @@ nvm_hash_table_remove_internal (paddr_t         key,
   TX_BEGIN(pop) {
     cur = D_RO(entries)[node_index];
   } TX_END
+  *index = 0;
   return HASH_ENT_IS_VALID(cur);
 }
 
@@ -1283,12 +1288,14 @@ nvm_hash_table_remove_internal (paddr_t         key,
  */
 int
 nvm_hash_table_remove (paddr_t         key,
-                       paddr_t        *removed,
-                       size_t         *nprevious,
-                       size_t         *ncontiguous)
+                       paddr_t        *removed//,
+                       //size_t         *nprevious,
+                       //size_t         *ncontiguous
+                       )
 {
-  return nvm_hash_table_remove_internal(key, removed,
-                                        nprevious, ncontiguous);
+  return nvm_hash_table_remove_internal(key, removed
+                                        //, nprevious, ncontiguous
+                                        );
 }
 
 

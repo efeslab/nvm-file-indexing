@@ -191,7 +191,7 @@ nvm_hash_table_new (hash_func_t       hash_func,
 //void nvm_hash_table_destroy(nvm_hash_idx_t     *hash_table);
 
 int nvm_hash_table_insert(paddr_t         key,
-                          paddr_t         value//,
+                          paddr_t         *index,
                           //size_t          index,
                           //size_t          range
                           );
@@ -201,12 +201,12 @@ int nvm_hash_table_update(paddr_t         key,
                           size_t          new_range);
 
 int nvm_hash_table_remove(paddr_t         key,
-                          paddr_t        *value,
+                          paddr_t        *value/*,
                           size_t         *nprevious,
-                          size_t         *nblocks);
+                          size_t         *nblocks*/);
 
-void nvm_hash_table_lookup(paddr_t key,
-    paddr_t *val, paddr_t *size/*, bool force*/);
+int nvm_hash_table_lookup(paddr_t key,
+    paddr_t *val/*, paddr_t *size, bool force*/);
 
 int nvm_hash_table_contains(paddr_t key);
 
