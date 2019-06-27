@@ -11,7 +11,7 @@ add_subdirectory(hashtable)
 add_subdirectory(extents)
 add_subdirectory(levelhash)
 add_subdirectory(radixtree)
-add_subdirectory(test)
+# add_subdirectory(test)
 
 file(GLOB api_src
     "*.h"
