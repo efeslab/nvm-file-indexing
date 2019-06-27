@@ -1021,9 +1021,9 @@ int nvm_hash_table_lookup(paddr_t key,
 #endif
 
   //pthread_rwlock_rdlock(hash_table->locks + node_index);
-  paddr_t ent_val = HASH_ENT_VAL(*ent);
+  paddr_t ent_val = HASH_ENT_VAL(ent);
   *val = node_index;
-  int success = !HASH_ENT_IS_TOMBSTONE(*ent);
+  int success = !HASH_ENT_IS_TOMBSTONE(ent);
 
 // #ifdef SIMPLE_ENTRIES
 //   *size = 1;
