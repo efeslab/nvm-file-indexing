@@ -738,7 +738,7 @@ int nvm_hash_table_update(paddr_t         key,
  * If @notify is %TRUE then the destroy notify functions are called
  * for the key and value of the hash node.
  */
-static void nvm_hash_table_remove_node (int              i,
+static void nvm_hash_table_remove_node (int              i//,
                                         /*paddr_t         *pblk,
                                         size_t          *old_precursor,
                                         size_t          *old_size*/) {

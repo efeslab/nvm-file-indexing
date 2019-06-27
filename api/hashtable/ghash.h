@@ -191,7 +191,7 @@ nvm_hash_table_new (hash_func_t       hash_func,
 //void nvm_hash_table_destroy(nvm_hash_idx_t     *hash_table);
 
 int nvm_hash_table_insert(paddr_t         key,
-                          paddr_t         *index,
+                          paddr_t         *index//,
                           //size_t          index,
                           //size_t          range
                           );
