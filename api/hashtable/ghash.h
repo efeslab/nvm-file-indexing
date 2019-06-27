@@ -176,7 +176,9 @@ struct nvm_hashtable_index {
     //hash_stats_t stats;
 };
 
-PMEMobjpool *
+PMEMobjpool *pop;
+
+void
 nvm_hash_table_new (hash_func_t       hash_func,
                     char* filename,
                     size_t            max_entries
@@ -188,31 +190,27 @@ nvm_hash_table_new (hash_func_t       hash_func,
 
 //void nvm_hash_table_destroy(nvm_hash_idx_t     *hash_table);
 
-int nvm_hash_table_insert(PMEMobjpool *pop,
-                          paddr_t         key,
+int nvm_hash_table_insert(paddr_t         key,
                           paddr_t         value//,
                           //size_t          index,
                           //size_t          range
                           );
 
 // Used for truncate
-int nvm_hash_table_update(PMEMobjpool *pop,
-                          paddr_t         key,
+int nvm_hash_table_update(paddr_t         key,
                           size_t          new_range);
 
-int nvm_hash_table_remove(PMEMobjpool *pop,
-                          paddr_t         key,
+int nvm_hash_table_remove(paddr_t         key,
                           paddr_t        *value,
                           size_t         *nprevious,
                           size_t         *nblocks);
 
-void nvm_hash_table_lookup(PMEMobjpool *pop, paddr_t key,
+void nvm_hash_table_lookup(paddr_t key,
     paddr_t *val, paddr_t *size/*, bool force*/);
 
-int nvm_hash_table_contains(PMEMobjpool *pop,
-                          paddr_t key);
+int nvm_hash_table_contains(paddr_t key);
 
-unsigned nvm_hash_table_size(PMEMobjpool *pop);
+unsigned nvm_hash_table_size();
 
 
 extern uint64_t reads;

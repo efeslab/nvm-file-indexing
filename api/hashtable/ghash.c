@@ -175,8 +175,7 @@ nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
                                  uint32_t       *hash_return, 
                                  int start);
 static inline uint32_t
-nvm_hash_table_lookup_node (PMEMobjpool    *pop,
-                          paddr_t        key,
+nvm_hash_table_lookup_node (paddr_t        key,
                           hash_ent_t  *ent_return,
                           uint32_t      *hash_return/*,
                           bool           force*/) {
@@ -653,19 +652,17 @@ VOFFSETS(4);
 // }
 
 static void 
-nvm_hash_table_update_internal(PMEMobjpool *hash_table,
-                               hash_ent_t     ent,
+nvm_hash_table_update_internal(hash_ent_t     ent,
                                uint32_t        node_index,
                                size_t          new_range) 
 {
-#ifndef SIMPLE_ENTRIES
-    ent->size = new_range;
-    nvm_update(hash_table, node_index);
-#endif
+// #ifndef SIMPLE_ENTRIES
+//    ent->size = new_range;
+//    nvm_update(pop, node_index);
+// #endif
 }
 // Very similar to lookup, but we also update the entry at the end.
-int nvm_hash_table_update(PMEMobjpool *pop,
-                          paddr_t         key,
+int nvm_hash_table_update(paddr_t         key,
                           size_t          new_range) {
   TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
   TOID(hash_ent_t) entries;
@@ -703,7 +700,7 @@ int nvm_hash_table_update(PMEMobjpool *pop,
 
   while (!HASH_ENT_IS_EMPTY(cur)) {
     if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
-      nvm_hash_table_update_internal(pop, cur, node_index, new_range);
+      nvm_hash_table_update_internal(cur, node_index, new_range);
       //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
       //pthread_rwlock_unlock(hash_table->cache_lock);
       return 1;
@@ -741,8 +738,7 @@ int nvm_hash_table_update(PMEMobjpool *pop,
  * If @notify is %TRUE then the destroy notify functions are called
  * for the key and value of the hash node.
  */
-static void nvm_hash_table_remove_node (PMEMobjpool  *pop,
-                                        int              i,
+static void nvm_hash_table_remove_node (int              i,
                                         paddr_t         *pblk,
                                         size_t          *old_precursor,
                                         size_t          *old_size) {
@@ -826,7 +822,7 @@ nvm_hash_table_maybe_resize (nvm_hash_idx_t *hash_table) {
  *
  * Returns: a new #nvm_hash_idx_t
  */
-PMEMobjpool *
+void
 nvm_hash_table_new(hash_func_t       hash_func,
                    char* filename,
                    size_t            max_entries
@@ -836,7 +832,6 @@ nvm_hash_table_new(hash_func_t       hash_func,
                    //const idx_spec_t *idx_spec
                    ) {
 
-  PMEMobjpool *pop;
   if(pmemobj_check(filename, POBJ_LAYOUT_NAME(hash_layout)) != 1) {
     pop = pmemobj_create(filename, POBJ_LAYOUT_NAME(hash_layout), PMEMOBJ_MIN_POOL, 0666);
   }
@@ -939,8 +934,7 @@ nvm_hash_table_new(hash_func_t       hash_func,
  * Returns: %TRUE if the key did not exist yet
  */
 static int
-nvm_hash_table_insert_node(PMEMobjpool *pop,
-                           uint32_t node_index, uint32_t key_hash,
+nvm_hash_table_insert_node(uint32_t node_index, uint32_t key_hash,
                            paddr_t new_key, paddr_t new_value
                            //, size_t new_index, size_t new_range
                            )
@@ -1009,7 +1003,7 @@ nvm_hash_table_insert_node(PMEMobjpool *pop,
  *
  * Returns: (nullable): the associated value, or %NULL if the key is not found
  */
-void nvm_hash_table_lookup(PMEMobjpool *pop, paddr_t key,
+void nvm_hash_table_lookup(paddr_t key,
     paddr_t *val, paddr_t *size/*, bool force*/) {
   uint32_t node_index;
   uint32_t *hash_return;
@@ -1026,7 +1020,7 @@ void nvm_hash_table_lookup(PMEMobjpool *pop, paddr_t key,
       node_index = nvm_hash_table_lookup_node(hash_table, key, &ent, &hash_return, force);
   }
 #else
-  node_index = nvm_hash_table_lookup_node(pop, key, ent, hash_return/*,force*/);
+  node_index = nvm_hash_table_lookup_node(key, ent, hash_return/*,force*/);
 #endif
 
   //pthread_rwlock_rdlock(hash_table->locks + node_index);
@@ -1063,8 +1057,7 @@ free(hash_return);
  * Returns: %TRUE if the key did not exist yet
  */
 static inline int
-nvm_hash_table_insert_internal (PMEMobjpool *pop,
-                                paddr_t    key,
+nvm_hash_table_insert_internal (paddr_t    key,
                                 paddr_t    value//,
                                 //size_t     index,
                                 //size_t     size
@@ -1142,7 +1135,7 @@ nvm_hash_table_insert_internal (PMEMobjpool *pop,
   }
 
   int res = nvm_hash_table_insert_node(
-      pop, node_index, hash_value, key, value);//, index, size);
+      node_index, hash_value, key, value);//, index, size);
 
   //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
 
@@ -1168,14 +1161,13 @@ nvm_hash_table_insert_internal (PMEMobjpool *pop,
  * Returns: %TRUE if the key did not exist yet
  */
 int
-nvm_hash_table_insert (PMEMobjpool *pop,
-                       paddr_t     key,
+nvm_hash_table_insert (paddr_t     key,
                        paddr_t     value//,
                        //size_t      index,
                        //size_t      size
                        )
 {
-  return nvm_hash_table_insert_internal(pop, key, value);//, index, size);
+  return nvm_hash_table_insert_internal(key, value);//, index, size);
 }
 
 /*
@@ -1192,8 +1184,7 @@ nvm_hash_table_insert (PMEMobjpool *pop,
  * destroy notify handlers only if @notify is %TRUE.
  */
 static int
-nvm_hash_table_remove_internal (PMEMobjpool *pop,
-                                paddr_t         key,
+nvm_hash_table_remove_internal (paddr_t         key,
                                 paddr_t        *old_pblk,
                                 size_t         *old_idx,
                                 size_t         *old_size)
@@ -1262,7 +1253,7 @@ nvm_hash_table_remove_internal (PMEMobjpool *pop,
   }
   
   if (HASH_ENT_IS_VALID(cur)) {
-      nvm_hash_table_remove_node(pop, node_index, old_pblk, old_idx, old_size);
+      nvm_hash_table_remove_node(node_index, old_pblk, old_idx, old_size);
       //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
       return 1;
   }
@@ -1291,13 +1282,12 @@ nvm_hash_table_remove_internal (PMEMobjpool *pop,
  * Returns: %TRUE if the key was found and removed from the #nvm_hash_idx_t
  */
 int
-nvm_hash_table_remove (PMEMobjpool *pop,
-                       paddr_t         key,
+nvm_hash_table_remove (paddr_t         key,
                        paddr_t        *removed,
                        size_t         *nprevious,
                        size_t         *ncontiguous)
 {
-  return nvm_hash_table_remove_internal(pop, key, removed,
+  return nvm_hash_table_remove_internal(key, removed,
                                         nprevious, ncontiguous);
 }
 
@@ -1310,7 +1300,7 @@ nvm_hash_table_remove (PMEMobjpool *pop,
  *
  * Returns: the number of key/value pairs in the #nvm_hash_idx_t.
  */
-uint32_t nvm_hash_table_size (PMEMobjpool *pop) {
+uint32_t nvm_hash_table_size () {
   TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
   uint32_t size = 0;
   TX_BEGIN(pop) {
