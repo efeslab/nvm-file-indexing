@@ -178,7 +178,7 @@ struct nvm_hashtable_index {
     //hash_stats_t stats;
 };
 
-PMEMobjpool *pop;
+extern PMEMobjpool *pop;
 
 void
 nvm_hash_table_new (hash_func_t       hash_func,

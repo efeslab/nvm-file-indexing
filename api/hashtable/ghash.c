@@ -44,6 +44,7 @@
 uint64_t reads;
 uint64_t writes;
 uint64_t blocks;
+PMEMobjpool *pop;
 
 #if 0
 #define pthread_rwlock_rdlock(x) 0
