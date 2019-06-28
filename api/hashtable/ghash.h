@@ -23,10 +23,10 @@
 #ifndef __NVM_IDX_G_HASH_MOD_H__
 #define __NVM_IDX_G_HASH_MOD_H__ 1
 
-// #ifdef __cplusplus
-// extern "C" {
-// #define _Static_assert static_assert
-// #endif
+#ifdef __cplusplus
+extern "C" {
+#define _Static_assert static_assert
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -100,39 +100,41 @@ struct hash_index_entry{
 #define BLK_IDX(ht, x) (x % (ht->blksz / sizeof(hash_ent_t)))
 #define BLK_NUM(ht, x) (x / (ht->blksz / sizeof(hash_ent_t)))
 
-//#define HASHCACHE
+/*
+#define HASHCACHE
 
-// This is the hash table meta-data that is persisted to NVRAM, that we may read
-// it and know everything we need to know in order to reconstruct it in memory.
-// typedef struct device_hashtable_metadata {
-//   // Metadata for the in-memory state.
-//   uint32_t size;
-//   uint32_t mod;
-//   uint32_t mask;
-//   uint32_t nnodes;
-//   uint32_t noccupied;
-//   // Metadata about the on-disk state.
-//   size_t  blksz;
-//   paddr_t nvram_size;
-//   paddr_t range_size;
-//   paddr_t data_start;
-// } dev_hash_metadata_t;
+This is the hash table meta-data that is persisted to NVRAM, that we may read
+it and know everything we need to know in order to reconstruct it in memory.
+typedef struct device_hashtable_metadata {
+  // Metadata for the in-memory state.
+  uint32_t size;
+  uint32_t mod;
+  uint32_t mask;
+  uint32_t nnodes;
+  uint32_t noccupied;
+  // Metadata about the on-disk state.
+  size_t  blksz;
+  paddr_t nvram_size;
+  paddr_t range_size;
+  paddr_t data_start;
+} dev_hash_metadata_t;
 
-// typedef struct hashtable_stats {
-//     uint64_t n_lookups;
-//     uint64_t n_min_ents_per_lookup;
-//     uint64_t n_max_ents_per_lookup;
-//     uint64_t n_ents;
-//     STAT_FIELD(loop_time);
-// } hash_stats_t;
+typedef struct hashtable_stats {
+    uint64_t n_lookups;
+    uint64_t n_min_ents_per_lookup;
+    uint64_t n_max_ents_per_lookup;
+    uint64_t n_ents;
+    STAT_FIELD(loop_time);
+} hash_stats_t;
 
-// static void print_hashtable_stats(hash_stats_t *s) {
-//     printf("hashtable stats: \n");
-//     printf("\tAvg. collisions: %.2f\n", (double)s->n_ents / (double)s->n_lookups);
-//     printf("\tMin. collisions: %llu\n", s->n_min_ents_per_lookup);
-//     printf("\tMax. collisions: %llu\n", s->n_max_ents_per_lookup);
-//     PFIELD(s, loop_time);
-// }
+static void print_hashtable_stats(hash_stats_t *s) {
+    printf("hashtable stats: \n");
+    printf("\tAvg. collisions: %.2f\n", (double)s->n_ents / (double)s->n_lookups);
+    printf("\tMin. collisions: %llu\n", s->n_min_ents_per_lookup);
+    printf("\tMax. collisions: %llu\n", s->n_max_ents_per_lookup);
+    PFIELD(s, loop_time);
+}
+*/
 
 struct nvm_hashtable_index {
     int             size;
@@ -224,7 +226,7 @@ extern uint64_t blocks;
  * Convenience wrapper for when you need to look up the single value within
  * the block and nothing else. Index is offset from start (bytes).
  */
-#if 0
+/*#if 0
 static void
 nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t **ret, bool force) {
 
@@ -254,9 +256,10 @@ nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t **ret, bool force) {
     reads++;
 }
 #else
-//#define nvm_read_entry(ht, idx, ret, force) \
+#define nvm_read_entry(ht, idx, ret, force) \
     do { *ret = (hash_ent_t*)(ht->data_ptr + (BLK_NUM(ht, idx) * ht->blksz) + (BLK_IDX(ht, idx) * sizeof(**ret))); } while(0)
 #endif
+*/
 
 /*
  * Read the hashtable metadata from disk. If the size is zero, then we need to
@@ -265,56 +268,62 @@ nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t **ret, bool force) {
  *
  * Returns 1 on success, 0 on failure.
  */
-// static int
-// nvm_read_metadata(nvm_hash_idx_t *ht) {
 
-//     dev_hash_metadata_t metadata;
-//     ssize_t err = CB(ht, cb_read, ht->metadata, 0,
-//                                          sizeof(metadata), (char*)&metadata);
+/*
+static int
+nvm_read_metadata(nvm_hash_idx_t *ht) {
 
-//     if_then_panic(err != sizeof(metadata), "Could not read metadata!");
+    dev_hash_metadata_t metadata;
+    ssize_t err = CB(ht, cb_read, ht->metadata, 0,
+                                         sizeof(metadata), (char*)&metadata);
 
-//     // now check the actual metadata
-//     if (metadata.nvram_size == 0) {
-//         return 0;
-//     }
+    if_then_panic(err != sizeof(metadata), "Could not read metadata!");
 
-//     assert(ht->nvram_size == metadata.nvram_size);
-//     assert(ht->range_size == metadata.range_size);
-//     // reconsititute the rest of the httable from
-//     ht->size = metadata.size;
-//     ht->blksz = metadata.blksz;
-//     ht->mod = metadata.mod;
-//     ht->mask = metadata.mask;
-//     ht->nnodes = metadata.nnodes;
-//     ht->noccupied = metadata.noccupied;
-//     ht->data = metadata.data_start;
+    // now check the actual metadata
+    if (metadata.nvram_size == 0) {
+        return 0;
+    }
 
-//     return 1;
-// }
+    assert(ht->nvram_size == metadata.nvram_size);
+    assert(ht->range_size == metadata.range_size);
+    // reconsititute the rest of the httable from
+    ht->size = metadata.size;
+    ht->blksz = metadata.blksz;
+    ht->mod = metadata.mod;
+    ht->mask = metadata.mask;
+    ht->nnodes = metadata.nnodes;
+    ht->noccupied = metadata.noccupied;
+    ht->data = metadata.data_start;
 
-// static int
-// nvm_write_metadata(nvm_hash_idx_t *ht) {
-//     dev_hash_metadata_t metadata;
+    return 1;
+}
+*/
 
-//     // reconsititute the rest of the httable from
-//     metadata.nvram_size = ht->nvram_size;
-//     metadata.blksz = ht->blksz;
-//     metadata.size = ht->size;
-//     metadata.range_size = ht->range_size;
-//     metadata.mod = ht->mod;
-//     metadata.mask = ht->mask;
-//     metadata.nnodes = ht->nnodes;
-//     metadata.noccupied = ht->noccupied;
-//     metadata.data_start = ht->data;
 
-//     ssize_t err = CB(ht, cb_write, ht->metadata, 0,
-//                                           sizeof(metadata), (char*)&metadata);
+/*
+static int
+nvm_write_metadata(nvm_hash_idx_t *ht) {
+    dev_hash_metadata_t metadata;
 
-//     if_then_panic(err != sizeof(metadata), "Could not write metadata!");
+    // reconsititute the rest of the httable from
+    metadata.nvram_size = ht->nvram_size;
+    metadata.blksz = ht->blksz;
+    metadata.size = ht->size;
+    metadata.range_size = ht->range_size;
+    metadata.mod = ht->mod;
+    metadata.mask = ht->mask;
+    metadata.nnodes = ht->nnodes;
+    metadata.noccupied = ht->noccupied;
+    metadata.data_start = ht->data;
 
-//     return 1;
-// }
+    ssize_t err = CB(ht, cb_write, ht->metadata, 0,
+                                          sizeof(metadata), (char*)&metadata);
+
+    if_then_panic(err != sizeof(metadata), "Could not write metadata!");
+
+    return 1;
+}
+*/
 
 /*
  * Update a single slot in NVRAM.
@@ -324,34 +333,38 @@ nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t **ret, bool force) {
  * start: block address of range.
  * index: byte index into range.
  */
-// static inline void
+/* static inline void
 // nvm_update(nvm_hash_idx_t *ht, paddr_t idx) {
 
-//     if (ht->do_cache) {
-// #if 0
-//         paddr_t paddr = ht->data + BLK_NUM(ht, idx);
-//         ssize_t size  = sizeof(*ht->cache);
-//         off_t offset  = BLK_IDX(ht, idx) * size;
+    if (ht->do_cache) {
+#if 0
+        paddr_t paddr = ht->data + BLK_NUM(ht, idx);
+        ssize_t size  = sizeof(*ht->cache);
+        off_t offset  = BLK_IDX(ht, idx) * size;
 
-//         ssize_t ret = CB(ht, cb_write, 
-//                          paddr, offset, size, (char*)&(ht->cache[idx]));
+        ssize_t ret = CB(ht, cb_write, 
+                         paddr, offset, size, (char*)&(ht->cache[idx]));
 
-//         if_then_panic(ret != size, "did not write full entry!");
-// #endif
-//         ht->cache_state[idx] = 1;
-//     }
-//     // This is a no-op for non-cached, as it reads directly from the device.
+        if_then_panic(ret != size, "did not write full entry!");
+#endif
+        ht->cache_state[idx] = 1;
+    }
+    // This is a no-op for non-cached, as it reads directly from the device.
 
-// }
+}
+*/
 
-// static inline int nvm_invalidate(nvm_hash_idx_t *ht) {
-//     if (unlikely(!ht->do_cache)) return 0;
 
-//     pthread_rwlock_wrlock(ht->cache_lock);
-//     memset(ht->cache_state, -1, ht->nvram_size);
-//     pthread_rwlock_unlock(ht->cache_lock);
-//     return 0;
-// }
+/*
+static inline int nvm_invalidate(nvm_hash_idx_t *ht) {
+    if (unlikely(!ht->do_cache)) return 0;
+
+    pthread_rwlock_wrlock(ht->cache_lock);
+    memset(ht->cache_state, -1, ht->nvram_size);
+    pthread_rwlock_unlock(ht->cache_lock);
+    return 0;
+} 
+*/
 
 /*
  * The more interesting function. Find ranges and write them all back at once.
@@ -387,8 +400,8 @@ nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t **ret, bool force) {
 //     return 0;
 // }
 
-// #ifdef __cplusplus
-// }
-// #endif
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __NVM_IDX_G_HASH_MOD_H__ */
