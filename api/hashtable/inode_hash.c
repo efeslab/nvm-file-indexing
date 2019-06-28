@@ -12,6 +12,8 @@
 #define trace_me() 0
 #endif
 
+#define Eric
+
 int hashtable_initialize(const idx_spec_t *idx_spec,
                          idx_struct_t *idx_struct,
                          paddr_t *location) {
@@ -46,11 +48,11 @@ int hashtable_initialize(const idx_spec_t *idx_spec,
 
         if_then_panic(nalloc < 1, "no room for metadata!");
     }
-
+#ifndef Eric
     ht = nvm_hash_table_new(nvm_idx_hash6432shift, devinfo.di_size_blocks,
                             devinfo.di_block_size, 1, *location, idx_spec);
     if_then_panic(ht == NULL, "could not allocate hash table");
-
+#endif
     idx_struct->idx_metadata = (void*)ht;
 
     return 0;
@@ -78,6 +80,7 @@ ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
         size_t range = nalloc - blkno;
         // Index: how many more logical blocks are contiguous before this one?
         size_t index = blkno;
+#ifndef Eric        
         int err = nvm_hash_table_insert(ht, k, (*paddr) + blkno, index, range);
         if (!err) {
             ssize_t dealloc = CB(idx_struct, cb_dealloc_data, nalloc, *paddr);
@@ -85,6 +88,7 @@ ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
             *paddr = 0;
             return -EEXIST;
         }
+#endif
     }
 
     return nalloc;
@@ -100,7 +104,9 @@ ssize_t hashtable_lookup(idx_struct_t *idx_struct, inum_t inum,
 
     hash_key_t k = MAKEKEY(inum, laddr);
     size_t size;
+#ifndef Eric
     nvm_hash_table_lookup(ht, k, paddr, &size, false);
+#endif
     if (*paddr != 0) return (ssize_t)size;
     return -ENOENT;
 }
@@ -127,7 +133,10 @@ ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         size_t removed;
         size_t index;
         size_t range;
-        ssize_t was_removed = nvm_hash_table_remove(ht, k, &removed, &index, &range);
+        ssize_t was_removed;
+#ifndef Eric
+        was_removed = nvm_hash_table_remove(ht, k, &removed, &index, &range);
+#endif
         if_then_panic(!range, "size was 0 on delete!");
 
         if (lblk == laddr) {
@@ -161,7 +170,10 @@ ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
             hash_key_t k = MAKEKEY(inum, lblk);
             size_t new_range = new_size - lblk;
             if_then_panic(new_range == 0, "Cannot insert with size 0!");
+            int was_updated;
+#ifndef Eric
             int was_updated = nvm_hash_table_update(ht, k, new_range);
+#endif
             if_then_panic(!was_updated, "could not update range size!\n");
         }
     }
