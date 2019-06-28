@@ -842,9 +842,7 @@ nvm_hash_table_new(hash_func_t       hash_func,
       TX_ADD(ht);
       D_RW(ht)->hash_func = hash_func ? hash_func : nvm_idx_direct_hash;
     } TX_END
-    
-
-    return pop;
+    return;
   }
 
   TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
@@ -912,7 +910,7 @@ nvm_hash_table_new(hash_func_t       hash_func,
   }
 #endif
 
-  return pop;
+  return;
 }
 
 /*
