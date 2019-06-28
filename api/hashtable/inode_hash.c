@@ -1,5 +1,5 @@
-// #include <stdbool.h>
-// #include "inode_hash.h"
+#include <stdbool.h>
+#include "inode_hash.h"
 
 // #if 0
 // #define trace_me() \
@@ -175,10 +175,12 @@
 //     return ret;
 // }
 
-idx_fns_t hash_fns = {
-    // .im_init          = hashtable_initialize,
-    // .im_init_prealloc = NULL,
-    // .im_lookup        = hashtable_lookup,
-    // .im_create        = hashtable_create,
-    // .im_remove        = hashtable_remove
-};
+// idx_fns_t hash_fns = {
+//     .im_init          = hashtable_initialize,
+//     .im_init_prealloc = NULL,
+//     .im_lookup        = hashtable_lookup,
+//     .im_create        = hashtable_create,
+//     .im_remove        = hashtable_remove
+// };
+
+idx_fns_t hash_fns;
