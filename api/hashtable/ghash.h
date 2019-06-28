@@ -188,6 +188,8 @@ nvm_hash_table_new (hash_func_t       hash_func,
                     //const idx_spec_t *idx_spec
                     );
 
+void
+nvm_hash_table_close ();
 //void nvm_hash_table_destroy(nvm_hash_idx_t     *hash_table);
 
 int nvm_hash_table_insert(paddr_t         key,

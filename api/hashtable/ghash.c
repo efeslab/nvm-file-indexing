@@ -933,6 +933,10 @@ nvm_hash_table_new(hash_func_t       hash_func,
  *
  * Returns: %TRUE if the key did not exist yet
  */
+
+void nvm_hash_table_close() {
+  pmemobj_close(pop);
+}
 static int
 nvm_hash_table_insert_node(uint32_t node_index, uint32_t key_hash,
                            paddr_t new_key, paddr_t new_value
