@@ -30,10 +30,10 @@
 #include <assert.h>
 #include <string.h>  /* memset */
 #include <stdint.h>
-#include <libpmemobj.h>
+#include <libpmem.h>
 #include <emmintrin.h>
 #include <immintrin.h>
-
+#include <stdatomic.h>
 #include "ghash.h"
 
 #define G_DISABLE_ASSERT
@@ -44,7 +44,7 @@
 uint64_t reads;
 uint64_t writes;
 uint64_t blocks;
-PMEMobjpool *pop;
+nvm_hash_idx_t *ht = NULL;
 
 #if 0
 #define pthread_rwlock_rdlock(x) 0
@@ -105,6 +105,15 @@ static const int prime_mod [] = {
   1073741789,
   2147483647  /* For 1 << 31 */
 };
+
+static void pmem_nvm_flush(uint64_t start, uint64_t len) {
+    if(ht->is_pmem) {
+      pmem_persist(start, len);
+    }
+    else {
+      pmem_msync(start, len);
+    }
+}
 
 static void
 nvm_hash_table_set_shift (nvm_hash_idx_t *hash_table, int shift) {
@@ -168,7 +177,7 @@ nvm_hash_table_set_shift_from_size (nvm_hash_idx_t *hash_table, int size) {
  */
 #define SEQ_STEP
 #pragma GCC push_options
-#pragma GCC optimize ("unroll-loops")
+//#pragma GCC optimize ("unroll-loops")
 static uint32_t
 nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
                                  paddr_t         key,
@@ -177,7 +186,7 @@ nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
                                  int start);
 static inline uint32_t
 nvm_hash_table_lookup_node (paddr_t        key,
-                          hash_ent_t  *ent_return,
+                          paddr_t  *ent_return,
                           uint32_t      *hash_return/*,
                           bool           force*/) {
 
@@ -186,22 +195,19 @@ nvm_hash_table_lookup_node (paddr_t        key,
   uint32_t mod;
   uint32_t first_tombstone = 0;
   int have_tombstone = FALSE;
-  TOID(nvm_hash_idx_t) hash_table = POBJ_ROOT(pop, nvm_hash_idx_t);
-  TOID(hash_ent_t) entries;
 #ifdef SEQ_STEP
   uint32_t step = 1;
 #else
   uint32_t step = 0;
 #endif
-  hash_ent_t buffer;
-  hash_ent_t cur;
-TX_BEGIN(pop) {
-  entries = D_RO(hash_table)->entries;
-  hash_value = D_RO(hash_table)->hash_func(key);
-  mod = D_RO(hash_table)->mod;
+  paddr_t cur;
+
+  paddr_t *entries = ht->entries;
+  hash_value = ht->hash_func(key);
+  mod = ht->mod;
   node_index = hash_value % mod;
-  cur = D_RO(entries)[node_index];
-} TX_END
+  cur = entries[node_index];
+
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
@@ -225,10 +231,9 @@ TX_BEGIN(pop) {
 
   count++;
 
-  while (!cur.value == 0) {
-    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
+  while (!HASH_ENT_IS_EMPTY(cur)) {
+    if (cur == key && HASH_ENT_IS_VALID(cur)) {
       
-
       *ent_return = cur;
 //       #if 1
 //       if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
@@ -267,18 +272,15 @@ TX_BEGIN(pop) {
 //     }
 // #endif
     node_index = new_idx;
-    TX_BEGIN(pop) {
-      cur = D_RO(entries)[node_index];
-    } TX_END
-
+    cur = entries[node_index];
+    
     count++;
   }
 
 end:
   if (have_tombstone) {
-    TX_BEGIN(pop) {
-      *ent_return = D_RO(entries)[first_tombstone];
-    } TX_END
+    *ent_return = entries[first_tombstone];
+   
 // #if 1
 //     if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
 //       //pthread_rwlock_unlock(hash_table->cache_lock);
@@ -286,9 +288,8 @@ end:
     return first_tombstone;
   }
 
-  TX_BEGIN(pop) {
-      *ent_return = D_RO(entries)[node_index];
-    } TX_END
+  
+    *ent_return = entries[node_index];
 
 // #if 1
 //   if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
@@ -653,7 +654,7 @@ VOFFSETS(4);
 // }
 
 static void 
-nvm_hash_table_update_internal(hash_ent_t     ent,
+nvm_hash_table_update_internal(paddr_t     ent,
                                uint32_t        node_index,
                                size_t          new_range) 
 {
@@ -665,25 +666,19 @@ nvm_hash_table_update_internal(hash_ent_t     ent,
 // Very similar to lookup, but we also update the entry at the end.
 int nvm_hash_table_update(paddr_t         key,
                           size_t          new_range) {
-  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
-  TOID(hash_ent_t) entries;
-  uint32_t node_index;
-  uint32_t hash_value;
 #ifdef SEQ_STEP
   uint32_t step = 1;
 #else
   uint32_t step = 0;
 #endif
-  int mod;
-  hash_ent_t buffer;
-  hash_ent_t cur;
-  TX_BEGIN(pop) {
-    entries = D_RO(ht)->entries;
-    mod = D_RO(ht)->mod;
-    hash_value = D_RO(ht)->hash_func(key);
-    node_index = hash_value % mod;
-    cur = D_RO(entries)[node_index];
-  } TX_END
+
+
+  paddr_t *entries = ht->entries;
+  int mod = ht->mod;
+  uint32_t hash_value = ht->hash_func(key);
+  uint32_t node_index = hash_value % mod;
+  paddr_t cur = entries[node_index];
+
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
@@ -700,7 +695,7 @@ int nvm_hash_table_update(paddr_t         key,
   //cur = hash_table->cache[BLK_NUM(node_index)][BLK_IDX(node_index)];
 
   while (!HASH_ENT_IS_EMPTY(cur)) {
-    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
+    if (cur == key && HASH_ENT_IS_VALID(cur)) {
       nvm_hash_table_update_internal(cur, node_index, new_range);
       //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
       //pthread_rwlock_unlock(hash_table->cache_lock);
@@ -716,9 +711,7 @@ int nvm_hash_table_update(paddr_t         key,
     //   pthread_rwlock_rdlock(hash_table->locks + new_idx);
     // }
     node_index = new_idx;
-    TX_BEGIN(pop) {
-      cur = D_RO(entries)[node_index];
-    } TX_END
+    cur = entries[node_index];
   }
 
   //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
@@ -743,9 +736,7 @@ static void nvm_hash_table_remove_node (int              i//,
                                         /*paddr_t         *pblk,
                                         size_t          *old_precursor,
                                         size_t          *old_size*/) {
-  hash_ent_t ent;
-  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
-  TOID(hash_ent_t) entries;
+  
   //pthread_rwlock_wrlock(hash_table->locks + i);
   // nvm_read_entry(hash_table, i, &ent, true);
   // *pblk = HASH_ENT_VAL(*ent);
@@ -759,16 +750,16 @@ static void nvm_hash_table_remove_node (int              i//,
 
   // HASH_ENT_SET_TOMBSTONE(*ent);
 #ifndef SIMPLE_ENTRIES
-  ent->size = 0;
-  ent->index = 0;
+  // ent->size = 0;
+  // ent->index = 0;
 #endif
-  TX_BEGIN(pop) {
-    TX_ADD(ht);
-    entries = D_RO(ht)->entries;
-    //*pblk = D_RO(entries)[i].value;
-    D_RW(entries)[i].value = (paddr_t) ~0;
-    D_RW(ht)->nnodes = D_RO(ht)->nnodes - 1;
-  } TX_END
+  paddr_t *entries = ht->entries;
+  //*pblk = D_RO(entries)[i].value;
+  HASH_ENT_SET_TOMBSTONE(entries[i]);
+  pmem_nvm_flush(entries + i, sizeof(paddr_t));
+  ht->nnodes -= 1;
+  pmem_nvm_flush(&(ht->nnodes), sizeof(int));
+  
   /* Erect tombstone */
 
   //pthread_rwlock_unlock(hash_table->locks + i);
@@ -825,41 +816,53 @@ nvm_hash_table_maybe_resize (nvm_hash_idx_t *hash_table) {
  */
 void
 nvm_hash_table_new(hash_func_t       hash_func,
-                   char* filename,
                    size_t            max_entries
                    //size_t            block_size,
                    //size_t            range_size,
                    //paddr_t           metadata_location,
                    //const idx_spec_t *idx_spec
                    ) {
+  
+  if(ht != NULL && ht->valid == 1) {
+    ht->valid = 0;
+    pmem_nvm_flush(&(ht->valid), sizeof(int));
+    ht->hash_func = hash_func ? hash_func : nvm_idx_direct_hash;
+    ht->valid = 1;
+    pmem_nvm_flush(&(ht->valid), sizeof(int));
+    //exists
 
-  if(pmemobj_check(filename, POBJ_LAYOUT_NAME(hash_layout)) != 1) {
-    pop = pmemobj_create(filename, POBJ_LAYOUT_NAME(hash_layout), PMEMOBJ_MIN_POOL, 0666);
-  }
-  else {
-    pop = pmemobj_open(filename, POBJ_LAYOUT_NAME(hash_layout));
-    TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
-    TX_BEGIN(pop) {
-      TX_ADD(ht);
-      D_RW(ht)->hash_func = hash_func ? hash_func : nvm_idx_direct_hash;
-    } TX_END
     return;
   }
+  
+  struct disk_superblock *sblk = sb[g_root_dev]->ondisk;
+  ht = sblk->datablock_start * g_block_size_bytes;
 
-  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
-  TX_BEGIN(pop) {
-    TX_ADD(ht);
-    
-    D_RW(ht)->entries = TX_ALLOC(hash_ent_t, sizeof(hash_ent_t) * max_entries);
-    D_RW(ht)->hash_func = hash_func ? hash_func : nvm_idx_direct_hash;
-    D_RW(ht)->nnodes = 0;
-    D_RW(ht)->noccupied = 0;
-    D_RW(ht)->mod = max_entries;
-    D_RW(ht)->size = max_entries;
-    D_RW(ht)->mask = 127; //deprecated? 6/18/2019
-    
-  } TX_END
+  uint64_t ent_num_bytes = sizeof(paddr_t) * sblk->ndatablocks;
+  int ent_num_blocks_needed = ent_num_bytes / g_block_size_bytes;
+  if(ent_num_bytes % g_block_size_bytes != 0) {
+    ++ent_num_blocks_needed;
+  }
 
+  ht->num_entries = sblk->ndatablocks - ent_num_blocks_needed;
+  ht->entries_blk = sblk->datablock_start + 1;
+  ht->entries = ht->entries_blk * g_block_size_bytes;
+
+  sblk->datablock_start = ht->entries_blk + ent_num_blocks_needed;
+  sblk->ndatablocks = ht->num_entries;
+
+  //need to update num blocks available somewhere?
+  ht->hash_func = hash_func ? hash_func : nvm_idx_direct_hash;
+  ht->nnodes = 0;
+  ht->noccupied = 0;
+  ht->mod = ht->num_entries;
+  ht->mask = ht->num_entries;
+  ht->size = 0;
+
+  ht->is_pmem = pmem_is_pmem(ht, (ent_num_blocks_needed + 1) * g_block_size_bytes);
+  
+  pmem_nvm_flush(ht, (ent_num_blocks_needed + 1) * g_block_size_bytes);
+  ht->valid = 1;
+  pmem_nvm_flush(&(ht->valid), sizeof(int));
 
   // // initialize read-writer locks
   // ht->locks = MALLOC(idx_spec, max_entries * sizeof(pthread_rwlock_t));
@@ -914,6 +917,12 @@ nvm_hash_table_new(hash_func_t       hash_func,
   return;
 }
 
+
+void nvm_hash_table_close() {
+  
+}
+
+
 /*
  * nvm_hash_table_insert_node:
  * @hash_table: our #nvm_hash_idx_t
@@ -933,45 +942,32 @@ nvm_hash_table_new(hash_func_t       hash_func,
  * Returns: %TRUE if the key did not exist yet
  */
 
-void nvm_hash_table_close() {
-  pmemobj_close(pop);
-}
 static int
 nvm_hash_table_insert_node(uint32_t node_index, uint32_t key_hash,
-                           paddr_t new_key, paddr_t new_value
+                           paddr_t new_key
                            //, size_t new_index, size_t new_range
                            )
 {
-  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
-  TOID(hash_ent_t) entries;
-  int already_exists;
-  hash_ent_t ent;
-  TX_BEGIN(pop) {
     // TX_ADD(ht);
-    entries = D_RO(ht)->entries;
-    ent = D_RO(entries)[node_index];
-  } TX_END
-  already_exists = HASH_ENT_IS_VALID(ent);
+  paddr_t *entries = ht->entries;
+  paddr_t ent = entries[node_index];
 
   // todo consider bookkeeping (nnodes, noccupied?)
-  if (already_exists) {
-    printf("already exists: %lx %lx (trying to insert: %lx %lx)\n",
-        ent.key, HASH_ENT_VAL(ent), new_key, new_value);
-  } else {
-    TX_BEGIN(pop) {
-      TX_ADD(ht);
-      D_RW(entries)[node_index].key = new_key;
-      D_RW(entries)[node_index].value = new_value;
-      D_RW(ht)->nnodes = D_RO(ht)->nnodes + 1;
-    } TX_END
+  paddr_t expected = (paddr_t)~0;
+  if(HASH_ENT_IS_TOMBSTONE(ent)) {
+    expected -= 1;
+  }
+  int success = atomic_compare_exchange_strong(entries + node_index, &expected, new_key);
+  if(success) {
+    pmem_nvm_flush(entries + node_index, sizeof(paddr_t));
+  }
+  return success;
+    
 
 #ifndef SIMPLE_ENTRIES
-    ent->index = new_index;
-    ent->size = new_range;
+    // ent->index = new_index;
+    // ent->size = new_range;
 #endif
-  }
-
-  return !already_exists;
 }
 
 /**
@@ -1010,9 +1006,8 @@ int nvm_hash_table_lookup(paddr_t key,
     paddr_t *val/*, paddr_t *size, bool force*/) {
   uint32_t node_index;
   uint32_t hash_return;
-  hash_ent_t ent;
+  paddr_t ent;
 
-  assert(pop != NULL);
 #if 0
   if (!hash_table->do_lock) {
       node_index = nvm_hash_table_lookup_node_simd(hash_table, key, &ent, &hash_return, 0);
@@ -1024,7 +1019,6 @@ int nvm_hash_table_lookup(paddr_t key,
 #endif
 
   //pthread_rwlock_rdlock(hash_table->locks + node_index);
-  paddr_t ent_val = HASH_ENT_VAL(ent);
   *val = node_index;
   int success = !HASH_ENT_IS_TOMBSTONE(ent);
 
@@ -1063,32 +1057,27 @@ nvm_hash_table_insert_internal (paddr_t    key,
                                 //size_t     size
                                 )
 {
-  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
-  TOID(hash_ent_t) entries;
+
   /*
    * iangneal: for concurrency reasons, we can't do lookup -> insert, as another
    * thread may come in and use the slot we just looked for.
    * This is basically a copy of lookup_node, but with write locks.
    */
-  uint32_t node_index;
-  uint32_t hash_value;
   uint32_t first_tombstone = 0;
-  int have_tombstone = FALSE;
-  int mod;
+  int have_tombstone = 0;
 #ifdef SEQ_STEP
   uint32_t step = 1;
 #else
   uint32_t step = 0;
+  uint32_t tombstone_step;
 #endif
-  hash_ent_t buffer;
-  hash_ent_t cur;
-  TX_BEGIN(pop) {
-    entries = D_RO(ht)->entries;
-    mod = D_RO(ht)->mod;
-    hash_value = D_RO(ht)->hash_func(key);
-    node_index = hash_value % mod;
-    cur = D_RO(entries)[node_index];
-  } TX_END
+
+  paddr_t *entries = ht->entries;
+  int mod = ht->mod;
+  uint32_t hash_value = ht->hash_func(key);
+  uint32_t node_index = hash_value % mod;
+  paddr_t cur = entries[node_index];
+  
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
@@ -1108,12 +1097,17 @@ nvm_hash_table_insert_internal (paddr_t    key,
   //   __builtin_prefetch((void*)( ((char*)cur) + 256 ), 1);
 
   while (!HASH_ENT_IS_EMPTY(cur)) {
-    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
-      break;
+    if (cur == key && HASH_ENT_IS_VALID(cur)) {
+      printf("already exists: %lx (trying to insert: %lx)\n",
+        cur, key);
+      return 0;
     } else if (HASH_ENT_IS_TOMBSTONE(cur) && !have_tombstone) {
       // keep lock until we decide we don't need it
       first_tombstone = node_index;
-      have_tombstone = TRUE;
+      have_tombstone = 1;
+#ifndef SEQ_STEP
+      tombstone_step = step;
+#endif
     } else {
       //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
     }
@@ -1125,22 +1119,37 @@ nvm_hash_table_insert_internal (paddr_t    key,
     //if (hash_table->do_lock) pthread_rwlock_wrlock(hash_table->locks + new_idx);
 
     node_index = new_idx;
-    TX_BEGIN(pop) {
-      cur = D_RO(entries)[node_index];
-    } TX_END
+    cur = entries[node_index];
   }
-
+  int success = 0;
   if (have_tombstone) {
+#ifndef SEQ_STEP
+    step = tombstone_step;
+#endif
     node_index = first_tombstone;
+    cur = entries[first_tombstone];
   }
 
-  int res = nvm_hash_table_insert_node(
-      node_index, hash_value, key, 1);//, index, size); // value = 1 which means not empty
+  while(!success) {
+      if(!HASH_ENT_IS_VALID(cur)) {
+        success = nvm_hash_table_insert_node(
+          node_index, hash_value, key);//, index, size);
+      }
+      if(!success) {
 
+#ifndef SEQ_STEP
+        ++step;
+#endif
+        node_index = (node_index + step) % mod;
+        cur = entries[node_index];
+      }
+    }
+  ht->nnodes = ht->nnodes + 1;
+  pmem_nvm_flush(&(ht->nnodes), sizeof(int));
   //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
   *index = node_index;
   //pthread_rwlock_unlock(hash_table->cache_lock);
-  return res;
+  return true;
 }
 
 /**
@@ -1195,29 +1204,21 @@ nvm_hash_table_remove_internal (paddr_t         key,
    * thread may come in and use the slot we just looked for.
    * This is basically a copy of lookup_node, but with write locks.
    */
-  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
-  TOID(hash_ent_t) entries;
-  uint32_t node_index;
-  uint32_t hash_value;
-  int mod;
+
 #ifdef SEQ_STEP
   uint32_t step = 1;
 #else
   uint32_t step = 0;
 #endif
-  hash_ent_t buffer;
-  hash_ent_t cur;
 
-  
-  TX_BEGIN(pop) {
     //assert(D_RO(ht)->ref_count > 0);
-    entries = D_RO(ht)->entries;
-    
-    mod = D_RO(ht)->mod;
-    hash_value = D_RO(ht)->hash_func(key);
-    node_index = hash_value % mod;
-    cur = D_RO(entries)[node_index];
-  } TX_END
+  paddr_t *entries = ht->entries;
+  
+  int mod = ht->mod;
+  uint32_t hash_value = ht->hash_func(key);
+  uint32_t node_index = hash_value % mod;
+  paddr_t cur = entries[node_index];
+
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
@@ -1225,14 +1226,14 @@ nvm_hash_table_remove_internal (paddr_t         key,
 #endif
 
   //pthread_rwlock_rdlock(hash_table->cache_lock);
-  node_index = hash_value % mod;
+  //node_index = hash_value % mod;
   //node_index = hash_value & hash_table->mask;
   //if (hash_table->do_lock) pthread_rwlock_wrlock(hash_table->locks + node_index);
 
   //nvm_read_entry(hash_table, node_index, &cur, false);
 
   while (!HASH_ENT_IS_EMPTY(cur)) {
-    if (cur.key == key && HASH_ENT_IS_VALID(cur)) {
+    if (cur == key && HASH_ENT_IS_VALID(cur)) {
       break;
     }
 #ifndef SEQ_STEP
@@ -1247,9 +1248,8 @@ nvm_hash_table_remove_internal (paddr_t         key,
     // }
 
     //nvm_read_entry(hash_table, new_idx, &cur, false);
-    TX_BEGIN(pop) {
-      cur = D_RO(entries)[new_idx];
-    } TX_END
+  
+    cur = entries[new_idx];
     node_index = new_idx;
   }
   
@@ -1263,11 +1263,9 @@ nvm_hash_table_remove_internal (paddr_t         key,
   //if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
 
   //pthread_rwlock_unlock(hash_table->cache_lock);
-  TX_BEGIN(pop) {
-    cur = D_RO(entries)[node_index];
-  } TX_END
+  //cur = entries[node_index];
   *index = 0;
-  return HASH_ENT_IS_VALID(cur);
+  return 0;
 }
 
 /**
@@ -1306,12 +1304,7 @@ nvm_hash_table_remove (paddr_t         key,
  * Returns: the number of key/value pairs in the #nvm_hash_idx_t.
  */
 uint32_t nvm_hash_table_size () {
-  TOID(nvm_hash_idx_t) ht = POBJ_ROOT(pop, nvm_hash_idx_t);
-  uint32_t size = 0;
-  TX_BEGIN(pop) {
-    size = D_RO(ht)->nnodes;
-  } TX_END
-  return size;
+  return ht->nnodes;
 }
 
 /*

@@ -32,7 +32,11 @@ extern "C" {
 #include <stdio.h>
 #include <stdbool.h>
 #include <pthread.h>
-#include <libpmemobj.h>
+#include <libpmem.h>
+
+#include "fs.h"
+#include "global/global.h"
+#include "shared.h"
 
 // from common
 #include "common/common.h"
@@ -45,10 +49,9 @@ extern "C" {
 typedef struct hash_index_entry hash_ent_t;
 typedef struct nvm_hashtable_index nvm_hash_idx_t;
 
-POBJ_LAYOUT_BEGIN(hash_layout);
-POBJ_LAYOUT_ROOT(hash_layout, nvm_hash_idx_t);
-POBJ_LAYOUT_TOID(hash_layout, hash_ent_t);
-POBJ_LAYOUT_END(hash_layout);
+
+
+
 //#undef SIMPLE_ENTRIES
 
 // For the big hash table, mapping (inode, lblk) -> single block
@@ -67,14 +70,13 @@ struct hash_index_entry{
 // _Static_assert(16 % sizeof(hash_ent_t) == 0, "Entries cross block boundary!");
 
 #ifdef SIMPLE_ENTRIES
-#define HASH_ENT_VAL(x) ((x).value)
-#define HASH_ENT_IS_TOMBSTONE(x) ((x).value == (paddr_t)~0)
-#define HASH_ENT_IS_EMPTY(x) ((x).value == 0)
+#define HASH_ENT_IS_TOMBSTONE(x) (x == ((paddr_t)~0) - 1)
+#define HASH_ENT_IS_EMPTY(x) (x == (paddr_t)~0)
 #define HASH_ENT_IS_VALID(x) (!HASH_ENT_IS_EMPTY(x) && !HASH_ENT_IS_TOMBSTONE(x))
 
-#define HASH_ENT_SET_TOMBSTONE(x) ((x).value = (paddr_t)~0)
-#define HASH_ENT_SET_EMPTY(x) ((x).value = 0)
-#define HASH_ENT_SET_VAL(x,v) ((x).value = v)
+#define HASH_ENT_SET_TOMBSTONE(x) (x = ((paddr_t)~0) - 1)
+#define HASH_ENT_SET_EMPTY(x) (x = (paddr_t)~0)
+#define HASH_ENT_SET_VAL(x,v) (x = v)
 #else
 #define HASH_ENT_VAL(x) (((paddr_t)(x).value_hi16 << 32) | ((paddr_t)(x).value_low32))
 #define HASH_ENT_IS_TOMBSTONE(x) ((x).value_hi16 == (uint16_t)~0 && \
@@ -135,14 +137,20 @@ static void print_hashtable_stats(hash_stats_t *s) {
     PFIELD(s, loop_time);
 }
 */
-
+//need to include global.h, shared.h, fs.h
 struct nvm_hashtable_index {
+    int             is_pmem;
+    int             valid;
+
     int             size;
     int             mod;
     unsigned        mask;
     int             nnodes;
     int             noccupied;  /* nnodes + tombstones */
-    TOID(hash_ent_t) entries;
+
+    paddr_t entries_blk; /* persists */
+    paddr_t *entries; /* run-time */
+    uint64_t num_entries;
     //paddr_t         metadata;
     //paddr_t         data;
     //char           *data_ptr;
@@ -178,11 +186,12 @@ struct nvm_hashtable_index {
     //hash_stats_t stats;
 };
 
-extern PMEMobjpool *pop;
+extern nvm_hash_idx_t *ht;
+
+
 
 void
 nvm_hash_table_new (hash_func_t       hash_func,
-                    char* filename,
                     size_t            max_entries
                     //size_t            block_size,
                     //size_t            range_size,

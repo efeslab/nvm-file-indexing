@@ -27,4 +27,4 @@ add_library(NVMIndexingAPI SHARED
             $<TARGET_OBJECTS:RadixTree>
             )
 target_link_libraries(NVMIndexingAPI m)
-target_link_libraries(NVMIndexingAPI "-L/usr/local/lib -lpmemobj -lpmem")
+target_link_libraries(NVMIndexingAPI "-L/usr/local/lib -lpmem")
