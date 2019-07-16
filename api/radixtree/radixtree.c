@@ -424,7 +424,7 @@ ssize_t index_and_find(radixtree_meta_t *radix, paddr_t page, uint16_t level, si
 
             if (!new_paddr) {
                 return nfound;
-            } else if (nfound && new_paddr != *paddr + nfound + 1) {
+            } else if (nfound && new_paddr != *paddr + nfound) {
                 return nfound;
             } else if (!nfound) {
                 *paddr = new_paddr;
@@ -454,7 +454,7 @@ ssize_t index_and_find(radixtree_meta_t *radix, paddr_t page, uint16_t level, si
 
             if (ret < 0) return ret;
 
-            if (nfound && new_paddr != *paddr + nfound + 1) {
+            if (nfound && new_paddr != *paddr + nfound) {
                 return nfound;
             } else if (!nfound) {
                 *paddr = new_paddr;
@@ -675,12 +675,16 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
             if (err) return err;
 
             ++radix->nlevels;
-            if_then_panic(write_metadata(radix), "Could not update metadata!");
+            
         } else if (is_full(radix)) {
+            radix->nentries += ninserted;
+            if_then_panic(write_metadata(radix), "Could not update metadata!");
             return ninserted ? ninserted : -ENOSPC;
         }
     }
 
+    radix->nentries += nalloc;
+    if_then_panic(write_metadata(radix), "Could not update metadata!");
     return nalloc;
 #if 0
     size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;

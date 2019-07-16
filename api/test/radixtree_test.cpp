@@ -90,7 +90,6 @@ TEST_F(RadixTreeFixture, InsertRepeat) {
     ASSERT_EQ(npages, ret);
     ASSERT_EQ(pblk, lookup_paddr);
 }
-#if 0
 
 TEST_F(RadixTreeFixture, InsertMulti) {
     inum_t inum   = 0;
@@ -102,7 +101,6 @@ TEST_F(RadixTreeFixture, InsertMulti) {
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 }
-
 
 TEST_F(RadixTreeFixture, LookupMulti) {
     inum_t inum   = 0;
@@ -116,13 +114,14 @@ TEST_F(RadixTreeFixture, LookupMulti) {
 
     for (size_t p = 0; p < npages; ++p) {
         paddr_t check_paddr;
-        ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk + p, &check_paddr);
+        ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk + p, 
+                                              npages - p, &check_paddr);
         ASSERT_EQ(pblk + p, check_paddr);
         ASSERT_EQ(npages - p, check_size);
     }
 }
 
-
+#if 0
 TEST_F(RadixTreeFixture, EraseRecreate) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
