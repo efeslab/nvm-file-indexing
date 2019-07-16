@@ -86,6 +86,8 @@ static int read_metadata(radixtree_meta_t *radix) {
     if (ret != sizeof(ondev)) return -EIO;
     if (ondev.magic == RADIX_MAGIC) {
         radix->top_page = ondev.top_page;
+        radix->nlevels  = ondev.nlevels;
+        radix->nentries = ondev.nentries;
         return 1;
     }
     return 0;
@@ -95,6 +97,8 @@ static int read_metadata(radixtree_meta_t *radix) {
 static int write_metadata(radixtree_meta_t *radix) {
     ondev_radix_meta_t ondev = {
         .magic    = RADIX_MAGIC,
+        .nlevels  = radix->nlevels,
+        .nentries = radix->nentries,
         .top_page = radix->top_page
     };
 
@@ -206,7 +210,7 @@ static radix_node_t* index_node(radixtree_meta_t *radix,
                                 radix_node_t *node, size_t idx) 
 {
     if_then_panic(idx >= radix->ents_per_node, 
-                  "Bad index calculation! (%llu)\n", idx);
+                  "Bad index calculation! (%lu)\n", idx);
     if_then_panic(!node, "Can't index nullptr!\n");
     if_then_panic(node->rn_depth >= radix->max_depth, 
                   "Cannot index further!\n");
@@ -254,6 +258,12 @@ static paddr_t index_dev_node(radixtree_meta_t *radix, paddr_t node, size_t idx)
     return entry;
 }
 
+/**
+ * Index the given node at index idx. If the resulting page has yet to be 
+ * initialized, initialize it. 
+ * 
+ * Returns the entry at idx.
+ */
 static paddr_t index_create_dev_node(radixtree_meta_t *radix, paddr_t node, size_t idx) 
 {
     if (!node) return 0;
@@ -324,6 +334,10 @@ static int lookup_dev_entry(radixtree_meta_t *radix, paddr_t node,
     return 0;
 }
 
+/**
+ * Inserts the entry into the node at index == idx.
+ * Equivalent to: node[idx] = entry
+ */
 static int insert_dev_entry(radixtree_meta_t *radix, paddr_t node, 
                             size_t idx, paddr_t entry)
 {
@@ -338,6 +352,7 @@ static int insert_dev_entry(radixtree_meta_t *radix, paddr_t node,
 /*******************************************************************************
  * Section: Public API Functions.
  ******************************************************************************/
+
 int radixtree_init(const idx_spec_t *idx_spec,
                    const paddr_range_t *metadata_location,
                    idx_struct_t *idx_struct) 
@@ -354,12 +369,12 @@ int radixtree_init(const idx_spec_t *idx_spec,
 
     radix->blksz         = di.di_block_size;
     radix->ent_size      = sizeof(paddr_t);
-    radix->ents_per_node = 1 << 8; // 8 bits worth
+    radix->ents_per_node = 1 << 9; // 9 bits worth
     radix->max_depth     = 4;
     radix->node_nbytes   = di.di_size_blocks;
     radix->nblk_per_node = 1;
-    radix->ent_idx_mask  = 0xFF;
-    radix->ent_shift     = 8;
+    radix->ent_idx_mask  = 0x1FF;
+    radix->ent_shift     = 9;
     radix->metadata_loc  = *metadata_location; 
     radix->idx_callbacks = idx_spec->idx_callbacks;
     radix->idx_mem_man   = idx_spec->idx_mem_man; 
@@ -370,12 +385,12 @@ int radixtree_init(const idx_spec_t *idx_spec,
     if (merr < 0) return merr;
 
     // Read the top page.
-#if 0
+    #if 0
     radix->cached_tree  = ZALLOC(radix, sizeof(*radix->cached_tree));
     if (!radix->cached_tree) return -ENOMEM;
     ssize_t err = create_radix_node(radix, radix->top_page, 1, radix->cached_tree);
     if (err) return err;
-#endif
+    #endif
 
     // If all of that is successful, finally set up structure.
     idx_struct->idx_metadata  = (void*)radix;
@@ -386,11 +401,77 @@ int radixtree_init(const idx_spec_t *idx_spec,
     return 0;
 }
 
+ssize_t index_and_find(radixtree_meta_t *radix, paddr_t page, uint16_t level, size_t n, 
+                     laddr_t laddr, paddr_t *paddr, bool *cont) 
+{
+    laddr_t start_idx = laddr & radix->ent_idx_mask;
+    ssize_t nfound = 0;
+    *cont = false;
+
+    if (level == 1) {
+        for (laddr_t l = 0; l < (laddr_t)n; ++l) {
+            laddr_t new_idx = (laddr + l) & radix->ent_idx_mask;
+
+            if (new_idx < start_idx) {
+                *cont = true;
+                break;
+            }
+
+            paddr_t new_paddr;
+
+            int err = lookup_dev_entry(radix, page, new_idx, &new_paddr);
+            if (err) return (ssize_t)err;
+
+            if (nfound && new_paddr != *paddr + nfound + 1) {
+                return nfound;
+            } else if (!nfound) {
+                *paddr = new_paddr;
+            } 
+
+            ++nfound;
+        }
+
+        return nfound;
+    }
+
+    laddr_t level_shift = (level - 1) * radix->ent_shift;
+
+    laddr_t index = (laddr >> level_shift) & radix->ent_idx_mask;
+    laddr_t max_index = ((~0u) >> level_shift) & radix->ent_idx_mask;
+
+
+    while (nfound < n) {
+        for (laddr_t i = index; i < max_index; ++i) {  
+            laddr_t new_laddr = laddr + nfound;
+            paddr_t new_paddr;
+            bool cont;
+
+            paddr_t subpage = index_dev_node(radix, page, i);
+            ssize_t ret = index_and_find(radix, subpage, level - 1, 
+                                n - nfound, new_laddr, &new_paddr, &cont);
+
+            if (ret < 0) return ret;
+
+            if (nfound && new_paddr != *paddr + nfound + 1) {
+                return nfound;
+            } else if (!nfound) {
+                *paddr = new_paddr;
+            }
+
+            nfound += ret;
+
+            if (!cont) return nfound;
+        }
+    }
+
+    return nfound;
+}
+
 ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
-                         size_t max_ents, paddr_t *paddr_ret) 
+                         size_t max_ents, paddr_t *paddr) 
 {
     GET_RADIX(idx_struct);
-    *paddr_ret = 0; 
+    *paddr = 0; 
 
     if (!radix->top_page) {
         // Check if someone else made this in the interrum.
@@ -399,6 +480,13 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     }
     if (!radix->top_page) return 0;
 
+    bool unused;
+    ssize_t ret = index_and_find(radix, radix->top_page, radix->nlevels, 
+                        max_ents, laddr, paddr, &unused);
+
+    return ret;
+
+#if 0
     size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
     size_t l2_current = (((size_t)laddr) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
     if (l1_current % 2) l2_current += 256;
@@ -461,6 +549,65 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     }
 
     return ncontiguous;
+#endif
+}
+
+int is_full(radixtree_meta_t *radix) {
+    size_t max_size = radix->ents_per_node;
+    for (int i = radix->nlevels; i > 1; --i) {
+        max_size *= radix->ents_per_node;
+    }
+
+    return max_size == radix->nentries;
+}
+
+ssize_t index_and_insert(radixtree_meta_t *radix, paddr_t page, uint16_t level, size_t n, 
+                     laddr_t laddr, paddr_t paddr) 
+{
+    laddr_t start_idx = laddr & radix->ent_idx_mask;
+    ssize_t ninserted = 0;
+
+    if (level == 1) {
+        
+        for (laddr_t l = 0; l < (laddr_t)n; ++l) {
+            laddr_t new_idx = (laddr + l) & radix->ent_idx_mask;
+
+            if (new_idx < start_idx) {
+                break;
+            }
+
+            paddr_t new_paddr = paddr + l;
+
+            int err = insert_dev_entry(radix, page, new_idx, new_paddr);
+            if (err) return (ssize_t)err;
+
+            ++ninserted;
+        }
+
+        return ninserted;
+    }
+
+    laddr_t level_shift = (level - 1) * radix->ent_shift;
+
+    laddr_t index = (laddr >> level_shift) & radix->ent_idx_mask;
+    laddr_t max_index = ((~0u) >> level_shift) & radix->ent_idx_mask;
+
+    while (ninserted < n && !is_full(radix)) {
+        for (laddr_t i = index; i < max_index; ++i) {  
+            laddr_t new_laddr = laddr + ninserted;
+            paddr_t new_paddr = paddr + ninserted;
+
+            paddr_t subpage = index_create_dev_node(radix, page, i);
+            ssize_t ret = index_and_insert(radix, subpage, level - 1, 
+                                n - ninserted, new_laddr, new_paddr);
+
+            if (ret < 0) return ret;
+
+            ninserted += ret;
+        }
+    }
+
+    return ninserted;
 }
 
 ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
@@ -482,10 +629,33 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         ssize_t nalloc = CB(radix, cb_alloc_metadata, 
                             radix->nblk_per_node, &(radix->top_page));
         if (nalloc != radix->nblk_per_node) return -ENOMEM;
+
+        radix->nlevels = 1;
+
         int werr = write_metadata(radix);
         if (werr) return werr;
     }
 
+    ssize_t ninserted = 0;
+    while (ninserted < nalloc) {
+        laddr_t new_laddr = laddr + ninserted;
+        paddr_t new_paddr = (*paddr) + ninserted;
+        
+        int ret = index_and_insert(radix, radix->top_page, radix->nlevels, nalloc - ninserted, new_laddr, new_paddr);
+
+        if (ret < 0) return ret;
+        if (!ret) break;
+
+        ninserted += ret;
+
+        if (is_full(radix)) {
+            // TODO: add a new level.
+            assert(false && "need to implement resize");
+        } 
+    }
+
+    return nalloc;
+#if 0
     size_t l1_current = (((size_t)laddr) >> (3 * radix->ent_shift)) & radix->ent_idx_mask;
     size_t l2_current = (((size_t)laddr) >> (2 * radix->ent_shift)) & radix->ent_idx_mask;
     if (l1_current % 2) l2_current += 256;
@@ -529,6 +699,7 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     }
 
     return nalloc;
+#endif
 }
 
 ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 

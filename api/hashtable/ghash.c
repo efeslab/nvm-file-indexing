@@ -426,6 +426,7 @@ static const int simd_offsets[] = {
 1225 * 16
 };
 
+#if 0
 #define SIM_W 8
 #define SIM_TYPE __m512i
 typedef union {
@@ -433,6 +434,7 @@ typedef union {
     paddr_t a[8];
 } simd64_t;
 
+#endif
 
 int countSetBits(unsigned int n)
 {
@@ -442,7 +444,7 @@ int countSetBits(unsigned int n)
     }
     return c;
 }
-
+#if 0
 static simd64_t incr = {.a = {
     8 * sizeof(hash_ent_t),
     8 * sizeof(hash_ent_t),
@@ -464,6 +466,7 @@ static simd64_t bitmask = {.a = {
     0x0000FFFFFFFFFFFF,
     0x0000FFFFFFFFFFFF
 }};
+
 
 #define OFFSETS(n) \
 static simd64_t offsets ## n = {.a = { \
@@ -500,6 +503,7 @@ VOFFSETS(1);
 VOFFSETS(2);
 VOFFSETS(3);
 VOFFSETS(4);
+#endif
 
 static uint32_t
 nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
@@ -538,7 +542,7 @@ nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
     __builtin_prefetch((void*)( ((char*)cur) + CL(7) ));
 
     int inc = 0;
-#if 1
+#if 0
     SIM_TYPE tombstone = bitmask.v;
     SIM_TYPE inval = _mm512_set1_epi64(0);
 
