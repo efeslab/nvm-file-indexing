@@ -75,7 +75,6 @@ TEST_F(RadixTreeFixture, RemoveSingle) {
     ASSERT_EQ(nalloc_start, device.num_allocated());
 }
 
-#if 0
 TEST_F(RadixTreeFixture, InsertRepeat) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
@@ -88,9 +87,10 @@ TEST_F(RadixTreeFixture, InsertRepeat) {
 
     paddr_t lookup_paddr;
     ret = radixtree_create(&radixtree, inum, lblk, npages, &lookup_paddr);
-    ASSERT_LT(ret, 0);
-    ASSERT_EQ(0, lookup_paddr);
+    ASSERT_EQ(npages, ret);
+    ASSERT_EQ(pblk, lookup_paddr);
 }
+#if 0
 
 TEST_F(RadixTreeFixture, InsertMulti) {
     inum_t inum   = 0;
