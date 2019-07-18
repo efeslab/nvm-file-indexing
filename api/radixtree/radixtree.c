@@ -481,11 +481,8 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     GET_RADIX(idx_struct);
     *paddr = 0; 
 
-    if (!radix->top_page) {
-        // Check if someone else made this in the interrum.
-        int merr = read_metadata(radix);
-        if (merr < 0) return merr;
-    }
+    int merr = read_metadata(radix);
+    if (merr < 0) return merr;
     if (!radix->top_page) return 0;
 
     bool unused;
