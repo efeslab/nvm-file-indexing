@@ -121,7 +121,7 @@ TEST_F(RadixTreeFixture, LookupMulti) {
     }
 }
 
-#if 0
+
 TEST_F(RadixTreeFixture, EraseRecreate) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
@@ -136,7 +136,7 @@ TEST_F(RadixTreeFixture, EraseRecreate) {
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = radixtree_lookup(&radixtree, inum, lblk, &check_paddr);
+    check_size = radixtree_lookup(&radixtree, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
@@ -160,7 +160,7 @@ TEST_F(RadixTreeFixture, EraseMulti) {
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = radixtree_lookup(&radixtree, inum, lblk, &check_paddr);
+    check_size = radixtree_lookup(&radixtree, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
@@ -182,14 +182,14 @@ TEST_F(RadixTreeFixture, ErasePartial) {
 
     for (laddr_t l = 0; l < (npages - nremove); ++l) {
         paddr_t check_paddr = 0;
-        check_size = radixtree_lookup(&radixtree, inum, l, &check_paddr);
+        check_size = radixtree_lookup(&radixtree, inum, l, npages, &check_paddr);
         ASSERT_EQ(pblk + l, check_paddr);
         ASSERT_EQ(npages - nremove - l, check_size);
     }
 
     for (laddr_t l = (npages - nremove); l < npages; ++l) {
         paddr_t check_paddr = 0;
-        check_size = radixtree_lookup(&radixtree, inum, l, &check_paddr);
+        check_size = radixtree_lookup(&radixtree, inum, l, npages, &check_paddr);
         ASSERT_LT(check_size, 0);
         ASSERT_EQ(0, check_paddr);
     }
@@ -212,9 +212,64 @@ TEST_F(RadixTreeFixture, EraseDeallocate) {
     ASSERT_EQ(nalloced_meta_only, device.num_allocated());
 
     paddr_t check_paddr = 0;
-    check_size = radixtree_lookup(&radixtree, inum, lblk, &check_paddr);
+    check_size = radixtree_lookup(&radixtree, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
 }
-#endif
+
+/*
+    Test grow/shrink capabilities.
+ */
+
+
+TEST_F(RadixTreeFixture, LookupGrow) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1024;
+
+    ssize_t ret = radixtree_create(&radixtree, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    GET_RADIX(&radixtree);
+    ASSERT_EQ(radix->nlevels, 2);
+
+    paddr_t check_paddr;
+    ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk, 
+                                        npages, &check_paddr);
+    ASSERT_EQ(npages, check_size);
+    ASSERT_EQ(pblk, check_paddr);
+}
+
+TEST_F(RadixTreeFixture, GrowAndShrink) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 1024;
+
+    ssize_t ret = radixtree_create(&radixtree, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    GET_RADIX(&radixtree);
+    ASSERT_EQ(radix->nlevels, 2);
+    ASSERT_EQ(radix->nentries, npages);
+
+    paddr_t check_paddr;
+    ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk, 
+                                        npages, &check_paddr);
+    ASSERT_EQ(npages, check_size);
+    ASSERT_EQ(pblk, check_paddr);
+
+    check_size = radixtree_remove(&radixtree, inum, lblk + (npages / 2), 
+                                  npages / 2);
+    ASSERT_EQ(npages / 2, check_size);
+    ASSERT_EQ(radix->nlevels, 1);
+    ASSERT_EQ(radix->nentries, npages / 2);
+
+    check_size = radixtree_lookup(&radixtree, inum, lblk, npages, &check_paddr);
+    ASSERT_EQ(npages / 2, check_size);
+    ASSERT_EQ(pblk, check_paddr);
+}

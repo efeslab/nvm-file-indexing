@@ -10,6 +10,8 @@ extern "C" {
 #include <pthread.h>
 #include "common/common.h"
 
+#define GET_RADIX(i) radixtree_meta_t *radix = (radixtree_meta_t*)(i)->idx_metadata
+
 typedef struct radix_node {
     // Where this page is located on the device.
     // First block of many.
