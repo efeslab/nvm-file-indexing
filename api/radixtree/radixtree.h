@@ -32,7 +32,7 @@ typedef struct radix_node {
 typedef struct ondevice_radixtree_metadata {
     uint32_t magic;
     uint16_t nlevels;
-    uint16_t nentries;
+    uint32_t nentries;
     paddr_t top_page;
 } ondev_radix_meta_t;
 
@@ -41,7 +41,7 @@ typedef struct radixtree_metadata {
     paddr_range_t metadata_loc;
     paddr_t top_page;
     uint16_t nlevels;
-    uint16_t nentries;
+    uint32_t nentries;
     radix_node_t *cached_tree;
 
     size_t blksz;

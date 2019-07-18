@@ -405,6 +405,7 @@ ssize_t index_and_find(radixtree_meta_t *radix, paddr_t page, uint16_t level, si
     laddr_t start_idx = laddr & radix->ent_idx_mask;
     ssize_t nfound = 0;
     *cont = false;
+    *paddr = 0;
 
     if (level == 1) {
         for (laddr_t l = 0; l < (laddr_t)n; ++l) {
@@ -442,33 +443,31 @@ ssize_t index_and_find(radixtree_meta_t *radix, paddr_t page, uint16_t level, si
     laddr_t max_index = ((~0u) >> level_shift) & radix->ent_idx_mask;
 
 
-    while (nfound < n) {
-        for (laddr_t i = index; i <= max_index; ++i) {  
-            laddr_t new_laddr = laddr + nfound;
-            paddr_t new_paddr;
-            bool do_cont;
+    for (laddr_t i = index; i <= max_index && nfound < n; ++i) {  
+        laddr_t new_laddr = laddr + nfound;
+        paddr_t new_paddr;
+        bool do_cont;
 
-            paddr_t subpage = index_dev_node(radix, page, i);
-            if (!subpage) return nfound;
-            
-            ssize_t ret = index_and_find(radix, subpage, level - 1, 
-                                n - nfound, new_laddr, &new_paddr, &do_cont);
+        paddr_t subpage = index_dev_node(radix, page, i);
+        if (!subpage) return nfound;
 
-            if (ret < 0) return ret;
+        ssize_t ret = index_and_find(radix, subpage, level - 1, 
+                            n - nfound, new_laddr, &new_paddr, &do_cont);
 
-            if (nfound && new_paddr != *paddr + nfound) {
-                *cont = false;
-                return nfound;
-            } else if (!nfound && !*paddr) {
-                *paddr = new_paddr;
-            }
+        if (ret < 0) return ret;
 
-            nfound += ret;
+        if (nfound && new_paddr != *paddr + nfound) {
+            *cont = false;
+            return nfound;
+        } else if (!nfound && !*paddr) {
+            *paddr = new_paddr;
+        }
 
-            if (!do_cont) {
-                *cont = false;
-                return nfound;
-            }
+        nfound += ret;
+
+        if (!do_cont) {
+            *cont = false;
+            return nfound;
         }
     }
 

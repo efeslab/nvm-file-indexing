@@ -273,3 +273,23 @@ TEST_F(RadixTreeFixture, GrowAndShrink) {
     ASSERT_EQ(npages / 2, check_size);
     ASSERT_EQ(pblk, check_paddr);
 }
+
+TEST_F(RadixTreeFixture, LookupGrowMulti) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 300000;
+
+    ssize_t ret = radixtree_create(&radixtree, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    GET_RADIX(&radixtree);
+    ASSERT_EQ(radix->nlevels, 3);
+
+    paddr_t check_paddr;
+    ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk, 
+                                        npages, &check_paddr);
+    ASSERT_EQ(npages, check_size);
+    ASSERT_EQ(pblk, check_paddr);
+}
