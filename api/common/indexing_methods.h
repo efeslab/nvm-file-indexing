@@ -56,6 +56,12 @@ typedef int (*set_locking_fn_t)(idx_struct_t*, bool);
 typedef int (*persist_updates_fn_t)(idx_struct_t*);
 typedef int (*invalidate_caches_fn_t)(idx_struct_t*);
 
+/**
+ * Metadata caching is essential for good performance it seems (not re-reading)
+ * data that is likely to change often. This will force re-reading.
+ */
+typedef void (*clear_metadata_cache_fn_t)(idx_struct_t*);
+
 /*
  * Section: Profiling (and statistics)
  *
@@ -81,6 +87,7 @@ typedef struct indexing_functions {
     set_locking_fn_t          im_set_locking;
     persist_updates_fn_t      im_persist;
     invalidate_caches_fn_t    im_invalidate;
+    clear_metadata_cache_fn_t im_clear_metadata;
 
     set_stats_t               im_set_stats;
     print_stats_t             im_print_stats;
