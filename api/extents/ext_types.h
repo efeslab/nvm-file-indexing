@@ -116,7 +116,7 @@ static void print_ext_stats(ext_stats_t *s) {
 }
 
 #define MAX_DEPTH 10
-
+#define DO_MEMOIZATION
 
 typedef struct nvm_api_extent_tree_metadata {
     paddr_range_t et_direct_range;
@@ -127,6 +127,10 @@ typedef struct nvm_api_extent_tree_metadata {
     char **et_buffers;
     // could be extent leaf or branch nodes
     void *et_direct_data;
+
+    // To avoid malloc/free overhead
+    extent_path_t path[MAX_DEPTH];
+    extent_path_t prev_path[MAX_DEPTH];
 
     // -- CACHING
     bool et_cached;

@@ -326,6 +326,10 @@ int __ext_dirty(const char *where, unsigned int line,
     return err;
 }
 
+/**
+ * Clean up path references by setting all the raw data buffers to NULL.
+ * Does not call FREE on anything.
+ */
 void ext_drop_refs(idx_struct_t *ext_idx, extent_path_t *path)
 {
     int depth, i;
@@ -353,19 +357,19 @@ static int ext_check(idx_struct_t *ext_idx, extent_header_t *eh,
     int max = 0;
 
     if (eh->eh_magic != EXT_MAGIC) {
-        error_msg = "invalid magic";
+        error_msg = "%s invalid magic";
         goto corrupted;
     }
     if (le16_to_cpu(eh->eh_depth) != depth) {
-        error_msg = "unexpected eh_depth";
+        error_msg = "%s unexpected eh_depth";
         goto corrupted;
     }
     if (eh->eh_max == 0) {
-        error_msg = "invalid eh_max";
+        error_msg = "%s invalid eh_max";
         goto corrupted;
     }
     if (eh->eh_entries > eh->eh_max) {
-        error_msg = "invalid eh_entries";
+        error_msg = "%s invalid eh_entries";
         goto corrupted;
     }
 
@@ -376,7 +380,7 @@ static int ext_check(idx_struct_t *ext_idx, extent_header_t *eh,
     return 0;
 
 corrupted:
-    if_then_panic(true, error_msg);
+    if_then_panic(true, error_msg, __func__);
     return -EIO;
 }
 
@@ -464,10 +468,11 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
 
     if (path) {
         ext_drop_refs(ext_idx, path);
-        if (depth > path[0].p_maxdepth) {
-            //FREE(ext_idx, path);
-            *orig_path = path = NULL;
-        }
+        assert(depth <= MAX_DEPTH);
+        // if (depth > path[0].p_maxdepth) {
+        //     //FREE(ext_idx, path);
+        //     *orig_path = path = NULL;
+        // }
     }
 
     if (!path) {
@@ -2362,6 +2367,37 @@ int ext_truncate(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
     return ret;
 }
 
+ssize_t search_extent_leaf(extent_leaf_t *ex, laddr_t laddr, paddr_t *paddr) {
+    if (!ex) return 0;
+
+    laddr_t ee_block = le32_to_cpu(ex->ee_block);
+    paddr_t ee_start = ext_pblock(ex);
+    unsigned short ee_len;
+
+    /*
+        * unwritten extents are treated as holes, except that
+        * we split out initialized portions during a write.
+        */
+    ee_len = ext_get_real_len(ex);
+
+    /* find extent covers block. simply return the extent */
+    if (in_range(laddr, ee_block, ee_len)) {
+        /* number of remain blocks in the extent */
+        size_t nblocks = ee_len + ee_block - laddr;
+
+        if (!ext_is_unwritten(ex)) {
+            *paddr = laddr - ee_block + ee_start;
+            return nblocks;
+        }
+    }
+
+    return 0;
+}
+
+/******************************************************************************
+ * API Section
+ *****************************************************************************/
+
 ssize_t extent_tree_create(idx_struct_t *ext_idx, inum_t inum,
                            laddr_t laddr, size_t size, paddr_t *new_paddr)
 {
@@ -2373,7 +2409,7 @@ ssize_t extent_tree_create(idx_struct_t *ext_idx, inum_t inum,
     int create;
 
     if (NULL == ext_idx) return -EINVAL;
-    if_then_panic(size > UINT16_MAX, "too big!!\n");
+    size = size > UINT16_MAX ? UINT16_MAX : size;
 
     int read_ret = read_ext_direct_data(ext_idx);
     if (read_ret) return read_ret;
@@ -2524,13 +2560,26 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
     int read_ret = read_ext_direct_data(ext_idx);
     if (read_ret) return read_ret;
 
+    EXTMETA(ext_idx, ext_meta);
+
+    #ifdef DO_MEMOIZATION
+    depth = ext_tree_depth(ext_idx);
+    ret = search_extent_leaf(ext_meta->prev_path[depth].p_ext, laddr, paddr);
+    if (ret > 0) {
+        return ret;
+    }
+    #endif
+
     /* find extent for this block */
-    path = find_extent(ext_idx, laddr, NULL, 0);
+    extent_path_t *pathp = (extent_path_t*)ext_meta->path;
+    path = find_extent(ext_idx, laddr, &(pathp), 0);   
     if (IS_ERR(path)) {
         err = PTR_ERR(path);
         path = NULL;
         return err;
     }
+
+    assert(path == ext_meta->path);
 
     depth = ext_tree_depth(ext_idx);
 
@@ -2540,7 +2589,8 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
      * this is why assert can't be put in ext_find_extent()
      */
     BUG_ON(path[depth].p_ext == NULL && depth != 0);
-
+ 
+    #if 0
     ex = path[depth].p_ext;
     if (ex) {
         laddr_t ee_block = le32_to_cpu(ex->ee_block);
@@ -2564,6 +2614,14 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
             }
         }
     }
+    #endif
+    ret = search_extent_leaf(path[depth].p_ext, laddr, paddr);
+
+    #ifdef DO_MEMOIZATION
+    if (ret > 0) {
+        memcpy(ext_meta->prev_path, ext_meta->path, sizeof(ext_meta->path));
+    }
+    #endif
 
     return ret;
 }

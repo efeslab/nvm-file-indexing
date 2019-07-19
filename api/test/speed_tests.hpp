@@ -53,7 +53,7 @@ class SpeedTestFixture : public TestFixture,
         ssize_t init_err = 0;
 
         inum_t inum = 17;
-        size_t npages = 10000;
+        size_t npages = 100000;
 };
 
 class SpeedTestFixturePrecreate : public SpeedTestFixture {
@@ -62,8 +62,12 @@ class SpeedTestFixturePrecreate : public SpeedTestFixture {
             SpeedTestFixture::SetUp();
 
             paddr_t pblk;
-            init_err = FN(&idx_struct, im_create,
-                        &idx_struct, inum, 0, npages, &pblk);
+            for (ssize_t s = 0; s < npages; ) {
+                ssize_t ret = FN(&idx_struct, im_create,
+                                 &idx_struct, inum, 0, npages, &pblk);
+                assert(ret > 0);
+                s += ret;
+            }
             
         }   
 };
