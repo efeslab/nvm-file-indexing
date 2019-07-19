@@ -932,7 +932,7 @@ nvm_hash_table_new(hash_func_t       hash_func,
   // Make sure the mod size doesn't go out of range.
   //ht->nvram_size = max(ht->nvram_size, ht->size);
   ht->mod = ht->nvram_size;
-  printf("--------%llx\n", ht->mod);
+  // printf("--------%llx\n", ht->mod);
   size_t scaled_size = ht->nvram_size;
 
   if (max_entries < scaled_size) {

@@ -28,10 +28,21 @@ typedef struct radix_node {
     struct radix_node *rn_cache_tree;
 } radix_node_t;
 
+// For path memoization.
+typedef struct radixtree_path {
+    paddr_t page;
+    laddr_t last_idx;
+    paddr_t last_ent;
+} radixpath_t;
+
+#define DO_MEMOIZATION
+//#undef DO_MEMOIZATION
+
 #define RADIX_MAGIC 0xfeedbeef
 typedef struct ondevice_radixtree_metadata {
     uint32_t magic;
     uint16_t nlevels;
+    uint64_t version;
     uint32_t nentries;
     paddr_t top_page;
 } ondev_radix_meta_t;
@@ -39,9 +50,13 @@ typedef struct ondevice_radixtree_metadata {
 typedef struct radixtree_metadata {
     bool cached;
     paddr_range_t metadata_loc;
+
+    bool is_init;
     paddr_t top_page;
+    uint64_t version;
     uint16_t nlevels;
     uint32_t nentries;
+
     radix_node_t *cached_tree;
 
     size_t blksz;
@@ -55,6 +70,9 @@ typedef struct radixtree_metadata {
     size_t ent_shift;
 
     size_t max_depth;
+
+    // For memoization. One per possible level of the radix tree.
+    radixpath_t prev_path[4];
 
     callback_fns_t *idx_callbacks;
     mem_man_fns_t  *idx_mem_man;
