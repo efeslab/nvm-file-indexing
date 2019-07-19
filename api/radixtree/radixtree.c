@@ -289,18 +289,24 @@ static paddr_t index_create_dev_node(radixtree_meta_t *radix, int level,
 {
     if (!node) return 0;
 
-    #ifdef DO_MEMOIZATION
-    if (radix->prev_path[level].page == node &&
-        radix->prev_path[level].last_idx == idx) {
-        return radix->prev_path[level].last_ent;
-    }
-    #endif
-
+    paddr_t entry;
     paddr_t *node_contents;
     int rerr = get_page(radix, node, &node_contents);
     if (rerr) return 0;
 
-    paddr_t entry = node_contents[idx];
+    #if defined(DO_MEMOIZATION)
+    if (radix->prev_path[level].page == node &&
+        radix->prev_path[level].last_idx == idx) {
+        // Memoized read.
+        entry = radix->prev_path[level].last_ent;
+    } else {
+        // NVM read.
+        entry = node_contents[idx];
+    }
+    #else
+    entry = node_contents[idx];
+    #endif
+
     if (!entry) {
         // We need to allocate this page!
         ssize_t nalloc = CB(radix, cb_alloc_metadata,
@@ -312,7 +318,7 @@ static paddr_t index_create_dev_node(radixtree_meta_t *radix, int level,
         //node_contents[idx + 1] = entry;
     }
 
-    #ifdef DO_MEMOIZATION
+    #if defined(DO_MEMOIZATION)
     radix->prev_path[level].page = node;
     radix->prev_path[level].last_idx = idx;
     radix->prev_path[level].last_ent = entry;
