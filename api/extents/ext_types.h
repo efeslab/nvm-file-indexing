@@ -117,9 +117,10 @@ static void print_ext_stats(ext_stats_t *s) {
 
 #define MAX_DEPTH 10
 #define DO_MEMOIZATION
+//#undef DO_MEMOIZATION
 
 #define METADATA_CACHING
-#undef METADATA_CACHING
+//#undef METADATA_CACHING
 
 typedef struct nvm_api_extent_tree_metadata {
     paddr_range_t et_direct_range;

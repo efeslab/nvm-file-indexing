@@ -111,6 +111,7 @@ int extent_tree_init(const idx_spec_t *idx_spec,
 
     ext_idx->idx_metadata = (void*)ext_meta;
 
+    ext_meta->reread_meta = true; // Always read on init.
     ext_meta->et_direct_range = *direct_ents;
 
     size_t ents_root = ext_space_root(ext_idx);
