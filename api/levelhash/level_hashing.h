@@ -78,6 +78,7 @@ static void print_level_stats(level_stats_t *s) {
 }
 
 #define METADATA_CACHING
+//#undef METADATA_CACHING
 
 typedef struct level_hash {            // A Level hash table
     level_bucket_t *buckets[2];        // The top level and bottom level in the Level hash table
