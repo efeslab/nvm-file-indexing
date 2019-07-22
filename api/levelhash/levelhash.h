@@ -30,6 +30,8 @@ int levelhash_set_caching(idx_struct_t*, bool);
 int levelhash_persist_updates(idx_struct_t*);
 int levelhash_invalidate_caches(idx_struct_t*);
 
+void levelhash_clear_metadata(idx_struct_t*);
+
 void levelhash_set_stats(idx_struct_t* level_idx, bool enable);
 void levelhash_print_stats(idx_struct_t* level_idx);
 

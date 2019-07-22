@@ -2670,16 +2670,17 @@ void extent_tree_print_stats(idx_struct_t *ext_idx) {
 
 
 idx_fns_t extent_tree_fns = {
-    .im_init          = NULL,
-    .im_init_prealloc = extent_tree_init,
-    .im_lookup        = extent_tree_lookup,
-    .im_create        = extent_tree_create,
-    .im_remove        = extent_tree_remove,
+    .im_init           = NULL,
+    .im_init_prealloc  = extent_tree_init,
+    .im_lookup         = extent_tree_lookup,
+    .im_create         = extent_tree_create,
+    .im_remove         = extent_tree_remove,
 
-    .im_set_caching   = extent_tree_set_caching,
-    .im_persist       = extent_tree_persist_updates,
-    .im_invalidate    = extent_tree_invalidate_caches,
+    .im_set_caching    = extent_tree_set_caching,
+    .im_persist        = extent_tree_persist_updates,
+    .im_invalidate     = extent_tree_invalidate_caches,
+    .im_clear_metadata = extent_tree_clear_metadata_cache,
 
-    .im_set_stats     = extent_tree_set_stats,
-    .im_print_stats   = extent_tree_print_stats
+    .im_set_stats      = extent_tree_set_stats,
+    .im_print_stats    = extent_tree_print_stats
 };

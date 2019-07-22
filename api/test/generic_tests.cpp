@@ -10,9 +10,6 @@ INSTANTIATE_TEST_CASE_P(AllStructures,
                                           &hash_fns, 
                                           &levelhash_fns,
                                           &radixtree_fns));
-INSTANTIATE_TEST_CASE_P(OnlyLevelHashing, 
-                        GenericTestFixture,
-                        ::testing::Values(&levelhash_fns));
 
 TEST_P(GenericTestFixture, InitNoError) {
     ASSERT_EQ(0, init_err);
@@ -38,6 +35,10 @@ TEST_P(GenericTestFixture, InsertPersistCheckEach) {
 
         mapping[lblk] = pblk;
         ASSERT_EQ(1, ret) << "Insert: " << lblk << ": " << pblk;
+
+        if (idx_struct.idx_fns->im_clear_metadata) {
+            FN(&idx_other, im_clear_metadata, &idx_other);
+        }
 
         // Make sure no entries go missing during insert.
         for (laddr_t l = 0; l <= lblk; ++l) {
@@ -74,6 +75,10 @@ TEST_P(GenericTestFixture, InsertPersistCheckEnd) {
 
     }
 
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
+
     for (laddr_t l = 0; l < (laddr_t)npages; ++l) {
         ASSERT_EQ(1, mapping.count(l)) << "This should never happen";
 
@@ -104,6 +109,10 @@ TEST_P(GenericTestFixture, InsertPersistThenRemoveAll) {
         ASSERT_EQ(1, ret) << "Insert: " << lblk << ": " << pblk;
     }
 
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
+
     for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
         paddr_t pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
@@ -118,6 +127,9 @@ TEST_P(GenericTestFixture, InsertPersistThenRemoveAll) {
                      &idx_struct, inum, 0, npages);
     ASSERT_EQ(ret, npages);
 
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
 
     // Do another lookup, make sure they are all gone.
     for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
@@ -151,6 +163,10 @@ TEST_P(GenericTestFixture, InsertPersistThenRemoveSome) {
         ASSERT_EQ(1, ret) << "Insert: " << lblk << ": " << pblk;
     }
 
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
+
     for (laddr_t lblk = start; lblk < (laddr_t)npages + start; ++lblk) {
         paddr_t pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
@@ -165,6 +181,9 @@ TEST_P(GenericTestFixture, InsertPersistThenRemoveSome) {
                      &idx_struct, inum, remove, nremove);
     ASSERT_EQ(ret, nremove);
 
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
 
     // Do another lookup for the remainder.
     for (laddr_t lblk = start; lblk < (laddr_t)nremain + start; ++lblk) {
@@ -196,6 +215,10 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveAll) {
     ASSERT_EQ(npages, ret) << "Insert: " << lblk << ": " << pblk;
     ASSERT_NE(0, pblk);
 
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
+
     for (laddr_t l = lblk; l < (laddr_t)npages + lblk; ++l) {
         paddr_t lookup_pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
@@ -207,6 +230,10 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveAll) {
 
     ret = FN(&idx_struct, im_remove, &idx_struct, inum, lblk, npages);
     ASSERT_EQ(ret, npages) << "Remove error: " << strerror(-ret);
+
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
 
     // Do another lookup, make sure they are all gone.
     for (laddr_t l = 0; l < (laddr_t)npages + lblk; ++l) {
@@ -240,6 +267,10 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveSome) {
         ASSERT_EQ(1, ret) << "Insert: " << lblk << ": " << pblk;
     }
 
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
+
     for (laddr_t lblk = start; lblk < (laddr_t)npages + start; ++lblk) {
         paddr_t pblk;
         ssize_t ret = FN(&idx_other, im_lookup,
@@ -254,6 +285,9 @@ TEST_P(GenericTestFixture, Slab_InsertPersistThenRemoveSome) {
                      &idx_struct, inum, remove, nremove);
     ASSERT_EQ(ret, nremove);
 
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
 
     // Do another lookup for the remainder.
     for (laddr_t lblk = start; lblk < (laddr_t)nremain + start; ++lblk) {
@@ -289,6 +323,9 @@ TEST_P(GenericTestFixture, SmallSlab_InsertPersistThenRemoveAll) {
         device.allocate(1); // Ensure the ranges are not contiguous.
     }
 
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
 
     for (laddr_t l = lblk; l < (laddr_t)npages + lblk; ++l) {
         paddr_t lookup_pblk;
@@ -300,6 +337,10 @@ TEST_P(GenericTestFixture, SmallSlab_InsertPersistThenRemoveAll) {
 
     ssize_t ret = FN(&idx_struct, im_remove, &idx_struct, inum, lblk, npages);
     ASSERT_EQ(ret, npages) << "Remove error: " << strerror(-ret);
+
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
 
     // Do another lookup, make sure they are all gone.
     for (laddr_t l = 0; l < (laddr_t)npages + lblk; ++l) {

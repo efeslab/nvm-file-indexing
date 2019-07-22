@@ -262,6 +262,8 @@ TEST_F(LevelHashingFixture, LevelLookupAfterExpandAcrossIndices) {
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 
+    levelhash_clear_metadata(&test_idx);
+
     for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
         paddr_t lookup_paddr;
         ret = levelhash_lookup(&test_idx, 0, lblk, npages - lblk, &lookup_paddr);

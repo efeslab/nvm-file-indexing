@@ -1,18 +1,19 @@
 #include "levelhash.h"
 
 idx_fns_t levelhash_fns = {
-    .im_init          = NULL,
-    .im_init_prealloc = levelhash_init,
-    .im_lookup        = levelhash_lookup,
-    .im_create        = levelhash_create,
-    .im_remove        = levelhash_remove,
+    .im_init           = NULL,
+    .im_init_prealloc  = levelhash_init,
+    .im_lookup         = levelhash_lookup,
+    .im_create         = levelhash_create,
+    .im_remove         = levelhash_remove,
 
-    .im_set_caching   = levelhash_set_caching,
-    .im_persist       = levelhash_persist_updates,
-    .im_invalidate    = levelhash_invalidate_caches,
+    .im_set_caching    = levelhash_set_caching,
+    .im_persist        = levelhash_persist_updates,
+    .im_invalidate     = levelhash_invalidate_caches,
+    .im_clear_metadata = levelhash_clear_metadata,
 
-    .im_set_stats     = levelhash_set_stats,
-    .im_print_stats   = levelhash_print_stats
+    .im_set_stats      = levelhash_set_stats,
+    .im_print_stats    = levelhash_print_stats
 };
 
 int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents, 
@@ -173,4 +174,9 @@ void levelhash_set_stats(idx_struct_t* level_idx, bool enable) {
 void levelhash_print_stats(idx_struct_t* level_idx) {
     LEVELMETA(level_idx, lh);
     print_level_stats(lh->stats);
+}
+
+void levelhash_clear_metadata(idx_struct_t* level_idx) {
+    LEVELMETA(level_idx, lh);
+    lh->reread_meta = true;
 }

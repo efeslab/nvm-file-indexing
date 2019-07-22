@@ -785,13 +785,14 @@ void radixtree_clear_metadata_cache(idx_struct_t *idx_struct) {
 }
 
 idx_fns_t radixtree_fns = {
-    .im_init          = NULL,
-    .im_init_prealloc = radixtree_init,
-    .im_lookup        = radixtree_lookup,
-    .im_create        = radixtree_create,
-    .im_remove        = radixtree_remove,
+    .im_init           = NULL,
+    .im_init_prealloc  = radixtree_init,
+    .im_lookup         = radixtree_lookup,
+    .im_create         = radixtree_create,
+    .im_remove         = radixtree_remove,
 
-    .im_set_caching   = radixtree_set_caching,
-    .im_persist       = radixtree_persist,
-    .im_invalidate    = radixtree_invalidate
+    .im_set_caching    = radixtree_set_caching,
+    .im_persist        = radixtree_persist,
+    .im_invalidate     = radixtree_invalidate, 
+    .im_clear_metadata = radixtree_clear_metadata_cache,
 };
