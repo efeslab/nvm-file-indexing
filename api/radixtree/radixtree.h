@@ -3,6 +3,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+#define _Static_assert static_assert
 #endif
 
 #include <stdint.h>
@@ -41,30 +42,31 @@ typedef struct radixtree_path {
 #define METADATA_CACHING
 //#undef METADATA_CACHING
 
-#define RADIX_MAGIC 0xfeedbeef
+#define RADIX_NDIRECT 7
+#pragma pack(push, radix, 1)
 typedef struct ondevice_radixtree_metadata {
-    uint32_t magic;
-    uint16_t nlevels;
-    uint64_t version;
-    uint32_t nentries;
-    paddr_t top_page;
+    uint32_t nentries;  
+    uint8_t nlevels;
 
-
+    paddr_t direct_entries[RADIX_NDIRECT];
 } ondev_radix_meta_t;
+#pragma pop(radix)
+
+_Static_assert(sizeof(ondev_radix_meta_t) <= 64, "On-device metadata > 64!");
 
 typedef struct radixtree_metadata {
     bool cached;
     paddr_range_t metadata_loc;
 
-    bool is_init;
     paddr_t top_page;
-    uint64_t version;
-    uint16_t nlevels;
+    uint8_t nlevels;
     uint32_t nentries;
 
     // -- CACHING
     // ---- Metadata
     bool reread_meta;
+    bool use_direct;
+    paddr_t direct_entries[RADIX_NDIRECT];
     // ---- General
     radix_node_t *cached_tree;
 

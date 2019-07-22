@@ -18,7 +18,7 @@ class RadixTreeFixture : public TestFixture {
             inode_space = {
                 .pr_start      = 1,
                 .pr_blk_offset = 0,
-                .pr_nbytes     = 256
+                .pr_nbytes     = 64,
             };
 
             // Since the per-inode extent trees don't initially allocate any

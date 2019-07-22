@@ -75,6 +75,17 @@ TEST_P(GenericTestFixture, InsertPersistCheckEnd) {
 
     }
 
+    for (laddr_t l = 0; l < (laddr_t)npages; ++l) {
+        ASSERT_EQ(1, mapping.count(l)) << "This should never happen";
+
+        paddr_t p;
+        ssize_t r = FN(&idx_struct, im_lookup,
+                       &idx_struct, inum, l, npages - l, &p);
+
+        ASSERT_LE(1, r) << strerror(-r) << " on lblk " << l;
+        ASSERT_TRUE(mapping[l] == p);
+    }
+
     if (idx_struct.idx_fns->im_clear_metadata) {
         FN(&idx_other, im_clear_metadata, &idx_other);
     }
@@ -85,7 +96,6 @@ TEST_P(GenericTestFixture, InsertPersistCheckEnd) {
         paddr_t p;
         ssize_t r = FN(&idx_other, im_lookup,
                        &idx_other, inum, l, npages - l, &p);
-
 
         ASSERT_LE(1, r) << strerror(-r) << " on lblk " << l;
         ASSERT_TRUE(mapping[l] == p);
