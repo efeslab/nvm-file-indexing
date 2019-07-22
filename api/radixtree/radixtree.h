@@ -39,6 +39,7 @@ typedef struct radixtree_path {
 //#undef DO_MEMOIZATION
 
 #define METADATA_CACHING
+//#undef METADATA_CACHING
 
 #define RADIX_MAGIC 0xfeedbeef
 typedef struct ondevice_radixtree_metadata {
