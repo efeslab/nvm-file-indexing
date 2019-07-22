@@ -523,12 +523,13 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
     /* walk through internal nodes (index nodes) of the tree from a root */
     while (i) {
 
-        #ifdef DO_MEMOIZATION
+        #if 0
         paddr_t paddr;
         extent_path_t *prevp = &(ext_meta->prev_path[ppos]);
         extent_path_t *prevp_next = &(ext_meta->prev_path[ppos + 1]);
         ret = search_extent_leaf(prevp->p_ext, block, &paddr);
         if (ret > 0) {
+            printf("ADVANCED\n");
             path[ppos].p_block = idx_pblock(prevp->p_idx);
             path[ppos].p_depth = i;
             path[ppos].p_ext = prevp->p_ext;
