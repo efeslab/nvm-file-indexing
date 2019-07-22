@@ -118,6 +118,9 @@ static void print_ext_stats(ext_stats_t *s) {
 #define MAX_DEPTH 10
 #define DO_MEMOIZATION
 
+#define METADATA_CACHING
+#undef METADATA_CACHING
+
 typedef struct nvm_api_extent_tree_metadata {
     paddr_range_t et_direct_range;
     // stats struct
@@ -131,6 +134,9 @@ typedef struct nvm_api_extent_tree_metadata {
     // To avoid malloc/free overhead
     extent_path_t path[MAX_DEPTH];
     extent_path_t prev_path[MAX_DEPTH];
+
+    // -- Force re-read of metadata
+    bool reread_meta;
 
     // -- CACHING
     bool et_cached;

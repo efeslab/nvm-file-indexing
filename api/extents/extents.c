@@ -2636,6 +2636,11 @@ ssize_t extent_tree_remove(idx_struct_t *ext_idx,
     return size;
 }
 
+void extent_tree_clear_metadata_cache(idx_struct_t *ext_idx) {
+    EXTMETA(ext_idx, ext_meta);
+    ext_meta->reread_meta = true;
+}
+
 int extent_tree_set_caching(idx_struct_t* ext_idx, bool enable) {
     EXTMETA(ext_idx, ext_meta);
     ext_meta->et_cached = enable;
