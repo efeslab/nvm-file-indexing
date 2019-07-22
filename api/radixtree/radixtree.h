@@ -38,6 +38,8 @@ typedef struct radixtree_path {
 #define DO_MEMOIZATION
 //#undef DO_MEMOIZATION
 
+#define METADATA_CACHING
+
 #define RADIX_MAGIC 0xfeedbeef
 typedef struct ondevice_radixtree_metadata {
     uint32_t magic;
@@ -57,6 +59,8 @@ typedef struct radixtree_metadata {
     uint16_t nlevels;
     uint32_t nentries;
 
+    // -- CACHING
+    bool reread_meta;
     radix_node_t *cached_tree;
 
     size_t blksz;
@@ -91,6 +95,8 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
 ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
                          size_t npages);
+
+void radixtree_clear_metadata_cache(idx_struct_t *idx_struct);
 
 extern idx_fns_t radixtree_fns;
 

@@ -77,11 +77,20 @@ static int read_metadata(radixtree_meta_t *radix) {
     paddr_range_t *meta = &(radix->metadata_loc);
     if_then_panic(meta->pr_nbytes < sizeof(ondev), 
             "Not enough space for metadata!\n");
+            
+    #ifndef METADATA_CACHING
+    radix->reread_meta = true;
+    #endif
+
+    if (!radix->reread_meta) return 1;
+
     ssize_t ret = CB(radix, cb_read,
                      meta->pr_start, meta->pr_blk_offset, 
                      sizeof(ondev), (char*)&ondev);
-
     if (ret != sizeof(ondev)) return -EIO;
+
+    radix->reread_meta = false;
+    
     if (ondev.magic == RADIX_MAGIC) {
         radix->top_page = ondev.top_page;
         radix->nlevels  = ondev.nlevels;
@@ -94,6 +103,7 @@ static int read_metadata(radixtree_meta_t *radix) {
         radix->version = ondev.version;
         return 1;
     }
+
     return 0;
 }
 
@@ -407,6 +417,7 @@ int radixtree_init(const idx_spec_t *idx_spec,
     int err = CB(idx_spec, cb_get_dev_info, &di);
     if_then_panic(err, "Could not get device size!");
 
+    radix->reread_meta   = true;
     radix->blksz         = di.di_block_size;
     radix->ent_size      = sizeof(paddr_t);
     radix->ents_per_node = 1 << 9; // 9 bits worth
@@ -766,6 +777,11 @@ int radixtree_persist(idx_struct_t *idx_struct) {
 
 int radixtree_invalidate(idx_struct_t *idx_struct) {
     return 0;
+}
+
+void radixtree_clear_metadata_cache(idx_struct_t *idx_struct) {
+    GET_RADIX(idx_struct);
+    radix->reread_meta = true;
 }
 
 idx_fns_t radixtree_fns = {
