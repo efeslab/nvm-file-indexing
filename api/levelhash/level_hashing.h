@@ -77,6 +77,8 @@ static void print_level_stats(level_stats_t *s) {
             (double)s->nchecked / (double)s->nreads);
 }
 
+#define METADATA_CACHING
+
 typedef struct level_hash {            // A Level hash table
     level_bucket_t *buckets[2];        // The top level and bottom level in the Level hash table
     int8_t *cache_state[2];            // API: Tri-state (-1 for not present, 0 for clean, 1 dirty)
@@ -98,6 +100,7 @@ typedef struct level_hash {            // A Level hash table
     bool do_cache;                     // If not cache, reread all the time.
     size_t block_size;                 // size of block on underlying device.
     paddr_range_t range;
+    bool reread_meta;                  // If we need to reread metadata or not.
     // stats struct
     bool enable_stats;
     level_stats_t *stats;

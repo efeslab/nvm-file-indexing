@@ -191,9 +191,17 @@ int read_metadata(const idx_spec_t *idx_spec,
 int reread_metadata(level_hash_t *level) {
     dev_level_hash_t *dhash;
     DECLARE_TIMING();
+
+    #ifndef METADATA_CACHING
+    level->reread_meta = true;
+    #endif
+
+    if (!level->reread_meta) return 0;
+
     if (level->enable_stats) {
         START_TIMING();
     }
+
     if (!level->do_cache || level->meta_cache_state < 0) {
         int ret = read_metadata(level->idx_spec, &(level->range), &dhash);
         if (ret) return -EIO;
@@ -248,6 +256,8 @@ out:
     if (level->enable_stats) {
         UPDATE_TIMING(level->stats, read_metadata);
     }
+
+    level->reread_meta = false;
 
     return 0;
 }
