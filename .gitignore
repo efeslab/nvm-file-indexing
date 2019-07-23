@@ -71,3 +71,6 @@ tags
 # Vim stuff
 *.vim
 *.swp
+
+# VSCode
+.vscode/
