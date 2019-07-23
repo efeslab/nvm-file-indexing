@@ -76,7 +76,7 @@ TEST_F(RadixTreeFixture, RemoveSingle) {
 }
 
 TEST_F(RadixTreeFixture, InsertRepeat) {
-    inum_t inum   = 0;
+    inum_t inum   = 0; 
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;

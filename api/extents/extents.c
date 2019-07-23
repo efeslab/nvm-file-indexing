@@ -450,6 +450,33 @@ static void ext_binsearch(idx_struct_t *ext_idx, extent_path_t *path,
     path->p_ext = l - 1;
 }
 
+ssize_t search_extent_leaf(extent_leaf_t *ex, laddr_t laddr, paddr_t *paddr) {
+    if (!ex) return 0;
+
+    laddr_t ee_block = le32_to_cpu(ex->ee_block);
+    paddr_t ee_start = ext_pblock(ex);
+    unsigned short ee_len;
+
+    /*
+        * unwritten extents are treated as holes, except that
+        * we split out initialized portions during a write.
+        */
+    ee_len = ext_get_real_len(ex);
+
+    /* find extent covers block. simply return the extent */
+    if (in_range(laddr, ee_block, ee_len)) {
+        /* number of remain blocks in the extent */
+        size_t nblocks = ee_len + ee_block - laddr;
+
+        if (!ext_is_unwritten(ex)) {
+            *paddr = laddr - ee_block + ee_start;
+            return nblocks;
+        }
+    }
+
+    return 0;
+}
+
 /* path works like cursor of extent tree.
  * path[0] is root of the tree (stored in inode->i_data)
  */
@@ -495,6 +522,30 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
     i = depth;
     /* walk through internal nodes (index nodes) of the tree from a root */
     while (i) {
+
+        #ifdef DO_MEMOIZATION
+        paddr_t paddr;
+        extent_path_t *prevp = &(ext_meta->prev_path[ppos]);
+        extent_path_t *prevp_next = &(ext_meta->prev_path[ppos + 1]);
+        ret = search_extent_leaf(prevp->p_ext, block, &paddr);
+        if (ret > 0) {
+            path[ppos].p_block = idx_pblock(prevp->p_idx);
+            path[ppos].p_depth = i;
+            path[ppos].p_ext = prevp->p_ext;
+            i--; ppos++;
+
+            if (unlikely(ppos > depth)) {
+                ret = -EIO;
+                goto err;
+            }
+
+            path[ppos].p_raw = prevp_next->p_raw;
+            path[ppos].p_pblk = prevp->p_block;
+            path[ppos].p_hdr = ext_header_from_block(prevp_next->p_raw);
+            continue;
+        }
+        #endif
+
         /* set the nearest index node */
         ext_binsearch_idx(ext_idx, path + ppos, block);
 
@@ -2366,33 +2417,6 @@ int ext_truncate(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
     */
 
     return ret;
-}
-
-ssize_t search_extent_leaf(extent_leaf_t *ex, laddr_t laddr, paddr_t *paddr) {
-    if (!ex) return 0;
-
-    laddr_t ee_block = le32_to_cpu(ex->ee_block);
-    paddr_t ee_start = ext_pblock(ex);
-    unsigned short ee_len;
-
-    /*
-        * unwritten extents are treated as holes, except that
-        * we split out initialized portions during a write.
-        */
-    ee_len = ext_get_real_len(ex);
-
-    /* find extent covers block. simply return the extent */
-    if (in_range(laddr, ee_block, ee_len)) {
-        /* number of remain blocks in the extent */
-        size_t nblocks = ee_len + ee_block - laddr;
-
-        if (!ext_is_unwritten(ex)) {
-            *paddr = laddr - ee_block + ee_start;
-            return nblocks;
-        }
-    }
-
-    return 0;
 }
 
 /******************************************************************************
