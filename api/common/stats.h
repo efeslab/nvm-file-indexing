@@ -46,7 +46,7 @@ static inline unsigned long long _asm_rdtscp(void)
     uint64_t NR(name)
 
 #define PFIELD(p, name) \
-    printf("\t%s: (tsc/op) %llu / %llu (%lf)\n", xstr(name), \
+    printf("\t%s: (tsc/op) %lu / %lu (%lf)\n", xstr(name), \
             (p)->TSC(name), (p)->NR(name),\
             (double)(p)->TSC(name) / (double)(p)->NR(name));
 

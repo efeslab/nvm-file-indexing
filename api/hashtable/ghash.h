@@ -25,11 +25,13 @@
 
 #ifdef __cplusplus
 extern "C" {
+#define _Static_assert static_assert
 #endif
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 // from common
 #include "common/common.h"
@@ -37,29 +39,46 @@ extern "C" {
 // local includes
 #include "hash_functions.h"
 
+#define SIMPLE_ENTRIES
+#undef SIMPLE_ENTRIES
+
 // For the big hash table, mapping (inode, lblk) -> single block
-#pragma pack(push,2)
 typedef struct hash_index_entry {
+#ifdef SIMPLE_ENTRIES
+    paddr_t key;
+    paddr_t value;
+#else
     paddr_t  key;
-    uint16_t index; // Go backwards to modify size on truncate
-    uint16_t size;
+    uint8_t  index; // Go backwards to modify size on truncate
+    uint8_t  size;
     uint16_t value_hi16;
     uint32_t value_low32;
-    uint16_t padding_[7];
+#endif
 } hash_ent_t;
-#pragma pack(pop)
+_Static_assert(16 % sizeof(hash_ent_t) == 0, "Entries cross block boundary!");
 
-#define HASH_ENT_VAL(x) (((paddr_t)x.value_hi16 << 32) | ((paddr_t)x.value_low32))
-#define HASH_ENT_IS_TOMBSTONE(x) (x.value_hi16 == (uint16_t)~0 && \
-                                  x.value_low32 == (uint32_t)~0)
-#define HASH_ENT_IS_EMPTY(x) (x.value_hi16 == 0 && x.value_low32 == 0)
+#ifdef SIMPLE_ENTRIES
+#define HASH_ENT_VAL(x) ((x).value)
+#define HASH_ENT_IS_TOMBSTONE(x) ((x).value == (paddr_t)~0)
+#define HASH_ENT_IS_EMPTY(x) ((x).value == 0)
 #define HASH_ENT_IS_VALID(x) (!HASH_ENT_IS_EMPTY(x) && !HASH_ENT_IS_TOMBSTONE(x))
 
-#define HASH_ENT_SET_TOMBSTONE(x) do {x.value_hi16 = ~0; \
-                                      x.value_low32 = ~0;} while(0)
-#define HASH_ENT_SET_EMPTY(x) do {x.value_hi16 = 0; x.value_low32 = 0;} while(0)
-#define HASH_ENT_SET_VAL(x,v) do {x.value_hi16 = (uint16_t)(v >> 32); \
-                                  x.value_low32 = (uint32_t)(v);} while(0)
+#define HASH_ENT_SET_TOMBSTONE(x) ((x).value = (paddr_t)~0)
+#define HASH_ENT_SET_EMPTY(x) ((x).value = 0)
+#define HASH_ENT_SET_VAL(x,v) ((x).value = v)
+#else
+#define HASH_ENT_VAL(x) (((paddr_t)(x).value_hi16 << 32) | ((paddr_t)(x).value_low32))
+#define HASH_ENT_IS_TOMBSTONE(x) ((x).value_hi16 == (uint16_t)~0 && \
+                                  (x).value_low32 == (uint32_t)~0)
+#define HASH_ENT_IS_EMPTY(x) ((x).value_hi16 == 0 && (x).value_low32 == 0)
+#define HASH_ENT_IS_VALID(x) (!HASH_ENT_IS_EMPTY(x) && !HASH_ENT_IS_TOMBSTONE(x))
+
+#define HASH_ENT_SET_TOMBSTONE(x) do {(x).value_hi16 = ~0; \
+                                      (x).value_low32 = ~0;} while(0)
+#define HASH_ENT_SET_EMPTY(x) do {(x).value_hi16 = 0; (x).value_low32 = 0;} while(0)
+#define HASH_ENT_SET_VAL(x,v) do {(x).value_hi16 = (uint16_t)(v >> 32); \
+                                  (x).value_low32 = (uint32_t)(v);} while(0)
+#endif
 
 //#define RANGE_SIZE (1 << 5) // 32
 #define RANGE_SIZE (1 << 9) // 512 -- 2MB
@@ -90,6 +109,21 @@ typedef struct device_hashtable_metadata {
   paddr_t data_start;
 } dev_hash_metadata_t;
 
+typedef struct hashtable_stats {
+    uint64_t n_lookups;
+    uint64_t n_min_ents_per_lookup;
+    uint64_t n_max_ents_per_lookup;
+    uint64_t n_ents;
+    STAT_FIELD(loop_time);
+} hash_stats_t;
+
+static void print_hashtable_stats(hash_stats_t *s) {
+    printf("hashtable stats: \n");
+    printf("\tAvg. collisions: %.2f\n", (double)s->n_ents / (double)s->n_lookups);
+    printf("\tMin. collisions: %llu\n", s->n_min_ents_per_lookup);
+    printf("\tMax. collisions: %llu\n", s->n_max_ents_per_lookup);
+    PFIELD(s, loop_time);
+}
 
 typedef struct nvm_hashtable_index {
     int             size;
@@ -100,6 +134,7 @@ typedef struct nvm_hashtable_index {
 
     paddr_t         metadata;
     paddr_t         data;
+    char           *data_ptr;
     paddr_t         nvram_size;
     size_t          blksz;
     size_t          range_size;
@@ -109,7 +144,8 @@ typedef struct nvm_hashtable_index {
     int              ref_count;
 
     // callbacks
-    callback_fns_t *callbacks;
+    callback_fns_t *idx_callbacks;
+    mem_man_fns_t  *idx_mem_man;
 
     // device infomation
     device_info_t  *devinfo;
@@ -118,13 +154,17 @@ typedef struct nvm_hashtable_index {
     pthread_rwlock_t *locks;
     pthread_mutex_t *metalock;
 
-    // caching
-#if 0 && defined(HASHCACHE)
+    // -- CACHING
+    bool do_lock;
+    bool do_cache;
     pthread_rwlock_t *cache_lock;
-    unsigned long* cache_bitmap;
-    // array of blocks
-    hash_ent_t **cache;
-#endif
+    int8_t* cache_state;
+    // array of entries
+    hash_ent_t *cache;
+
+    // -- STATS
+    bool enable_stats;
+    hash_stats_t stats;
 } nvm_hash_idx_t;
 
 
@@ -168,65 +208,44 @@ extern uint64_t reads;
 extern uint64_t writes;
 extern uint64_t blocks;
 
-#if 0 && defined(HASHCACHE)
-/*
- * Read a NVRAM block and give the users a reference to our cache (saves a
- * memcpy).
- * Used to read buckets and potentially iterate over them.
- *
- * buf -- reference to cache page. Don't free!
- * offset -- needs to be block aligned!
- * force -- refresh the cache from NVRAM.
- */
-static void
-nvram_read(nvm_hash_idx_t *ht, paddr_t offset, hash_ent_t **buf, bool force) {
-  struct buffer_head *bh;
-  int err;
-
-  /*
-   * Do some caching!
-   */
-  if (__test_and_clear_bit(offset, ht->cache_bitmap)) {
-    force = true;
-  }
-  // if NULL, then it got invalidated or never loaded.
-  if (likely(!force && ht->cache[offset] != NULL)) {
-    *buf = ht->cache[offset];
-    return;
-    //*buf = ht->cache[offset];
-    //return;
-  }
-
-  if (unlikely(ht->cache[offset] == NULL)) {
-    ht->cache[offset] = (hash_ent_t*)mlfs_zalloc(g_block_size_bytes);
-    mlfs_assert(ht->cache[offset]);
-  }
-
-  *buf = ht->cache[offset];
-
-  ht->callbacks->cb_read(ht->data + offset, 0, (char*)ht->cache[offset]);
-  reads++;
-
-}
-
-#endif
 
 /*
  * Convenience wrapper for when you need to look up the single value within
  * the block and nothing else. Index is offset from start (bytes).
  */
+#if 0
 static void
-nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t *ret, bool force) {
+nvm_read_entry(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t **ret, bool force) {
+
     paddr_t block  = ht->data + BLK_NUM(ht, idx);
-    off_t   offset = BLK_IDX(ht, idx) * sizeof(*ret);
+    off_t   offset = BLK_IDX(ht, idx) * sizeof(**ret);
 
-    ssize_t err = ht->callbacks->cb_read(block, offset,
-                                         sizeof(*ret), (char*)ret);
+    if (!ht->do_cache) {
+#if 0
+        ssize_t err = CB(ht, cb_get_addr, block, offset, (char**)ret);
+        if_then_panic(err, "Could not get device address!");
+#else
+        *ret = (hash_ent_t*)(ht->data_ptr + (BLK_NUM(ht, idx) * ht->blksz) + offset);
+#endif
+                        
+    } else if (ht->do_cache && ht->cache_state[idx] < 0) {
+        ssize_t err = CB(ht, cb_read, 
+                         block, offset, sizeof(*ht->cache), (char*)&(ht->cache[idx]));
 
-    if_then_panic(sizeof(*ret) != err, "Did not read enough bytes!");
+        if_then_panic(sizeof(*ht->cache) != err, "Did not read enough bytes!");
+
+        ht->cache_state[idx] = 0;
+
+        *ret = &(ht->cache[idx]);
+    }
+
 
     reads++;
 }
+#else
+#define nvm_read_entry(ht, idx, ret, force) \
+    do { *ret = (hash_ent_t*)(ht->data_ptr + (BLK_NUM(ht, idx) * ht->blksz) + (BLK_IDX(ht, idx) * sizeof(**ret))); } while(0)
+#endif
 
 /*
  * Read the hashtable metadata from disk. If the size is zero, then we need to
@@ -239,7 +258,7 @@ static int
 nvm_read_metadata(nvm_hash_idx_t *ht) {
 
     dev_hash_metadata_t metadata;
-    ssize_t err = ht->callbacks->cb_read(ht->metadata, 0,
+    ssize_t err = CB(ht, cb_read, ht->metadata, 0,
                                          sizeof(metadata), (char*)&metadata);
 
     if_then_panic(err != sizeof(metadata), "Could not read metadata!");
@@ -278,7 +297,7 @@ nvm_write_metadata(nvm_hash_idx_t *ht) {
     metadata.noccupied = ht->noccupied;
     metadata.data_start = ht->data;
 
-    ssize_t err = ht->callbacks->cb_write(ht->metadata, 0,
+    ssize_t err = CB(ht, cb_write, ht->metadata, 0,
                                           sizeof(metadata), (char*)&metadata);
 
     if_then_panic(err != sizeof(metadata), "Could not write metadata!");
@@ -295,14 +314,66 @@ nvm_write_metadata(nvm_hash_idx_t *ht) {
  * index: byte index into range.
  */
 static inline void
-nvm_update(nvm_hash_idx_t *ht, paddr_t idx, hash_ent_t* val) {
-    paddr_t paddr = ht->data + BLK_NUM(ht, idx);
-    ssize_t size  = sizeof(*val);
-    off_t offset  = BLK_IDX(ht, idx) * size;
+nvm_update(nvm_hash_idx_t *ht, paddr_t idx) {
 
-    ssize_t ret = ht->callbacks->cb_write(paddr, offset, size, (char*)val);
+    if (ht->do_cache) {
+#if 0
+        paddr_t paddr = ht->data + BLK_NUM(ht, idx);
+        ssize_t size  = sizeof(*ht->cache);
+        off_t offset  = BLK_IDX(ht, idx) * size;
 
-    if_then_panic(ret != size, "did not write full entry!");
+        ssize_t ret = CB(ht, cb_write, 
+                         paddr, offset, size, (char*)&(ht->cache[idx]));
+
+        if_then_panic(ret != size, "did not write full entry!");
+#endif
+        ht->cache_state[idx] = 1;
+    }
+    // This is a no-op for non-cached, as it reads directly from the device.
+
+}
+
+static inline int nvm_invalidate(nvm_hash_idx_t *ht) {
+    if (unlikely(!ht->do_cache)) return 0;
+
+    pthread_rwlock_wrlock(ht->cache_lock);
+    memset(ht->cache_state, -1, ht->nvram_size);
+    pthread_rwlock_unlock(ht->cache_lock);
+    return 0;
+}
+
+/*
+ * The more interesting function. Find ranges and write them all back at once.
+ */
+static inline int nvm_persist(nvm_hash_idx_t *ht) {
+    if (unlikely(!ht->do_cache)) return 0;
+
+    pthread_rwlock_wrlock(ht->cache_lock);
+    for (paddr_t idx = 0; idx < ht->nvram_size; ++idx) {
+        if (ht->cache_state[idx] > 0) {
+            paddr_t end = idx;
+            while (ht->cache_state[end] > 0) {
+                ht->cache_state[end] = 0;
+                ++end;
+            }
+
+            paddr_t paddr = ht->data + BLK_NUM(ht, idx);
+            ssize_t size  = sizeof(*ht->cache) * (end - idx);
+            off_t offset  = BLK_IDX(ht, idx) * sizeof(*ht->cache);
+
+            ssize_t ret = CB(ht, cb_write, 
+                             paddr, offset, size, (char*)&(ht->cache[idx]));
+            if(ret != size) {
+                pthread_rwlock_unlock(ht->cache_lock);
+                return -EIO;
+            }
+
+            idx = end;
+        } 
+    }
+    pthread_rwlock_unlock(ht->cache_lock);
+
+    return 0;
 }
 
 #ifdef __cplusplus

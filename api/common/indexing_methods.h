@@ -34,10 +34,12 @@ typedef int (*init_struct_prealloc_fn_t)(const idx_spec_t*, const paddr_range_t*
  * Lookup Index: Given an inum and a laddr of the file, find paddr of the
  * device that maps to the laddr.
  *
+ * For Lookup, the size_t is the max number of entries to find.
+ *
  * Returns -ERRNO on failure, and the number of contiguous blocks found with
  * paddr on success.
  */
-typedef ssize_t (*lookup_index_fn_t)(idx_struct_t*, inum_t, laddr_t, paddr_t*);
+typedef ssize_t (*lookup_index_fn_t)(idx_struct_t*, inum_t, laddr_t, size_t, paddr_t*);
 
 typedef ssize_t (*create_index_fn_t)(idx_struct_t*, inum_t, laddr_t, size_t, paddr_t*);
 
@@ -49,8 +51,16 @@ typedef ssize_t (*remove_index_fn_t)(idx_struct_t*, inum_t, laddr_t, size_t);
  * Specifies how indices are persisted or potentially cached.
  */
 
-int persist_updates();
-int clear_caches();
+typedef int (*set_caching_fn_t)(idx_struct_t*, bool);
+typedef int (*set_locking_fn_t)(idx_struct_t*, bool);
+typedef int (*persist_updates_fn_t)(idx_struct_t*);
+typedef int (*invalidate_caches_fn_t)(idx_struct_t*);
+
+/**
+ * Metadata caching is essential for good performance it seems (not re-reading)
+ * data that is likely to change often. This will force re-reading.
+ */
+typedef void (*clear_metadata_cache_fn_t)(idx_struct_t*);
 
 /*
  * Section: Profiling (and statistics)
@@ -72,6 +82,13 @@ typedef struct indexing_functions {
     lookup_index_fn_t         im_lookup;
     create_index_fn_t         im_create;
     remove_index_fn_t         im_remove;
+
+    set_caching_fn_t          im_set_caching;
+    set_locking_fn_t          im_set_locking;
+    persist_updates_fn_t      im_persist;
+    invalidate_caches_fn_t    im_invalidate;
+    clear_metadata_cache_fn_t im_clear_metadata;
+
     set_stats_t               im_set_stats;
     print_stats_t             im_print_stats;
 } idx_fns_t;

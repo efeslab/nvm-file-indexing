@@ -17,65 +17,6 @@ uint32_t crc32c(uint32_t crc, const void *buf, size_t size);
 #define EFSCORRUPTED    117
 #define EFSBADCRC        74
 
-/*
- * inode has i_data array (60 bytes total).
- * The first 12 bytes store extent_header;
- * the remainder stores an array of extent.
- * For non-inode extent blocks, extent_tail
- * follows the array.
- */
-
-/*
- * This is the extent tail on-disk structure.
- * All other extent structures are 12 bytes long.  It turns out that
- * block_size % 12 >= 4 for at least all powers of 2 greater than 512, which
- * covers all valid ext4 block sizes.  Therefore, this tail structure can be
- * crammed into the end of the block without having to rebalance the tree.
- */
-typedef struct nvm_api_extent_tail {
-    uint32_t et_checksum; /* crc32c(uuid+inum+extent_block) */
-} extent_tail_t;
-
-#define ET_CHECKSUM_MAGIC 0xF1ABCD1F
-
-/*
- * This is the extent on-disk structure.
- * It's used at the bottom of the tree.
- */
-typedef struct nvm_api_extent {
-    uint32_t ee_block;    /* first logical block extent covers */
-    uint16_t ee_len;      /* number of blocks covered by extent */
-    uint16_t ee_start_hi; /* high 16 bits of physical block */
-    uint32_t ee_start_lo; /* low 32 bits of physical block */
-} extent_leaf_t;
-
-/*
- * This is the index on-disk structure.
- * It's used at all the levels except for the bottom.
- */
-typedef struct nvm_api_extent_idx {
-    uint32_t ei_block;   /* index covers logical blocks from 'block' */
-    uint32_t ei_leaf_lo; /* pointer to the physical block of the next level.
-                            leaf or next index could be there */
-    uint16_t ei_leaf_hi; /* high 16 bits of physical block */
-    uint16_t ei_unused;
-} extent_branch_t;
-
-#if 0
-_Static_assert(sizeof(extent_branch_t) == sizeof(extent_leaf_t),
-               "Must be the same size!");
-#endif
-
-/*
- * Each block (leaves and indexes), even inode-stored has header.
- */
-typedef struct nvm_api_extent_header {
-    uint16_t eh_magic;      /* probably will support different formats */
-    uint16_t eh_entries;    /* number of valid entries */
-    uint16_t eh_max;        /* capacity of store in entries */
-    uint16_t eh_depth;      /* has tree real underlying blocks? */
-    uint32_t eh_generation; /* generation of the tree */
-} extent_header_t;
 
 /*
  * API Data Structures
@@ -99,23 +40,6 @@ static inline extent_tail_t *find_ext_tail(extent_header_t *eh)
     return (extent_tail_t*)(((void *)eh) + EXTENT_TAIL_OFFSET(eh));
 #endif
 }
-
-/*
- * Array of ext_path contains path to some extent.
- * It works as a cursor for a given key (logical block).
- * Creation/lookup routines use it for traversal/splitting/etc.
- * Truncate uses it to simulate recursive walking.
- */
-typedef struct ext_path {
-    paddr_t p_block;
-    uint16_t p_depth;
-    uint16_t p_maxdepth;
-    extent_leaf_t *p_ext;
-    extent_branch_t *p_idx;
-    extent_header_t *p_hdr;
-    char *p_raw;
-    paddr_t p_pblk;
-} extent_path_t;
 
 /*
  * Flags used by ext4_map_blocks()
@@ -175,13 +99,6 @@ typedef struct ext_path {
 #define MAP_LOG_ALLOC  (1 << 1)
 #define MAP_GC_ALLOC   (1 << 2)
 
-typedef struct nvm_api_map_blocks {
-    paddr_t m_pblk;
-    laddr_t m_lblk;
-    uint32_t m_len;
-    uint32_t m_flags;
-} map_blocks_t;
-
 /*
  * EXT_INIT_MAX_LEN is the maximum number of blocks we can have in an
  * initialized extent. This is 2^15 and not (2^16 - 1), since we use the
@@ -224,7 +141,8 @@ typedef struct nvm_api_map_blocks {
 
 static inline extent_header_t *ext_header(const idx_struct_t *ext_idx)
 {
-    EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, eh);
+    EXTMETA(ext_idx, ext_meta); 
+    EXTHDR(ext_meta, eh);
     return eh;
 }
 
@@ -240,7 +158,6 @@ static inline int write_ext_direct_data(const idx_struct_t *ext_idx)
         printf("nbytes = %lu, but wrote %lu\n",
                 ext_meta->et_direct_range.pr_nbytes,
                 nbytes);
-        fflush(stdout);
         return -EIO;
     }
 
@@ -249,13 +166,28 @@ static inline int write_ext_direct_data(const idx_struct_t *ext_idx)
 
 static inline int read_ext_direct_data(const idx_struct_t *ext_idx) 
 {
-    EXTMETA(ext_idx, ext_meta);
-    ssize_t nmeta = CB(ext_idx, cb_read,
-                       ext_meta->et_direct_range.pr_start,
-                       ext_meta->et_direct_range.pr_blk_offset,
-                       ext_meta->et_direct_range.pr_nbytes,
-                       (char*)ext_meta->et_direct_data);
-    if(nmeta != ext_meta->et_direct_range.pr_nbytes) return -EIO;
+    EXTMETA(ext_idx, ext_meta); 
+    EXTHDR(ext_meta, eh);
+
+    #ifndef METADATA_CACHING
+    if (!ext_meta->et_cached || ext_meta->et_direct_data_cache_state < 0) {
+    #else
+    if (ext_meta->reread_meta) {
+    #endif
+        ssize_t nmeta = CB(ext_idx, cb_read,
+                           ext_meta->et_direct_range.pr_start,
+                           ext_meta->et_direct_range.pr_blk_offset,
+                           ext_meta->et_direct_range.pr_nbytes,
+                           (char*)ext_meta->et_direct_data);
+        if(nmeta != ext_meta->et_direct_range.pr_nbytes) return -EIO;
+
+        ext_meta->et_direct_data_cache_state = 0;
+        #ifdef METADATA_CACHING
+        ext_meta->reread_meta = false;
+        #endif
+
+        memset(ext_meta->prev_path, 0, sizeof(ext_meta->prev_path));
+    }
 
     return 0;
 }
@@ -395,16 +327,11 @@ static inline void idx_store_pblock(extent_branch_t *ix,
 #define ext_dirty(ext_idx, path)  \
     __ext_dirty(__func__, __LINE__, (ext_idx), (path))
 
-int ext_get_blocks(idx_struct_t *ext_idx, map_blocks_t *map, int flags);
-
 extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
                            extent_path_t **orig_path, int flags);
 
 int ext_truncate(idx_struct_t *ext_idx, laddr_t from, laddr_t to);
 
-void extent_tree_set_stats(idx_struct_t *ext_idx, bool enable);
-
-void extent_tree_print_stats(idx_struct_t *ext_idx);
 
 #ifdef __cplusplus
 }

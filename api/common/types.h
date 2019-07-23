@@ -42,6 +42,10 @@ typedef struct memory_management_functions {
 
 typedef ssize_t (*writeback_fn_t)(paddr_t, off_t, size_t, const char*);
 typedef ssize_t (*read_fn_t)(paddr_t, off_t, size_t, char*);
+
+// Rather than copy to the buffer, give the structure direct access.
+typedef ssize_t (*get_dev_addr_fn_t)(paddr_t, off_t, char**);
+
 typedef ssize_t (*alloc_metadata_t)(size_t, paddr_t*);
 typedef ssize_t (*alloc_data_t)(size_t, paddr_t*);
 typedef ssize_t (*dealloc_metadata_t)(size_t, paddr_t);
@@ -54,10 +58,10 @@ typedef struct device_info {
 
 typedef int (*get_dev_info_fn_t)(device_info_t*);
 
-
 typedef struct callback_functions {
     writeback_fn_t      cb_write;
     read_fn_t           cb_read;
+    get_dev_addr_fn_t   cb_get_addr;
     alloc_metadata_t    cb_alloc_metadata;
     alloc_data_t        cb_alloc_data;
     dealloc_metadata_t  cb_dealloc_metadata;

@@ -47,7 +47,7 @@ int hashtable_initialize(const idx_spec_t *idx_spec,
         if_then_panic(nalloc < 1, "no room for metadata!");
     }
 
-    ht = nvm_hash_table_new(nvm_idx_hash6432shift, devinfo.di_size_blocks,
+    ht = nvm_hash_table_new(nvm_xxhash, devinfo.di_size_blocks,
                             devinfo.di_block_size, 1, *location, idx_spec);
     if_then_panic(ht == NULL, "could not allocate hash table");
 
@@ -63,6 +63,11 @@ ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t size, paddr_t *paddr) {
     trace_me();
     NVMHASH(idx_struct, ht);
+#ifdef SIMPLE_ENTRIES
+    size = 1;
+#else
+    size = min(size, 255);
+#endif
 
     ssize_t nalloc = CB(idx_struct, cb_alloc_data, size, paddr);
 
@@ -94,7 +99,7 @@ ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
  * Returns 0 if found, or -errno otherwise.
  */
 ssize_t hashtable_lookup(idx_struct_t *idx_struct, inum_t inum,
-                         laddr_t laddr, paddr_t* paddr) {
+                         laddr_t laddr, size_t max, paddr_t* paddr) {
     trace_me();
     NVMHASH(idx_struct, ht);
 
@@ -174,10 +179,50 @@ ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     return ret;
 }
 
+int hashtable_set_caching(idx_struct_t *idx_struct, bool enable) {
+    NVMHASH(idx_struct, ht);
+    ht->do_cache = enable;
+    return 0;
+}
+
+int hashtable_set_locking(idx_struct_t *idx_struct, bool enable) {
+    NVMHASH(idx_struct, ht);
+    ht->do_lock = enable;
+    return 0;
+}
+
+int hashtable_persist_updates(idx_struct_t *idx_struct) {
+    NVMHASH(idx_struct, ht);
+    return nvm_persist(ht); 
+}
+
+int hashtable_invalidate_caches(idx_struct_t *idx_struct) {
+    NVMHASH(idx_struct, ht);
+    return nvm_invalidate(ht);
+}
+
+void hashtable_set_stats(idx_struct_t *idx_struct, bool enable) {
+    NVMHASH(idx_struct, ht);
+    if (ht) ht->enable_stats = enable;
+}
+
+void hashtable_print_stats(idx_struct_t *idx_struct) {
+    NVMHASH(idx_struct, ht);
+    if (ht) print_hashtable_stats(&(ht->stats));
+}
+
 idx_fns_t hash_fns = {
     .im_init          = hashtable_initialize,
     .im_init_prealloc = NULL,
     .im_lookup        = hashtable_lookup,
     .im_create        = hashtable_create,
-    .im_remove        = hashtable_remove
+    .im_remove        = hashtable_remove,
+
+    .im_set_caching   = hashtable_set_caching,
+    .im_set_locking   = hashtable_set_locking,
+    .im_persist       = hashtable_persist_updates,
+    .im_invalidate    = hashtable_invalidate_caches,
+
+    .im_set_stats     = hashtable_set_stats,
+    .im_print_stats   = hashtable_print_stats
 };

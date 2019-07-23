@@ -33,43 +33,20 @@ ssize_t TestFixture::mock_dealloc_data(size_t nblocks, paddr_t blk) {
 }
 
 ssize_t TestFixture::mock_read(paddr_t blk, off_t off, size_t nbytes, char* buf) {
-    paddr_t end_blk = blk + ((off + nbytes) / BLK_SZ);
-    size_t total = 0;
-    ssize_t cret = 0;
-    for (paddr_t p = blk; p <= end_blk; ++p) {
-        off_t  o = (p == blk) ? off : 0;
-        if (o > BLK_SZ) {
-            p += (o / BLK_SZ);
-            o %= BLK_SZ;
-        }
-        size_t b = (nbytes - total) > (BLK_SZ - o) ? (BLK_SZ - o) : (nbytes - total);
-        ssize_t ret = device[p].read(o, b, buf + total);
-        total += b; 
-        if (ret < 0) return ret;
-        cret += ret;
-    }
-
-    return cret;
+    char *dev_data = device[blk] + off;
+    memmove(buf, dev_data, nbytes);
+    return nbytes;
 }
 
 ssize_t TestFixture::mock_write(paddr_t blk, off_t off, size_t nbytes, const char* buf) {
-    paddr_t end_blk = blk + ((off + nbytes) / BLK_SZ);
-    size_t total = 0;
-    ssize_t cret = 0;
-    for (paddr_t p = blk; p <= end_blk; ++p) {
-        off_t  o = (p == blk) ? off : 0;
-        if (o > BLK_SZ) {
-            p += (o / BLK_SZ);
-            o %= BLK_SZ;
-        }
-        size_t b = (nbytes - total) > (BLK_SZ - o) ? (BLK_SZ - o) : (nbytes - total);
-        ssize_t ret = device[p].write(o, b, buf + total);
-        total += b; 
-        if (ret < 0) return ret;
-        cret += ret;
-    }
+    char *dev_data = device[blk] + off;
+    memmove(dev_data, buf, nbytes);
+    return nbytes;
+}
 
-    return cret;
+ssize_t TestFixture::mock_get_addr(paddr_t blk, off_t off, char **buf) {
+    *buf = device[blk] + off;
+    return 0;
 }
 
 void TestFixture::SetUp() {
@@ -80,6 +57,7 @@ void TestFixture::SetUp() {
    idx_spec.idx_callbacks                      = new callback_fns_t;
    idx_spec.idx_callbacks->cb_write            = mock_write;
    idx_spec.idx_callbacks->cb_read             = mock_read;
+   idx_spec.idx_callbacks->cb_get_addr         = mock_get_addr;
    idx_spec.idx_callbacks->cb_alloc_metadata   = mock_alloc_metadata;
    idx_spec.idx_callbacks->cb_alloc_data       = mock_alloc_data;
    idx_spec.idx_callbacks->cb_dealloc_metadata = mock_dealloc_metadata;
@@ -90,6 +68,7 @@ void TestFixture::SetUp() {
 void TestFixture::TearDown() {
    delete idx_spec.idx_mem_man;
    delete idx_spec.idx_callbacks;
+   device.deallocate();
 }
 
 /*******************************************************************************

@@ -1,13 +1,19 @@
 #include "levelhash.h"
 
 idx_fns_t levelhash_fns = {
-    .im_init          = NULL,
-    .im_init_prealloc = levelhash_init,
-    .im_lookup        = levelhash_lookup,
-    .im_create        = levelhash_create,
-    .im_remove        = levelhash_remove,
-    .im_set_stats     = levelhash_set_stats,
-    .im_print_stats   = levelhash_print_stats
+    .im_init           = NULL,
+    .im_init_prealloc  = levelhash_init,
+    .im_lookup         = levelhash_lookup,
+    .im_create         = levelhash_create,
+    .im_remove         = levelhash_remove,
+
+    .im_set_caching    = levelhash_set_caching,
+    .im_persist        = levelhash_persist_updates,
+    .im_invalidate     = levelhash_invalidate_caches,
+    .im_clear_metadata = levelhash_clear_metadata,
+
+    .im_set_stats      = levelhash_set_stats,
+    .im_print_stats    = levelhash_print_stats
 };
 
 int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents, 
@@ -25,11 +31,18 @@ int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents,
 }
 
 ssize_t levelhash_lookup(idx_struct_t* level_idx, inum_t inum, 
-                         laddr_t laddr, paddr_t* paddr) {
+                         laddr_t laddr, size_t max, paddr_t* paddr) {
     LEVELMETA(level_idx, lh);
     if (reread_metadata(lh)) return -EIO;
 
+    DECLARE_TIMING();
+    if (lh->enable_stats) START_TIMING();
+#if 1
     size_t size = level_dynamic_query(lh, laddr, paddr);
+#else
+    size_t size = level_static_query(lh, laddr, paddr);
+#endif
+    if (lh->enable_stats) UPDATE_TIMING(lh->stats, read_entries);
 
     if (0 == size) return -ENOENT;
 
@@ -39,9 +52,10 @@ ssize_t levelhash_lookup(idx_struct_t* level_idx, inum_t inum,
 ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, size_t nblk, paddr_t* paddr) {
     LEVELMETA(level_idx, lh);
-
-    ssize_t already_exists = levelhash_lookup(level_idx, inum, laddr, paddr);
+#if 1
+    ssize_t already_exists = levelhash_lookup(level_idx, inum, laddr, nblk, paddr);
     if (already_exists > 0) return already_exists;
+#endif
 
     nblk = nblk > LH_MAX_SIZE ? LH_MAX_SIZE : nblk;
 
@@ -126,9 +140,9 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
                 }
             }
         }
-    }
 
-    level_shrink(lh);
+        level_shrink(lh);
+    }
 
     int err = write_metadata(lh);
     if (err) return -EIO;
@@ -136,6 +150,33 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
     return (ssize_t) nblk;
 }
 
+int levelhash_set_caching(idx_struct_t* level_idx, bool enable) {
+    LEVELMETA(level_idx, lh);
+    lh->do_cache = enable;
+    return 0;
+}
 
-void levelhash_set_stats(idx_struct_t* level_idx, bool enable) {}
-void levelhash_print_stats(idx_struct_t* level_idx) {}
+int levelhash_persist_updates(idx_struct_t* level_idx) {
+    LEVELMETA(level_idx, lh);
+    return level_persist(lh);
+}
+
+int levelhash_invalidate_caches(idx_struct_t* level_idx) {
+    LEVELMETA(level_idx, lh);
+    return level_cache_invalidate(lh);
+}
+
+void levelhash_set_stats(idx_struct_t* level_idx, bool enable) {
+    LEVELMETA(level_idx, lh);
+    lh->enable_stats = enable;
+}
+
+void levelhash_print_stats(idx_struct_t* level_idx) {
+    LEVELMETA(level_idx, lh);
+    print_level_stats(lh->stats);
+}
+
+void levelhash_clear_metadata(idx_struct_t* level_idx) {
+    LEVELMETA(level_idx, lh);
+    lh->reread_meta = true;
+}

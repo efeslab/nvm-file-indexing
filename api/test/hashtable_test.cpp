@@ -75,7 +75,7 @@ TEST_F(HashTableFixture, LookupSingle) {
     ASSERT_GT(pblk, 0);
 
     paddr_t check_paddr;
-    ssize_t check_size = hashtable_lookup(&hashtable, inum, lblk, &check_paddr);
+    ssize_t check_size = hashtable_lookup(&hashtable, inum, lblk, npages, &check_paddr);
     ASSERT_EQ(pblk, check_paddr);
     ASSERT_EQ(npages, check_size);
 }
@@ -92,7 +92,7 @@ TEST_F(HashTableFixture, LookupMulti) {
 
     for (size_t p = 0; p < npages; ++p) {
         paddr_t check_paddr;
-        ssize_t check_size = hashtable_lookup(&hashtable, inum, lblk + p, &check_paddr);
+        ssize_t check_size = hashtable_lookup(&hashtable, inum, lblk + p, npages - p, &check_paddr);
         ASSERT_EQ(pblk + p, check_paddr);
         ASSERT_EQ(npages - p, check_size);
     }
@@ -112,7 +112,7 @@ TEST_F(HashTableFixture, EraseSingle) {
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = hashtable_lookup(&hashtable, inum, lblk, &check_paddr);
+    check_size = hashtable_lookup(&hashtable, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
@@ -132,7 +132,7 @@ TEST_F(HashTableFixture, EraseRecreate) {
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = hashtable_lookup(&hashtable, inum, lblk, &check_paddr);
+    check_size = hashtable_lookup(&hashtable, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
@@ -156,7 +156,7 @@ TEST_F(HashTableFixture, EraseMulti) {
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = hashtable_lookup(&hashtable, inum, lblk, &check_paddr);
+    check_size = hashtable_lookup(&hashtable, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
@@ -178,14 +178,15 @@ TEST_F(HashTableFixture, ErasePartial) {
 
     for (laddr_t l = 0; l < (npages - nremove); ++l) {
         paddr_t check_paddr = 0;
-        check_size = hashtable_lookup(&hashtable, inum, l, &check_paddr);
+        check_size = hashtable_lookup(&hashtable, inum, l, 
+                                      npages - nremove - l, &check_paddr);
         ASSERT_EQ(pblk + l, check_paddr);
         ASSERT_EQ(npages - nremove - l, check_size);
     }
 
     for (laddr_t l = (npages - nremove); l < npages; ++l) {
         paddr_t check_paddr = 0;
-        check_size = hashtable_lookup(&hashtable, inum, l, &check_paddr);
+        check_size = hashtable_lookup(&hashtable, inum, l, 1, &check_paddr);
         ASSERT_LT(check_size, 0);
         ASSERT_EQ(0, check_paddr);
     }
@@ -208,7 +209,7 @@ TEST_F(HashTableFixture, EraseDeallocate) {
     ASSERT_EQ(nalloced_meta_only, device.num_allocated());
 
     paddr_t check_paddr = 0;
-    check_size = hashtable_lookup(&hashtable, inum, lblk, &check_paddr);
+    check_size = hashtable_lookup(&hashtable, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);

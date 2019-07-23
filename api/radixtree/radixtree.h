@@ -3,11 +3,15 @@
 
 #ifdef __cplusplus
 extern "C" {
+#define _Static_assert static_assert
 #endif
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <pthread.h>
 #include "common/common.h"
+
+#define GET_RADIX(i) radixtree_meta_t *radix = (radixtree_meta_t*)(i)->idx_metadata
 
 typedef struct radix_node {
     // Where this page is located on the device.
@@ -25,16 +29,45 @@ typedef struct radix_node {
     struct radix_node *rn_cache_tree;
 } radix_node_t;
 
-#define RADIX_MAGIC 0xfeedbeef
+// For path memoization.
+typedef struct radixtree_path {
+    paddr_t page;
+    laddr_t last_idx;
+    paddr_t last_ent;
+} radixpath_t;
+
+#define DO_MEMOIZATION
+//#undef DO_MEMOIZATION
+
+#define METADATA_CACHING
+//#undef METADATA_CACHING
+
+#define RADIX_NDIRECT 7
+#pragma pack(push, radix, 1)
 typedef struct ondevice_radixtree_metadata {
-    uint32_t magic;
-    paddr_t top_page;
+    uint32_t nentries;  
+    uint8_t nlevels;
+
+    paddr_t direct_entries[RADIX_NDIRECT];
 } ondev_radix_meta_t;
+#pragma pop(radix)
+
+_Static_assert(sizeof(ondev_radix_meta_t) <= 64, "On-device metadata > 64!");
 
 typedef struct radixtree_metadata {
     bool cached;
-    paddr_t metadata_blk;
+    paddr_range_t metadata_loc;
+
     paddr_t top_page;
+    uint8_t nlevels;
+    uint32_t nentries;
+
+    // -- CACHING
+    // ---- Metadata
+    bool reread_meta;
+    bool use_direct;
+    paddr_t direct_entries[RADIX_NDIRECT];
+    // ---- General
     radix_node_t *cached_tree;
 
     size_t blksz;
@@ -49,22 +82,28 @@ typedef struct radixtree_metadata {
 
     size_t max_depth;
 
+    // For memoization. One per possible level of the radix tree.
+    radixpath_t prev_path[4];
+
     callback_fns_t *idx_callbacks;
     mem_man_fns_t  *idx_mem_man;
 
 } radixtree_meta_t;
 
-int radixtree_init(const idx_spec_t *idx_spec, idx_struct_t *idx_struct, 
-                   paddr_t *metadata_location);
+int radixtree_init(const idx_spec_t *idx_spec,
+                   const paddr_range_t *metadata_location,
+                   idx_struct_t *idx_struct);
 
 ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
-                         paddr_t *paddr);
+                         size_t max, paddr_t *paddr);
 
 ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
                          size_t npages, paddr_t *paddr);
 
 ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr, 
                          size_t npages);
+
+void radixtree_clear_metadata_cache(idx_struct_t *idx_struct);
 
 extern idx_fns_t radixtree_fns;
 

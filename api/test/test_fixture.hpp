@@ -32,6 +32,8 @@ class TestFixture : public ::testing::Test {
 
         static ssize_t mock_write(paddr_t blk, off_t off, size_t nbytes, const char* buf);
 
+        static ssize_t mock_get_addr(paddr_t blk, off_t off, char **buf);
+
     protected:
         virtual void SetUp() override;
 
