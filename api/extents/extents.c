@@ -390,9 +390,8 @@ corrupted:
  * binary search for the closest index of the given block
  * the header must be checked before calling this
  */
-static void ext_binsearch_idx(idx_struct_t *ext_idx,
-                                   extent_path_t *path,
-                                   laddr_t block)
+static void ext_binsearch_idx(idx_struct_t *ext_idx, extent_path_t *path,
+                              laddr_t block)
 {
     //EXTMETA(ext_idx, ext_meta);
     //EXTHDR(ext_meta, eh);
@@ -527,9 +526,12 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
         paddr_t paddr;
         extent_path_t *prevp = &(ext_meta->prev_path[ppos]);
         extent_path_t *prevp_next = &(ext_meta->prev_path[ppos + 1]);
-        ret = search_extent_leaf(prevp->p_ext, block, &paddr);
-        if (ret > 0) {
-            path[ppos].p_block = idx_pblock(prevp->p_idx);
+        extent_branch_t *l, *r;
+        l = prevp->p_idx;
+        r = EXT_LAST_INDEX(eh) != l ? l + 1 : l;
+        
+        if (l && r && block > idx_lblock(l) && (block < idx_lblock(r) || l == r)) {
+            path[ppos].p_block = idx_pblock(l);
             path[ppos].p_depth = i;
             path[ppos].p_ext = prevp->p_ext;
             i--; ppos++;
@@ -577,6 +579,9 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
         path[ppos].p_pblk = path[ppos-1].p_block;
         path[ppos].p_hdr = eh;
     }
+
+    // (iangneal): Don't add new memoization here because it was the first
+    // thing we checked before we even called into find_extent.
 
     path[ppos].p_depth = i;
     path[ppos].p_ext = NULL;
