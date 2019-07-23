@@ -100,7 +100,6 @@ int extent_tree_init(const idx_spec_t *idx_spec,
 
     if (NULL != ext_meta) return -EEXIST;
 
-    // TODO allocate and such
     // if null, then read from device.
     ext_idx->idx_mem_man   = idx_spec->idx_mem_man;
     ext_idx->idx_callbacks = idx_spec->idx_callbacks;
@@ -526,25 +525,27 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
         paddr_t paddr;
         extent_path_t *prevp = &(ext_meta->prev_path[ppos]);
         extent_path_t *prevp_next = &(ext_meta->prev_path[ppos + 1]);
-        extent_branch_t *l, *r;
-        l = prevp->p_idx;
-        r = EXT_LAST_INDEX(eh) != l ? l + 1 : l;
-        
-        if (l && r && block > idx_lblock(l) && (block < idx_lblock(r) || l == r)) {
-            path[ppos].p_block = idx_pblock(l);
-            path[ppos].p_depth = i;
-            path[ppos].p_ext = prevp->p_ext;
-            i--; ppos++;
+        if (prevp->p_hdr) {
+            extent_branch_t *l, *r;
+            l = prevp->p_idx;
+            r = EXT_LAST_INDEX(prevp->p_hdr) != l ? l + 1 : l;
+            
+            if (l && r && block >= idx_lblock(l) && block < idx_lblock(r)) {
+                path[ppos].p_block = idx_pblock(l);
+                path[ppos].p_depth = i;
+                path[ppos].p_ext = prevp->p_ext;
+                i--; ppos++;
 
-            if (unlikely(ppos > depth)) {
-                ret = -EIO;
-                goto err;
+                if (unlikely(ppos > depth)) {
+                    ret = -EIO;
+                    goto err;
+                }
+
+                path[ppos].p_raw = prevp_next->p_raw;
+                path[ppos].p_pblk = prevp->p_block;
+                path[ppos].p_hdr = ext_header_from_block(prevp_next->p_raw);
+                continue;
             }
-
-            path[ppos].p_raw = prevp_next->p_raw;
-            path[ppos].p_pblk = prevp->p_block;
-            path[ppos].p_hdr = ext_header_from_block(prevp_next->p_raw);
-            continue;
         }
         #endif
 
