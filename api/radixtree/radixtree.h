@@ -43,14 +43,14 @@ typedef struct radixtree_path {
 //#undef METADATA_CACHING
 
 #define RADIX_NDIRECT 7
-#pragma pack(push, radix, 1)
+#pragma pack(push, 1)
 typedef struct ondevice_radixtree_metadata {
     uint32_t nentries;  
     uint8_t nlevels;
 
     paddr_t direct_entries[RADIX_NDIRECT];
 } ondev_radix_meta_t;
-#pragma pop(radix)
+#pragma pack(pop)
 
 _Static_assert(sizeof(ondev_radix_meta_t) <= 64, "On-device metadata > 64!");
 

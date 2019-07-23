@@ -191,7 +191,7 @@ static int write_radix_node(radixtree_meta_t *radix, radix_node_t *node) {
     if (!radix->cached) return 0;
 
     int ret = write_page(radix, node->rn_page, node->rn_dev_contents);
-    if (ret) return ret;
+    return ret;
 }
 
 static int read_radix_node_entry(radixtree_meta_t *radix, 
