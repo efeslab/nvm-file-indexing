@@ -132,8 +132,8 @@ typedef struct nvm_api_extent_tree_metadata {
     void *et_direct_data;
 
     // To avoid malloc/free overhead
-    extent_path_t path[MAX_DEPTH];
-    extent_path_t prev_path[MAX_DEPTH];
+    extent_path_t *path;
+    extent_path_t *prev_path;
 
     // -- Force re-read of metadata
     bool reread_meta;

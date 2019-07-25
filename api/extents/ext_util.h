@@ -167,9 +167,8 @@ static inline int write_ext_direct_data(const idx_struct_t *ext_idx)
 static inline int read_ext_direct_data(const idx_struct_t *ext_idx) 
 {
     EXTMETA(ext_idx, ext_meta); 
-    EXTHDR(ext_meta, eh);
 
-    if (!ext_meta->et_cached || ext_meta->reread_meta) {
+    if (ext_meta->et_cached && ext_meta->reread_meta) {
         ssize_t nmeta = CB(ext_idx, cb_read,
                            ext_meta->et_direct_range.pr_start,
                            ext_meta->et_direct_range.pr_blk_offset,
@@ -182,14 +181,14 @@ static inline int read_ext_direct_data(const idx_struct_t *ext_idx)
 
         ext_meta->et_direct_data = ext_meta->et_direct_data_cache;
 
-        memset(ext_meta->prev_path, 0, sizeof(ext_meta->prev_path));
+        memset(ext_meta->prev_path, 0, sizeof(*ext_meta->prev_path) * MAX_DEPTH);
     } else if (!ext_meta->et_direct_data || ext_meta->reread_meta) {
         int err = CB(ext_idx, cb_get_addr, ext_meta->et_direct_range.pr_start,
                                     ext_meta->et_direct_range.pr_blk_offset,
                                     (char**)&(ext_meta->et_direct_data));
         if (err) return -EIO;
 
-        memset(ext_meta->prev_path, 0, sizeof(ext_meta->prev_path));
+        memset(ext_meta->prev_path, 0, sizeof(*ext_meta->prev_path) * MAX_DEPTH);
     }
 
     return 0;

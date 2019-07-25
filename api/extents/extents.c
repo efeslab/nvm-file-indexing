@@ -119,6 +119,10 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     if (NULL == ext_meta->et_stats) return -ENOMEM;
     ext_meta->et_enable_stats = false;
 
+    ext_meta->path = ZALLOC(idx_spec, sizeof(*(ext_meta->path)) * MAX_DEPTH);
+    ext_meta->prev_path = ZALLOC(idx_spec, sizeof(*(ext_meta->path)) * MAX_DEPTH);
+    if (!ext_meta->path || !ext_meta->prev_path) return -ENOMEM;
+
 #if 0
     ext_meta->et_buffers = ZALLOC(idx_spec, MAX_DEPTH * sizeof(char*));
     if (NULL == ext_meta->et_buffers) return -ENOMEM;
@@ -2429,8 +2433,8 @@ ssize_t extent_tree_create(idx_struct_t *ext_idx, inum_t inum,
     if (NULL == ext_idx) return -EINVAL;
     size = size > UINT16_MAX ? UINT16_MAX : size;
 
-    int read_ret = read_ext_direct_data(ext_idx);
-    if (read_ret) return read_ret;
+    //int read_ret = read_ext_direct_data(ext_idx);
+    //if (read_ret) return read_ret;
 
     /* find extent for this block */
     path = ext_meta->path;
@@ -2564,8 +2568,8 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
     *paddr = 0;
     ret = 0;
 
-    int read_ret = read_ext_direct_data(ext_idx);
-    if (read_ret) return read_ret;
+    //int read_ret = read_ext_direct_data(ext_idx);
+    //if (read_ret) return read_ret;
 
     EXTMETA(ext_idx, ext_meta);
 
@@ -2626,7 +2630,10 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
 
     #ifdef DO_MEMOIZATION
     if (ret > 0) {
-        memcpy(ext_meta->prev_path, ext_meta->path, sizeof(ext_meta->path));
+        extent_path_t *tmp = ext_meta->prev_path;
+        ext_meta->prev_path = ext_meta->path;
+        ext_meta->path = tmp;
+        //memcpy(ext_meta->prev_path, ext_meta->path, sizeof(ext_meta->path));
     }
     #endif
 
@@ -2635,8 +2642,8 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
 
 ssize_t extent_tree_remove(idx_struct_t *ext_idx,
                            inum_t inum, laddr_t laddr, size_t size) {
-    int read_ret = read_ext_direct_data(ext_idx);
-    if (read_ret) return read_ret;
+    //int read_ret = read_ext_direct_data(ext_idx);
+    //if (read_ret) return read_ret;
 
     int err = ext_truncate(ext_idx, laddr, laddr + size - 1);
     if (err) return err;
@@ -2646,6 +2653,9 @@ ssize_t extent_tree_remove(idx_struct_t *ext_idx,
 void extent_tree_clear_metadata_cache(idx_struct_t *ext_idx) {
     EXTMETA(ext_idx, ext_meta);
     ext_meta->reread_meta = true;
+
+    int read_ret = read_ext_direct_data(ext_idx);
+    if_then_panic(read_ret, "could not reread metadata!\n"); 
 }
 
 int extent_tree_set_caching(idx_struct_t* ext_idx, bool enable) {
