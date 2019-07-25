@@ -503,9 +503,9 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
     assert(depth <= MAX_DEPTH);
   
     path[0].p_hdr = eh;
-    if (ext_meta->et_cached) {
-        path[0].p_node = ext_meta->et_direct_cache;
-    }
+    //if (ext_meta->et_cached) {
+    //    path[0].p_node = ext_meta->et_direct_cache;
+    //}
     // buffer_head of root is always NULL.
     //path[0].p_bh = NULL;
 
@@ -525,6 +525,7 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
             if (l && r && block >= idx_lblock(l) && block < idx_lblock(r)) {
                 path[ppos].p_block = idx_pblock(l);
                 path[ppos].p_depth = i;
+                path[ppos].p_idx = prevp->p_idx;
                 path[ppos].p_ext = prevp->p_ext;
                 i--; ppos++;
 
@@ -534,7 +535,8 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
                 }
 
                 path[ppos].p_raw = prevp_next->p_raw;
-                path[ppos].p_pblk = prevp->p_block;
+                //path[ppos].p_pblk = prevp->p_block;
+                path[ppos].p_pblk = idx_pblock(l);
                 path[ppos].p_hdr = ext_header_from_block(prevp_next->p_raw);
                 continue;
             }
@@ -593,7 +595,7 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
 err:
     ext_drop_refs(ext_idx, path);
     if (path) {
-        FREE(ext_idx, path);
+        //FREE(ext_idx, path);
         if (orig_path) {
             *orig_path = NULL;
         }
@@ -2601,39 +2603,22 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
      */
     BUG_ON(path[depth].p_ext == NULL && depth != 0);
  
-    #if 0
-    ex = path[depth].p_ext;
-    if (ex) {
-        laddr_t ee_block = le32_to_cpu(ex->ee_block);
-        paddr_t ee_start = ext_pblock(ex);
-        unsigned short ee_len;
-
-        /*
-         * unwritten extents are treated as holes, except that
-         * we split out initialized portions during a write.
-         */
-        ee_len = ext_get_real_len(ex);
-
-        /* find extent covers block. simply return the extent */
-        if (in_range(laddr, ee_block, ee_len)) {
-            /* number of remain blocks in the extent */
-            size_t nblocks = ee_len + ee_block - laddr;
-
-            if (!ext_is_unwritten(ex)) {
-                *paddr = laddr - ee_block + ee_start;
-                ret = nblocks;
-            }
-        }
-    }
-    #endif
     ret = search_extent_leaf(path[depth].p_ext, laddr, paddr);
 
     #ifdef DO_MEMOIZATION
     if (ret > 0) {
+        #if 1
         extent_path_t *tmp = ext_meta->prev_path;
         ext_meta->prev_path = ext_meta->path;
         ext_meta->path = tmp;
-        //memcpy(ext_meta->prev_path, ext_meta->path, sizeof(ext_meta->path));
+        #elif 0
+        memcpy(ext_meta->prev_path, ext_meta->path, sizeof(*ext_meta->path) * MAX_DEPTH);
+        #else
+        extent_path_t *tmp = ext_meta->prev_path;
+        ext_meta->prev_path = ext_meta->path;
+        ext_meta->path = tmp;
+        memset(ext_meta->path, 0, sizeof(*ext_meta->path)*MAX_DEPTH);
+        #endif
     }
     #endif
 
