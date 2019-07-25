@@ -129,7 +129,6 @@ typedef struct nvm_api_extent_tree_metadata {
     ext_stats_t *et_stats;
     // buffers for the paths
     char **et_buffers;
-    // could be extent leaf or branch nodes
     void *et_direct_data;
 
     // To avoid malloc/free overhead
@@ -143,6 +142,8 @@ typedef struct nvm_api_extent_tree_metadata {
     bool et_cached;
     int8_t et_direct_data_cache_state;
     extent_cache_t *et_direct_cache;
+    // could be extent leaf or branch nodes
+    void *et_direct_data_cache;
 } ext_meta_t;
 
 #ifdef __cplusplus

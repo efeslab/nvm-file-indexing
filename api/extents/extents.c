@@ -114,9 +114,6 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     ext_meta->et_direct_range = *direct_ents;
 
     size_t ents_root = ext_space_root(ext_idx);
-    ext_meta->et_direct_data = ZALLOC(idx_spec,
-            (ents_root * sizeof(extent_leaf_t)) + sizeof(extent_header_t));
-    if (NULL == ext_meta->et_direct_data) { return -ENOMEM; }
 
     ext_meta->et_stats = ZALLOC(idx_spec, sizeof(*(ext_meta->et_stats)));
     if (NULL == ext_meta->et_stats) return -ENOMEM;
@@ -133,6 +130,10 @@ int extent_tree_init(const idx_spec_t *idx_spec,
         if (NULL == ext_meta->et_buffers[i]) return -ENOMEM;
     }
 #endif
+
+    ext_meta->et_direct_data_cache = ZALLOC(idx_spec,
+            (ents_root * sizeof(extent_leaf_t)) + sizeof(extent_header_t));
+    if (NULL == ext_meta->et_direct_data_cache) return -ENOMEM; 
 
     int read_ret = read_ext_direct_data(ext_idx);
     if (read_ret) return read_ret;
@@ -152,8 +153,8 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     ext_meta->et_cached = false;
     ext_meta->et_direct_data_cache_state = 0;
     ext_meta->et_direct_cache = ZALLOC(idx_spec, (ents_root * sizeof(extent_leaf_t)));
-    if (NULL == ext_meta->et_direct_cache) { return -ENOMEM; }
-
+    if (NULL == ext_meta->et_direct_cache) return -ENOMEM;
+    
 
     return 0;
 }
@@ -492,24 +493,11 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
 
     depth = ext_tree_depth(ext_idx);
 
-    if (path) {
-        ext_drop_refs(ext_idx, path);
-        assert(depth <= MAX_DEPTH);
-        // if (depth > path[0].p_maxdepth) {
-        //     //FREE(ext_idx, path);
-        //     *orig_path = path = NULL;
-        // }
-    }
+    if_then_panic(!path, "should send pre-allocated path");
 
-    if (!path) {
-        /* account possible depth increase */
-        path = ZALLOC(ext_idx, sizeof(extent_path_t) * (depth + 2));
-        if (unlikely(!path)) {
-            return (extent_path_t*)ERR_PTR(-ENOMEM);
-        }
-        path[0].p_maxdepth = depth + 1;
-    }
-
+    ext_drop_refs(ext_idx, path);
+    assert(depth <= MAX_DEPTH);
+  
     path[0].p_hdr = eh;
     if (ext_meta->et_cached) {
         path[0].p_node = ext_meta->et_direct_cache;
@@ -2143,7 +2131,7 @@ int ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
 {
     EXTMETA(ext_idx, ext_meta);
     int depth = ext_tree_depth(ext_idx);
-    extent_path_t *path;
+    extent_path_t *path = ext_meta->path;
     int i = 0, err = 0;
 
     /*
@@ -2159,9 +2147,8 @@ int ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
         paddr_t pblk;
 
         /* find extent for or closest extent to this block */
-        path = find_extent(ext_idx, end, NULL, EX_NOCACHE);
-        if (IS_ERR(path))
-            return PTR_ERR(path);
+        path = find_extent(ext_idx, end, &path, EX_NOCACHE);
+        if (IS_ERR(path)) return PTR_ERR(path);
 
         //ext_show_path(inode, path);
 
@@ -2200,8 +2187,7 @@ int ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
              */
             err = force_split_extent_at(ext_idx, &path,
                              end + 1, 1);
-            if (err < 0)
-                goto out;
+            if (err < 0) goto out;
 
         } else if (end >= ex_end) {
             /*
@@ -2328,7 +2314,7 @@ int ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
 out:
     if (path) {
         ext_drop_refs(ext_idx, path);
-        FREE(ext_idx, path);
+        //FREE(ext_idx, path);
     }
 
     return err;
@@ -2438,6 +2424,7 @@ ssize_t extent_tree_create(idx_struct_t *ext_idx, inum_t inum,
     laddr_t allocated = 0;
     paddr_t next, newblock;
     int create;
+    EXTMETA(ext_idx, ext_meta);
 
     if (NULL == ext_idx) return -EINVAL;
     size = size > UINT16_MAX ? UINT16_MAX : size;
@@ -2446,7 +2433,8 @@ ssize_t extent_tree_create(idx_struct_t *ext_idx, inum_t inum,
     if (read_ret) return read_ret;
 
     /* find extent for this block */
-    path = find_extent(ext_idx, laddr, NULL, 0);
+    path = ext_meta->path;
+    path = find_extent(ext_idx, laddr, &(path), 0);
     if (IS_ERR(path)) {
         err = PTR_ERR(path);
         path = NULL;
@@ -2553,24 +2541,12 @@ out:
     }
 
     *new_paddr = newblock;
-#if 0 && defined(REUSE_PREVIOUS_PATH)
-    if (inode->invalidate_path) {
-        inode->invalidate_path = 0;
-        ext_drop_refs(inode->previous_path);
-        free(inode->previous_path); //TODO: for continue debug
-        inode->previous_path = NULL;
-    }
-    else {
-        inode->previous_path = path;
-        path = NULL;
-    }
 
-#endif
 out2:
     if (path) {
         /* write back tree changes (internal/leaf nodes) */
         ext_drop_refs(ext_idx, path);
-        FREE(ext_idx, path);
+        //FREE(ext_idx, path);
     }
 
     return err ? err : allocated;

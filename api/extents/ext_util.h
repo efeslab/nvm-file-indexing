@@ -169,22 +169,25 @@ static inline int read_ext_direct_data(const idx_struct_t *ext_idx)
     EXTMETA(ext_idx, ext_meta); 
     EXTHDR(ext_meta, eh);
 
-    #ifndef METADATA_CACHING
-    if (!ext_meta->et_cached || ext_meta->et_direct_data_cache_state < 0) {
-    #else
-    if (ext_meta->reread_meta) {
-    #endif
+    if (!ext_meta->et_cached || ext_meta->reread_meta) {
         ssize_t nmeta = CB(ext_idx, cb_read,
                            ext_meta->et_direct_range.pr_start,
                            ext_meta->et_direct_range.pr_blk_offset,
                            ext_meta->et_direct_range.pr_nbytes,
-                           (char*)ext_meta->et_direct_data);
+                           (char*)ext_meta->et_direct_data_cache);
         if(nmeta != ext_meta->et_direct_range.pr_nbytes) return -EIO;
 
         ext_meta->et_direct_data_cache_state = 0;
-        #ifdef METADATA_CACHING
         ext_meta->reread_meta = false;
-        #endif
+
+        ext_meta->et_direct_data = ext_meta->et_direct_data_cache;
+
+        memset(ext_meta->prev_path, 0, sizeof(ext_meta->prev_path));
+    } else if (!ext_meta->et_direct_data || ext_meta->reread_meta) {
+        int err = CB(ext_idx, cb_get_addr, ext_meta->et_direct_range.pr_start,
+                                    ext_meta->et_direct_range.pr_blk_offset,
+                                    (char**)&(ext_meta->et_direct_data));
+        if (err) return -EIO;
 
         memset(ext_meta->prev_path, 0, sizeof(ext_meta->prev_path));
     }

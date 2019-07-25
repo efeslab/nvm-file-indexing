@@ -4,15 +4,10 @@
 
 using namespace std;
 #if 0
-INSTANTIATE_TEST_CASE_P(OnlyLevelHashing, 
+INSTANTIATE_TEST_CASE_P(ExtentTree, 
                         CachingTestFixture,
-                        ::testing::Values(&levelhash_fns));
-
-INSTANTIATE_TEST_CASE_P(OnlyGlobalHashTable, 
-                        CachingTestFixture,
-                        ::testing::Values(&hash_fns));
+                        ::testing::Values(&extent_tree_fns));
 #endif
-
 TEST_P(CachingTestFixture, InitNoError) {
     ASSERT_EQ(0, init_err);
 }
