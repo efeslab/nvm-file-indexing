@@ -220,9 +220,7 @@ static int write_radix_node_entry(radixtree_meta_t *radix,
 
     return err;
 }
-#endif
 
-#if 0
 static radix_node_t* index_node(radixtree_meta_t *radix, 
                                 radix_node_t *node, size_t idx) 
 {
@@ -593,7 +591,7 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     return ret;
 }
 
-int is_full(radixtree_meta_t *radix) {
+static inline int is_full(radixtree_meta_t *radix) {
     if (radix->use_direct) return radix->nentries == RADIX_NDIRECT;
 
     size_t max_size = radix->ents_per_node;
@@ -604,7 +602,7 @@ int is_full(radixtree_meta_t *radix) {
     return max_size == radix->nentries;
 }
 
-int can_shrink(radixtree_meta_t *radix) {
+static inline int can_shrink(radixtree_meta_t *radix) {
     if (!radix->nlevels) return 0;
 
     size_t max_size_on_shrink = 1;
@@ -615,9 +613,7 @@ int can_shrink(radixtree_meta_t *radix) {
     return max_size_on_shrink >= radix->nentries;
 }
 
-int can_grow(radixtree_meta_t *radix) {
-    return radix->nlevels < radix->max_depth;
-}
+#define can_grow(r) (r->nlevels < r->max_depth)
 
 ssize_t index_and_insert(radixtree_meta_t *radix, paddr_t page, uint16_t level, size_t n, 
                      laddr_t laddr, paddr_t paddr) 
