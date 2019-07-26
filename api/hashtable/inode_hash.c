@@ -33,7 +33,7 @@ int hashtable_initialize(const idx_spec_t *idx_spec,
 
     // Allocate space on device.
     if_then_panic(devinfo.di_block_size % sizeof(hash_ent_t) != 0,
-                  "bad hash_entry_t size: %llu %% %llu = %llu overflow\n",
+                  "bad hash_entry_t size: %lu %% %lu = %lu overflow\n",
                   devinfo.di_block_size, sizeof(hash_ent_t),
                   devinfo.di_block_size % sizeof(hash_ent_t));
 
@@ -154,7 +154,7 @@ ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
             if_then_panic(was_removed != (size_t)ndeleted, "could not deallocate!");
             ret += was_removed;
         } else {
-            printf("Could not remove requested block %lu from %lu, returned %lld\n", 
+            printf("Could not remove requested block %u from %u, returned %ld\n", 
                     lblk, inum, was_removed);
         }
 
@@ -173,8 +173,7 @@ ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
     if (ret <= 0) return -ENOENT;
 
-    if (ret != size)
-        printf("Only freed %llu of %llu blocks!\n", ret, size);
+    if (ret != size) printf("Only freed %lu of %lu blocks!\n", ret, size);
 
     return ret;
 }
