@@ -179,7 +179,7 @@ int read_metadata(const idx_spec_t *idx_spec,
                   const paddr_range_t *loc, 
                   dev_level_hash_t **dhash) {
     if_then_panic(loc->pr_nbytes < sizeof(**dhash), 
-                  "region is too small! Only have %llu bytes, but need %llu!\n",
+                  "region is too small! Only have %lu bytes, but need %lu!\n",
                   loc->pr_nbytes, sizeof(**dhash));
 
     ssize_t ret = CB(idx_spec, cb_get_addr,
@@ -449,7 +449,7 @@ void level_expand(level_hash_t *level)
     }
 
     if_then_panic(nalloced != new_buckets_blocks, 
-            "could not alloc metadata! Wanted %llu, got %llu!\n",
+            "could not alloc metadata! Wanted %lu, got %lu!\n",
             new_buckets_blocks, nalloced);
 
     level_bucket_t *newBuckets;
@@ -531,7 +531,7 @@ void level_expand(level_hash_t *level)
 
                 if(!insertSuccess){
                     printf("The expanding fails: 3\n");
-                    printf("\tWas expanding to level size %llu\n",
+                    printf("\tWas expanding to level size %lu\n",
                             level->level_size + 1);
                     exit(1);                    
                 }
