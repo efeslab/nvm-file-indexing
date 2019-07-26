@@ -335,6 +335,7 @@ int __ext_dirty(const char *where, unsigned int line,
  * Clean up path references by setting all the raw data buffers to NULL.
  * Does not call FREE on anything.
  */
+#if 0
 void ext_drop_refs(idx_struct_t *ext_idx, extent_path_t *path)
 {
     int depth, i;
@@ -349,6 +350,9 @@ void ext_drop_refs(idx_struct_t *ext_idx, extent_path_t *path)
         }
     }
 }
+#else
+#define ext_drop_refs(ext_idx, path) 0
+#endif
 
 /*
  * Check that whether the basic information inside the extent header
