@@ -72,6 +72,7 @@ typedef struct radixtree_metadata {
     radix_node_t *cached_tree;
 
     size_t blksz;
+    char*  dev_addr; // Avoid frequent callbacks.
     size_t ent_size;
     // We can make the size of radix nodes larger than one block.
     // We want 4 levels, so we have 16 bits of indexing per node.
@@ -90,6 +91,8 @@ typedef struct radixtree_metadata {
     mem_man_fns_t  *idx_mem_man;
 
 } radixtree_meta_t;
+
+#define get_contents(r, pblk) (paddr_t*)(r->dev_addr + (r->blksz * pblk))
 
 int radixtree_init(const idx_spec_t *idx_spec,
                    const paddr_range_t *metadata_location,
