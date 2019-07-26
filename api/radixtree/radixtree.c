@@ -65,7 +65,7 @@ static int write_entry(radixtree_meta_t *radix,
     return 0;
 }
 
-static int get_page(radixtree_meta_t *radix, paddr_t page, paddr_t **page_ptr) {
+static inline int get_page(radixtree_meta_t *radix, paddr_t page, paddr_t **page_ptr) {
     ssize_t err = CB(radix, cb_get_addr,
                      page, 0, (char**)page_ptr);
     return (int)err;
@@ -260,15 +260,18 @@ static radix_node_t* index_node(radixtree_meta_t *radix,
     return child;
 }
 
-static paddr_t index_dev_node(radixtree_meta_t *radix, int level, 
+static inline paddr_t index_dev_node(radixtree_meta_t *radix, int level, 
                               paddr_t node, size_t idx) 
 {
     if (!node) return 0;
 
     #ifdef DO_MEMOIZATION
-    if (radix->prev_path[level].page == node &&
-        radix->prev_path[level].last_idx == idx) {
-        return radix->prev_path[level].last_ent;
+    if (radix->prev_path[level].page == node) {
+        if (radix->prev_path[level].last_idx == idx) {
+            return radix->prev_path[level].last_ent;
+        } else if (radix->prev_path[level].contents) {
+            return radix->prev_path[level].contents[idx];
+        }
     }
     #endif
 
@@ -282,6 +285,7 @@ static paddr_t index_dev_node(radixtree_meta_t *radix, int level,
     radix->prev_path[level].page = node;
     radix->prev_path[level].last_idx = idx;
     radix->prev_path[level].last_ent = entry;
+    radix->prev_path[level].contents = node_contents;
     #endif
     return entry;
 }
@@ -299,19 +303,29 @@ static paddr_t index_create_dev_node(radixtree_meta_t *radix, int level,
 
     paddr_t entry;
     paddr_t *node_contents;
-    int rerr = get_page(radix, node, &node_contents);
-    if (rerr) return 0;
 
     #if defined(DO_MEMOIZATION)
-    if (radix->prev_path[level].page == node &&
-        radix->prev_path[level].last_idx == idx) {
-        // Memoized read.
-        entry = radix->prev_path[level].last_ent;
+    if (radix->prev_path[level].page == node) {
+        node_contents = radix->prev_path[level].contents;
+        if (radix->prev_path[level].last_idx == idx) {
+            entry = radix->prev_path[level].last_ent;
+        } else if (radix->prev_path[level].contents) {
+            entry = radix->prev_path[level].contents[idx];
+        } else {
+            // NVM read.
+            int rerr = get_page(radix, node, &node_contents);
+            if (rerr) return 0;
+            entry = node_contents[idx];
+        }
     } else {
         // NVM read.
+        int rerr = get_page(radix, node, &node_contents);
+        if (rerr) return 0;
         entry = node_contents[idx];
     }
     #else
+    int rerr = get_page(radix, node, &node_contents);
+    if (rerr) return 0;
     entry = node_contents[idx];
     #endif
 
@@ -330,6 +344,7 @@ static paddr_t index_create_dev_node(radixtree_meta_t *radix, int level,
     radix->prev_path[level].page = node;
     radix->prev_path[level].last_idx = idx;
     radix->prev_path[level].last_ent = entry;
+    radix->prev_path[level].contents = node_contents;
     #endif
 
     return entry;
@@ -369,8 +384,8 @@ static int lookup_entry(radixtree_meta_t *radix, radix_node_t *node,
     return 0;
 }
 
-static int lookup_dev_entry(radixtree_meta_t *radix, paddr_t node, 
-                            size_t idx, paddr_t *entry)
+static inline int lookup_dev_entry(radixtree_meta_t *radix, paddr_t node, 
+                                size_t idx, paddr_t *entry)
 {
     *entry = 0;
 
@@ -386,7 +401,7 @@ static int lookup_dev_entry(radixtree_meta_t *radix, paddr_t node,
  * Inserts the entry into the node at index == idx.
  * Equivalent to: node[idx] = entry
  */
-static int insert_dev_entry(radixtree_meta_t *radix, paddr_t node, 
+static inline int insert_dev_entry(radixtree_meta_t *radix, paddr_t node, 
                             size_t idx, paddr_t entry)
 {
     paddr_t *node_contents;
