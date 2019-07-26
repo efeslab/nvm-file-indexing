@@ -73,7 +73,7 @@ static void print_level_stats(level_stats_t *s) {
     PFIELD(s, per_read);
     PFIELD(s, per_loop);
     PFIELD(s, read_entries);
-    printf("\t Ratio: %llu / %llu (%lf)\n", s->nchecked, s->nreads, 
+    printf("\t Ratio: %lu / %lu (%lf)\n", s->nchecked, s->nreads, 
             (double)s->nchecked / (double)s->nreads);
 }
 

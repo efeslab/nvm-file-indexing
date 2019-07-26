@@ -546,8 +546,6 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     GET_RADIX(idx_struct);
     *paddr = 0; 
 
-    int merr = read_metadata(radix);
-    if (merr < 0) return merr;
     if (!radix->nentries) return 0;
 
     bool unused;
@@ -836,6 +834,8 @@ int radixtree_invalidate(idx_struct_t *idx_struct) {
 void radixtree_clear_metadata_cache(idx_struct_t *idx_struct) {
     GET_RADIX(idx_struct);
     radix->reread_meta = true;
+    int merr = read_metadata(radix);
+    if_then_panic(merr < 0, "could not reread metadata!");
 }
 
 idx_fns_t radixtree_fns = {
