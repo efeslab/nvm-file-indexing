@@ -1,5 +1,5 @@
 #include <stdbool.h>
-#include "inode_hash.h"
+#include "cuckoohash.h"
 
 #if 0
 #define trace_me() \
@@ -12,15 +12,16 @@
 #define trace_me() 0
 #endif
 
-int hashtable_initialize(const idx_spec_t *idx_spec,
+int cuckoohash_initialize(const idx_spec_t *idx_spec,
                          idx_struct_t *idx_struct,
                          paddr_t *location) {
+#if 0
     trace_me();
     if_then_panic(!idx_spec, "idx_spec cannot be null!");
     if_then_panic(!idx_struct, "idx_struct cannot be null!");
     if_then_panic(!location, "location ptr cannot be null!");
 
-    nvm_hash_idx_t *ht = (nvm_hash_idx_t*)idx_struct->idx_metadata;
+    nvm_cuckoo_idx_t *ht = (nvm_cuckoo_idx_t*)idx_struct->idx_metadata;
 
     if (ht) return -EEXIST;
 
@@ -54,20 +55,19 @@ int hashtable_initialize(const idx_spec_t *idx_spec,
     idx_struct->idx_metadata = (void*)ht;
 
     return 0;
+#else
+    return -EBUSY;
+#endif
 }
 
 // if not exists, then the value was not already in the table, therefore
 // success.
 // returns 1 on success, 0 if key already existed
-ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
+ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t size, paddr_t *paddr) {
+#if 0
     trace_me();
-    NVMHASH(idx_struct, ht);
-#ifdef SIMPLE_ENTRIES
-    size = 1;
-#else
-    size = min(size, 255);
-#endif
+    CUCKOOHASH(idx_struct, ht);
 
     ssize_t nalloc = CB(idx_struct, cb_alloc_data, size, paddr);
 
@@ -93,21 +93,28 @@ ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
     }
 
     return nalloc;
+#else
+    return -ENOMEM;
+#endif
 }
 
 /*
  * Returns 0 if found, or -errno otherwise.
  */
-ssize_t hashtable_lookup(idx_struct_t *idx_struct, inum_t inum,
+ssize_t cuckoohash_lookup(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t max, paddr_t* paddr) {
+#if 0
     trace_me();
-    NVMHASH(idx_struct, ht);
+    CUCKOOHASH(idx_struct, ht);
 
     hash_key_t k = MAKEKEY(inum, laddr);
     size_t size;
     nvm_hash_table_lookup(ht, k, paddr, &size, false);
     if (*paddr != 0) return (ssize_t)size;
     return -ENOENT;
+#else
+    return -ENOENT;
+#endif
 }
 
 /*
@@ -115,10 +122,11 @@ ssize_t hashtable_lookup(idx_struct_t *idx_struct, inum_t inum,
  * two hash tables.
  * TODO need to deallocate here!
  */
-ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
+ssize_t cuckoohash_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
                          size_t size) {
+#if 0
     trace_me();
-    NVMHASH(idx_struct, ht);
+    CUCKOOHASH(idx_struct, ht);
 
     if (size == 0) return -EINVAL;
 
@@ -176,52 +184,47 @@ ssize_t hashtable_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     if (ret != size) printf("Only freed %lu of %lu blocks!\n", ret, size);
 
     return ret;
+#else
+    return 0;
+#endif
 }
 
-int hashtable_set_caching(idx_struct_t *idx_struct, bool enable) {
-    NVMHASH(idx_struct, ht);
-    ht->do_cache = enable;
+int cuckoohash_set_caching(idx_struct_t *idx_struct, bool enable) {
     return 0;
 }
 
-int hashtable_set_locking(idx_struct_t *idx_struct, bool enable) {
-    NVMHASH(idx_struct, ht);
-    ht->do_lock = enable;
+int cuckoohash_set_locking(idx_struct_t *idx_struct, bool enable) {
     return 0;
 }
 
-int hashtable_persist_updates(idx_struct_t *idx_struct) {
-    NVMHASH(idx_struct, ht);
-    return nvm_persist(ht); 
+int cuckoohash_persist_updates(idx_struct_t *idx_struct) {
+    return 0; 
 }
 
-int hashtable_invalidate_caches(idx_struct_t *idx_struct) {
-    NVMHASH(idx_struct, ht);
-    return nvm_invalidate(ht);
+int cuckoohash_invalidate_caches(idx_struct_t *idx_struct) {
+    return 0;
 }
 
-void hashtable_set_stats(idx_struct_t *idx_struct, bool enable) {
-    NVMHASH(idx_struct, ht);
-    if (ht) ht->enable_stats = enable;
+void cuckoohash_set_stats(idx_struct_t *idx_struct, bool enable) {
+    return;
 }
 
-void hashtable_print_stats(idx_struct_t *idx_struct) {
-    NVMHASH(idx_struct, ht);
-    if (ht) print_hashtable_stats(&(ht->stats));
+void cuckoohash_print_stats(idx_struct_t *idx_struct) {
+    return;
 }
 
-idx_fns_t hash_fns = {
-    .im_init          = hashtable_initialize,
+idx_fns_t cuckoohash_fns = {
+    .im_init          = cuckoohash_initialize,
     .im_init_prealloc = NULL,
-    .im_lookup        = hashtable_lookup,
-    .im_create        = hashtable_create,
-    .im_remove        = hashtable_remove,
+    .im_lookup        = cuckoohash_lookup,
+    .im_create        = cuckoohash_create,
+    .im_remove        = cuckoohash_remove,
 
-    .im_set_caching   = hashtable_set_caching,
-    .im_set_locking   = hashtable_set_locking,
-    .im_persist       = hashtable_persist_updates,
-    .im_invalidate    = hashtable_invalidate_caches,
+    .im_set_caching   = cuckoohash_set_caching,
+    .im_set_locking   = cuckoohash_set_locking,
+    .im_persist       = cuckoohash_persist_updates,
+    .im_invalidate    = cuckoohash_invalidate_caches,
 
-    .im_set_stats     = hashtable_set_stats,
-    .im_print_stats   = hashtable_print_stats
+    .im_set_stats     = cuckoohash_set_stats,
+    .im_print_stats   = cuckoohash_print_stats
 };

@@ -19,6 +19,7 @@ add_executable(TestSuite
                ${test_src}
                $<TARGET_OBJECTS:Common>
                $<TARGET_OBJECTS:HashTable>
+               $<TARGET_OBJECTS:CuckooHash>
                $<TARGET_OBJECTS:ExtentTree>
                $<TARGET_OBJECTS:LevelHashing>
                $<TARGET_OBJECTS:RadixTree>

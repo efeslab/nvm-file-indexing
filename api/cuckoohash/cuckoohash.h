@@ -5,7 +5,8 @@
 #include <memory.h>
 #include <string.h>
 
-#include "ghash.h"
+#include "common/common.h"
+#include "cuckoo_hash_impl.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,30 +16,28 @@ extern "C" {
 
 typedef paddr_t hash_key_t;
 
-extern idx_fns_t hash_fns;
-
 /*
  * Generic hash table functions.
  */
 
-#define NVMHASH(i, n) nvm_hash_idx_t *(n) = (nvm_hash_idx_t*)(i)->idx_metadata
+#define CUCKOOHASH(i, n) nvm_cuckoo_idx_t *(n) = (nvm_cuckoo_idx_t*)(i)->idx_metadata
 
-int hashtable_initialize(const idx_spec_t *idx_spec,
+int cuckoohash_initialize(const idx_spec_t *idx_spec,
                          idx_struct_t *idx_struct, paddr_t *location);
 
-ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
+ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t size, paddr_t *new_paddr);
 
-ssize_t hashtable_lookup(idx_struct_t *idx_struct, inum_t inum,
+ssize_t cuckoohash_lookup(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t max, paddr_t* paddr);
 
-ssize_t hashtable_remove(idx_struct_t *idx_struct,
+ssize_t cuckoohash_remove(idx_struct_t *idx_struct,
                          inum_t inum, laddr_t laddr, size_t size);
 
-int hashtable_set_caching(idx_struct_t *idx_struct, bool enable);
-int hashtable_set_locking(idx_struct_t *idx_struct, bool enable);
-int hashtable_persist_updates(idx_struct_t *idx_struct);
-int hashtable_invalidate_caches(idx_struct_t *idx_struct);
+int cuckoohash_set_caching(idx_struct_t *idx_struct, bool enable);
+int cuckoohash_set_locking(idx_struct_t *idx_struct, bool enable);
+int cuckoohash_persist_updates(idx_struct_t *idx_struct);
+int cuckoohash_invalidate_caches(idx_struct_t *idx_struct);
 
 #ifdef __cplusplus
 }

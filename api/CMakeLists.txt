@@ -8,6 +8,7 @@ set (VERSION_MINOR 1)
 
 add_subdirectory(common)
 add_subdirectory(hashtable)
+add_subdirectory(cuckoohash)
 add_subdirectory(extents)
 add_subdirectory(levelhash)
 add_subdirectory(radixtree)
@@ -22,6 +23,7 @@ add_library(NVMIndexingAPI SHARED
             ${api_src}
             $<TARGET_OBJECTS:Common>
             $<TARGET_OBJECTS:HashTable>
+            $<TARGET_OBJECTS:CuckooHash>
             $<TARGET_OBJECTS:ExtentTree>
             $<TARGET_OBJECTS:LevelHashing>
             $<TARGET_OBJECTS:RadixTree>

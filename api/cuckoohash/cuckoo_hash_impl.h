@@ -15,40 +15,45 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _CUCKOO_HASH_H
-#define _CUCKOO_HASH_H 1
+#ifndef __NVM_IDX_CUCKOO_HASH__
+#define __NVM_IDX_CUCKOO_HASH__ 1
 
 #include <stddef.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#define _Static_assert static_assert
+#endif  /* __cplusplus */
 
 #define CUCKOO_HASH_FAILED  ((void *) -1)
 
 
-struct cuckoo_hash_item
-{
-  const void *key;
-  size_t key_len;
-  void *value;
+struct cuckoo_hash_item {
+    const void *key;
+    size_t key_len;
+    void *value;
 };
 
+typedef struct cuckoo_hash_elem {
+    struct cuckoo_hash_item hash_item;
+    uint32_t hash1;
+    uint32_t hash2;
+} cuckoo_elem_t;
 
-struct _cuckoo_hash_elem;
+#define sz sizeof(cuckoo_elem_t)
 
+_Static_assert(sz <= 64, "Must be <= cache line size!");
+_Static_assert(sz == 1 || !(sz & (sz - 1)) , "Must be a power of 2!");
 
-struct cuckoo_hash
-{
-  struct _cuckoo_hash_elem *table;
-  size_t count;
-  unsigned int bin_size;
-  unsigned char power;
-};
+#undef sz
 
-
-#ifdef __cplusplus
-extern "C" {
-#endif  /* __cplusplus */
-
+typedef struct cuckoo_hash {
+    struct cuckoo_hash_elem *table;
+    size_t count;
+    unsigned int bin_size;
+    unsigned char power;
+} nvm_cuckoo_idx_t;
 
 /*
   cuckoo_hash_init(hash, power):
