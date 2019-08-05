@@ -21,6 +21,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include "common/common.h"
+
 #ifdef __cplusplus
 extern "C" {
 #define _Static_assert static_assert
@@ -48,11 +50,15 @@ _Static_assert(sz == 1 || !(sz & (sz - 1)) , "Must be a power of 2!");
 
 #undef sz
 
+typedef struct cuckoo_meta {
+    paddr_t elem_start_blk;
+    size_t max_size;
+    size_t num_elements;
+} nvm_cuckoo_metadata_t;
+
 typedef struct cuckoo_hash {
-    struct cuckoo_hash_elem *table;
-    size_t count;
-    unsigned int bin_size;
-    unsigned char power;
+    nvm_cuckoo_metadata_t meta;
+    cuckoo_elem_t *table;
 } nvm_cuckoo_idx_t;
 
 /*
