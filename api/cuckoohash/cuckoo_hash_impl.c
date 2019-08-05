@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "cuckoo_hash.h"
+#include "cuckoo_hash_impl.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,11 +61,7 @@ cuckoo_hash_init(struct cuckoo_hash *hash, unsigned char power)
     hash->table = calloc((size_t) hash->bin_size << power, 
             sizeof(*hash->table));
     if (! hash->table)
-    return false;
-
-    XPROBES_SITE(cuckoo_hash, init,
-               (const struct cuckoo_hash *),
-               (hash));
+        return false;
 
     return true;
 }
@@ -74,11 +70,7 @@ cuckoo_hash_init(struct cuckoo_hash *hash, unsigned char power)
 void
 cuckoo_hash_destroy(const struct cuckoo_hash *hash)
 {
-  XPROBES_SITE(cuckoo_hash, destroy,
-               (const struct cuckoo_hash *),
-               (hash));
-
-  free(hash->table);
+    free(hash->table);
 }
 
 
@@ -86,7 +78,7 @@ static inline
 struct _cuckoo_hash_elem *
 bin_at(const struct cuckoo_hash *hash, uint32_t index)
 {
-  return (hash->table + index * hash->bin_size);
+    return hash->table + (index * hash->bin_size);
 }
 
 
@@ -107,10 +99,6 @@ lookup(const struct cuckoo_hash *hash, const void *key, size_t key_len,
           && elem->hash_item.key_len == key_len
           && memcmp(elem->hash_item.key, key, key_len) == 0)
         {
-          XPROBES_SITE(cuckoo_hash, lookup_hash1,
-                       (const struct cuckoo_hash *, int),
-                       (hash, hash->bin_size - (end - elem)));
-
           return &elem->hash_item;
         }
 
@@ -119,27 +107,18 @@ lookup(const struct cuckoo_hash *hash, const void *key, size_t key_len,
 
   elem = bin_at(hash, (h2 & mask));
   end = elem + hash->bin_size;
-  while (elem != end)
-    {
+  while (elem != end) {
       if (elem->hash2 == h1 && elem->hash1 == h2
           && elem->hash_item.key_len == key_len
           && memcmp(elem->hash_item.key, key, key_len) == 0)
         {
-          XPROBES_SITE(cuckoo_hash, lookup_hash2,
-                       (const struct cuckoo_hash *, int),
-                       (hash, 2 * hash->bin_size - (end - elem)));
-
           return &elem->hash_item;
         }
 
       ++elem;
-    }
+  }
 
-  XPROBES_SITE(cuckoo_hash, lookup_not_found,
-               (const struct cuckoo_hash *, int),
-               (hash, 2 * hash->bin_size));
-
-  return NULL;
+    return NULL;
 }
 
 
@@ -165,10 +144,6 @@ cuckoo_hash_remove(struct cuckoo_hash *hash,
          ((char *) hash_item - offsetof(struct _cuckoo_hash_elem, hash_item)));
       elem->hash1 = elem->hash2 = 0;
       --hash->count;
-
-      XPROBES_SITE(cuckoo_hash, remove,
-                   (const struct cuckoo_hash *),
-                   (hash));
     }
 }
 
@@ -195,27 +170,27 @@ static
 bool
 grow_bin_size(struct cuckoo_hash *hash)
 {
-  size_t size =
-    ((size_t) hash->bin_size << hash->power) * sizeof(*hash->table);
-  uint32_t bin_count = 1U << hash->power;
-  size_t add = bin_count * sizeof(*hash->table);
-  struct _cuckoo_hash_elem *table = realloc(hash->table, size + add);
-  if (! table)
-    return false;
+    size_t size =
+      ((size_t) hash->bin_size << hash->power) * sizeof(*hash->table);
+    uint32_t bin_count = 1U << hash->power;
+    size_t add = bin_count * sizeof(*hash->table);
+    struct _cuckoo_hash_elem *table = realloc(hash->table, size + add);
+    if (! table)
+      return false;
 
-  hash->table = table;
-  for (uint32_t bin = bin_count - 1; bin > 0; --bin)
-    {
-      struct _cuckoo_hash_elem *old = bin_at(hash, bin);
-      struct _cuckoo_hash_elem *new = old + bin;
-      memmove(new, old, hash->bin_size * sizeof(*hash->table));
-      memset(new + hash->bin_size, 0, sizeof(*hash->table));
+    hash->table = table;
+    for (uint32_t bin = bin_count - 1; bin > 0; --bin) {
+        struct _cuckoo_hash_elem *old = bin_at(hash, bin);
+        struct _cuckoo_hash_elem *new = old + bin;
+        memmove(new, old, hash->bin_size * sizeof(*hash->table));
+        memset(new + hash->bin_size, 0, sizeof(*hash->table));
     }
-  memset(hash->table + hash->bin_size, 0, sizeof(*hash->table));
+    
+    memset(hash->table + hash->bin_size, 0, sizeof(*hash->table));
 
-  ++hash->bin_size;
+    ++hash->bin_size;
 
-  return true;
+    return true;
 }
 
 
@@ -224,44 +199,32 @@ bool
 undo_insert(struct cuckoo_hash *hash, struct _cuckoo_hash_elem *item,
             size_t max_depth, uint32_t offset, int phase)
 {
-  uint32_t mask = (1U << hash->power) - 1;
+    uint32_t mask = (1U << hash->power) - 1;
 
-  for (size_t depth = 0; depth < max_depth * phase; ++depth)
-    {
-      if (offset-- == 0)
-        offset = hash->bin_size - 1;
+    for (size_t depth = 0; depth < max_depth * phase; ++depth) {
+        if (offset-- == 0)
+            offset = hash->bin_size - 1;
 
-      uint32_t h2m = item->hash2 & mask;
-      struct _cuckoo_hash_elem *beg = bin_at(hash, h2m);
+        uint32_t h2m = item->hash2 & mask;
+        struct _cuckoo_hash_elem *beg = bin_at(hash, h2m);
 
-      struct _cuckoo_hash_elem victim = beg[offset];
+        struct _cuckoo_hash_elem victim = beg[offset];
 
-      beg[offset].hash_item = item->hash_item;
-      beg[offset].hash1 = item->hash2;
-      beg[offset].hash2 = item->hash1;
+        beg[offset].hash_item = item->hash_item;
+        beg[offset].hash1 = item->hash2;
+        beg[offset].hash2 = item->hash1;
 
-      uint32_t h1m = victim.hash1 & mask;
-      if (h1m != h2m)
-        {
-          assert(depth >= max_depth);
+        uint32_t h1m = victim.hash1 & mask;
+        if (h1m != h2m) {
+            assert(depth >= max_depth);
 
-          XPROBES_SITE(cuckoo_hash, insert_undo_inserted,
-                       (const struct cuckoo_hash *,
-                        int, size_t, size_t),
-                       (hash, phase, depth, max_depth));
-
-          return true;
+            return true;
         }
 
-      *item = victim;
+        *item = victim;
     }
 
-  XPROBES_SITE(cuckoo_hash, insert_undo,
-               (const struct cuckoo_hash *,
-                int, size_t),
-               (hash, phase, max_depth));
-
-  return false;
+    return false;
 }
 
 
@@ -290,11 +253,6 @@ insert(struct cuckoo_hash *hash, struct _cuckoo_hash_elem *item)
                 {
                   *elem = *item;
 
-                  XPROBES_SITE(cuckoo_hash, insert_done,
-                               (const struct cuckoo_hash *,
-                                int, size_t, size_t),
-                               (hash, phase, depth, max_depth));
-
                   return true;
                 }
             }
@@ -313,13 +271,7 @@ insert(struct cuckoo_hash *hash, struct _cuckoo_hash_elem *item)
 
       ++phase;
 
-      if (phase == 1)
-        {
-          if (grow_table(hash))
-            /* continue */;
-          else
-            break;
-        }
+      if (phase == 1 && !grow_table(hash)) break;
     }
 
   if (grow_bin_size(hash))
@@ -329,11 +281,6 @@ insert(struct cuckoo_hash *hash, struct _cuckoo_hash_elem *item)
         bin_at(hash, (item->hash1 & mask) + 1) - 1;
 
       *last = *item;
-
-      XPROBES_SITE(cuckoo_hash, insert_grow_bin,
-                   (const struct cuckoo_hash *,
-                    int, size_t),
-                   (hash, phase, max_depth));
 
       return true;
     }
@@ -348,41 +295,32 @@ struct cuckoo_hash_item *
 cuckoo_hash_insert(struct cuckoo_hash *hash,
                    const void *key, size_t key_len, void *value)
 {
-  uint32_t h1, h2;
-  compute_hash(key, key_len, &h1, &h2);
+    uint32_t h1, h2;
+    compute_hash(key, key_len, &h1, &h2);
 
-  struct cuckoo_hash_item *item = lookup(hash, key, key_len, h1, h2);
-  if (item)
-    {
-      XPROBES_SITE(cuckoo_hash, insert_exists,
-                   (const struct cuckoo_hash *),
-                   (hash));
-
-      return item;
+    struct cuckoo_hash_item *item = lookup(hash, key, key_len, h1, h2);
+    if (item) {
+        return item;
     }
 
-  struct _cuckoo_hash_elem elem = {
-    .hash_item = { .key = key, .key_len = key_len, .value = value },
-    .hash1 = h1,
-    .hash2 = h2
-  };
+    struct _cuckoo_hash_elem elem = {
+      .hash_item = { .key = key, .key_len = key_len, .value = value },
+      .hash1 = h1,
+      .hash2 = h2
+    };
 
-  if (insert(hash, &elem))
-    {
-      ++hash->count;
-
-      return NULL;
+    if (insert(hash, &elem)) {
+        ++hash->count;
+        return NULL;
     }
-  else
-    {
-      assert(elem.hash_item.key == key);
-      assert(elem.hash_item.key_len == key_len);
-      assert(elem.hash_item.value == value);
-      assert(elem.hash1 == h1);
-      assert(elem.hash2 == h2);
 
-      return CUCKOO_HASH_FAILED;
-    }
+    assert(elem.hash_item.key == key);
+    assert(elem.hash_item.key_len == key_len);
+    assert(elem.hash_item.value == value);
+    assert(elem.hash1 == h1);
+    assert(elem.hash2 == h2);
+
+    return CUCKOO_HASH_FAILED;
 }
 
 
@@ -397,24 +335,22 @@ cuckoo_hash_next(const struct cuckoo_hash *hash,
         + 1)
      : hash->table);
 
-  uint32_t bin_count = 1U << hash->power;
-  struct _cuckoo_hash_elem *end = bin_at(hash, bin_count);
-  uint32_t mask = bin_count - 1;
-  while (elem != end)
-    {
-      if (elem->hash1 != elem->hash2)
-        {
+    uint32_t bin_count = 1U << hash->power;
+    struct _cuckoo_hash_elem *end = bin_at(hash, bin_count);
+    uint32_t mask = bin_count - 1;
+    while (elem != end) {
+        if (elem->hash1 != elem->hash2) {
           /*
             Test that the element is valid, i.e., its hash1 matches
             the bin index it resides in.
           */
-          struct _cuckoo_hash_elem *bin = bin_at(hash, (elem->hash1 & mask));
-          if (bin <= elem && elem < bin + hash->bin_size)
-            return &elem->hash_item;
+            struct _cuckoo_hash_elem *bin = bin_at(hash, (elem->hash1 & mask));
+            if (bin <= elem && elem < bin + hash->bin_size)
+                return &elem->hash_item;
         }
 
       ++elem;
     }
 
-  return NULL;
+    return NULL;
 }
