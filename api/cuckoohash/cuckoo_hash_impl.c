@@ -24,8 +24,7 @@
 
 static inline
 void
-compute_hash(const void *key, size_t key_len,
-             uint32_t *h1, uint32_t *h2)
+compute_hash(paddr_t key, uint32_t *h1, uint32_t *h2)
 {
     extern void hashlittle2(const void *key, size_t length,
                             uint32_t *pc, uint32_t *pb);
@@ -33,7 +32,8 @@ compute_hash(const void *key, size_t key_len,
     /* Initial values are arbitrary.  */
     *h1 = 0x3ac5d673;
     *h2 = 0x6d7839d0;
-    hashlittle2(key, key_len, h1, h2);
+    // TODO: might be inefficient
+    hashlittle2(&key, sizeof(key), h1, h2);
     if (*h1 == *h2) {
         *h2 = ~*h2;
     }
@@ -41,7 +41,7 @@ compute_hash(const void *key, size_t key_len,
 
 int
 cuckoo_hash_init(nvm_cuckoo_idx_t **ht, paddr_t meta_block, 
-                 size_t max_entries, idx_spec_t *idx_spec)
+                 size_t max_entries, const idx_spec_t *idx_spec)
 {
     *ht = NULL;
     nvm_cuckoo_idx_t *hash = ZALLOC(idx_spec, sizeof(*hash));
@@ -94,9 +94,8 @@ bin_at(const struct cuckoo_hash *hash, uint32_t index)
 #endif
 
 static inline
-struct cuckoo_hash_item *
-lookup(const struct cuckoo_hash *hash, const void *key, size_t key_len,
-       uint32_t h1, uint32_t h2)
+struct cuckoo_hash_elem *
+lookup(const struct cuckoo_hash *hash, paddr_t key, uint32_t h1, uint32_t h2)
 {
     uint32_t mod = hash->meta.max_size;
 
@@ -105,45 +104,69 @@ lookup(const struct cuckoo_hash *hash, const void *key, size_t key_len,
     elem = bin_at(hash, (h1 % mod));
 
     if (elem->hash2 == h2 && elem->hash1 == h1
-        && elem->hash_item.key_len == key_len
-        && memcmp(elem->hash_item.key, key, key_len) == 0)
+        && elem->hash_item.key == key)
     {
-        return &elem->hash_item;
+        return elem;
     }
 
     elem = bin_at(hash, (h2 % mod));
     if (elem->hash2 == h1 && elem->hash1 == h2
-        && elem->hash_item.key_len == key_len
-        && memcmp(elem->hash_item.key, key, key_len) == 0)
+        && elem->hash_item.key == key)
     {
-        return &elem->hash_item;
+        return elem;
     }
 
     return NULL;
 }
 
 
-struct cuckoo_hash_item *
+int
 cuckoo_hash_lookup(const struct cuckoo_hash *hash,
-                   const void *key, size_t key_len)
+                   paddr_t key, paddr_t *value, uint32_t *size)
 {
-  uint32_t h1, h2;
-  compute_hash(key, key_len, &h1, &h2);
+    uint32_t h1, h2;
+    compute_hash(key, &h1, &h2);
 
-  return lookup(hash, key, key_len, h1, h2);
+    cuckoo_elem_t *elem = lookup(hash, key, h1, h2);
+    if (!elem) return -ENOENT;
+
+    *value = elem->hash_item.value;
+    *size = elem->hash_item.range;
+    return 0;
 }
 
-
-void
-cuckoo_hash_remove(struct cuckoo_hash *hash,
-                   const struct cuckoo_hash_item *hash_item)
+int
+cuckoo_hash_update(const struct cuckoo_hash *hash, paddr_t key, uint32_t size)
 {
-    if (hash_item) {
-        cuckoo_elem_t *elem =
-          ((cuckoo_elem_t *)
-          ((char *) hash_item - offsetof(cuckoo_elem_t, hash_item)));
-        elem->hash1 = elem->hash2 = 0;
-    }
+    uint32_t h1, h2;
+    compute_hash(key, &h1, &h2);
+
+    cuckoo_elem_t *elem = lookup(hash, key, h1, h2);
+    if (!elem) return -ENOENT;
+
+    // TODO: make pmem
+    elem->hash_item.range = size;
+    return 0;
+}
+
+int
+cuckoo_hash_remove(struct cuckoo_hash *hash, paddr_t key, paddr_t *value,
+                   uint32_t *index, uint32_t *range)
+{
+    uint32_t h1, h2;
+    compute_hash(key, &h1, &h2);
+
+    cuckoo_elem_t *elem = lookup(hash, key, h1, h2);
+    if (!elem) return -ENOENT;
+
+    *value = elem->hash_item.value;
+    *index = elem->hash_item.index;
+    *range = elem->hash_item.range;
+
+    // TODO: make pmem persistent
+    memset((void*)elem, 0, sizeof(*elem));
+
+    return 0;
 }
 
 static
@@ -208,33 +231,34 @@ insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item)
 }
 
 
-struct cuckoo_hash_item *
-cuckoo_hash_insert(struct cuckoo_hash *hash,
-                   const void *key, size_t key_len, void *value)
+int
+cuckoo_hash_insert(struct cuckoo_hash *hash, paddr_t key, paddr_t value, 
+                   uint32_t index, uint32_t range)
 {
     uint32_t h1, h2;
-    compute_hash(key, key_len, &h1, &h2);
+    compute_hash(key, &h1, &h2);
 
-    struct cuckoo_hash_item *item = lookup(hash, key, key_len, h1, h2);
-    if (item) {
-        return item;
+    struct cuckoo_hash_elem *elem = lookup(hash, key, h1, h2);
+    if (elem) {
+        return 0;
     }
 
-    struct cuckoo_hash_elem elem = {
-      .hash_item = { .key = key, .key_len = key_len, .value = value },
+    struct cuckoo_hash_elem new_elem = {
+      .hash_item = { .key = key, .value = value, .index = index, .range = range },
       .hash1 = h1,
       .hash2 = h2
     };
 
-    if (insert(hash, &elem)) {
-        return NULL;
+    if (insert(hash, &new_elem)) {
+        return -1;
     }
 
-    assert(elem.hash_item.key == key);
-    assert(elem.hash_item.key_len == key_len);
-    assert(elem.hash_item.value == value);
-    assert(elem.hash1 == h1);
-    assert(elem.hash2 == h2);
+    assert(new_elem.hash_item.key == key);
+    assert(new_elem.hash_item.value == value);
+    assert(new_elem.hash_item.index == index);
+    assert(new_elem.hash_item.range == range);
+    assert(new_elem.hash1 == h1);
+    assert(new_elem.hash2 == h2);
 
-    return CUCKOO_HASH_FAILED;
+    return -1;
 }

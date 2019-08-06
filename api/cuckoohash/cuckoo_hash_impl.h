@@ -31,14 +31,15 @@ extern "C" {
 #define CUCKOO_HASH_FAILED  ((void *) -1)
 
 
-struct cuckoo_hash_item {
-    const void *key;
-    size_t key_len;
-    void *value;
-};
+typedef struct cuckoo_hash_item {
+    paddr_t key;
+    paddr_t value;
+    uint32_t index;
+    uint32_t range;
+} cuckoo_item_t;
 
 typedef struct cuckoo_hash_elem {
-    struct cuckoo_hash_item hash_item;
+    cuckoo_item_t hash_item;
     uint32_t hash1;
     uint32_t hash2;
 } cuckoo_elem_t;
@@ -72,7 +73,7 @@ typedef struct cuckoo_hash {
 */
 int
 cuckoo_hash_init(nvm_cuckoo_idx_t **ht, paddr_t meta_block, size_t max_entries, 
-                 idx_spec_t *idx_spec);
+                 const idx_spec_t *idx_spec);
 
 
 /*
@@ -109,9 +110,9 @@ cuckoo_hash_count(struct cuckoo_hash *hash)
   have to free the old value, and a new key, if they were allocated
   dynamically.
 */
-struct cuckoo_hash_item *
-cuckoo_hash_insert(struct cuckoo_hash *hash,
-                   const void *key, size_t key_len, void *value);
+int
+cuckoo_hash_insert(struct cuckoo_hash *hash, paddr_t key, paddr_t value,
+                   uint32_t index, uint32_t range);
 
 
 /*
@@ -122,10 +123,20 @@ cuckoo_hash_insert(struct cuckoo_hash *hash,
   Return pointer to struct cuckoo_hash_item, or NULL if the key
   doesn't exist in the hash.
 */
-struct cuckoo_hash_item *
+int
 cuckoo_hash_lookup(const struct cuckoo_hash *hash,
-                   const void *key, size_t key_len);
+                   paddr_t key, paddr_t *value, uint32_t *size);
 
+/*
+  cuckoo_hash_lookup(hash, key, key_len):
+
+  Lookup given key in the hash.
+
+  Return pointer to struct cuckoo_hash_item, or NULL if the key
+  doesn't exist in the hash.
+*/
+int
+cuckoo_hash_update(const struct cuckoo_hash *hash, paddr_t key, uint32_t size);
 
 /*
   cuckoo_hash_remove(hash, hash_item):
@@ -150,9 +161,9 @@ cuckoo_hash_lookup(const struct cuckoo_hash *hash,
 
   (that (void *) cast above is to cast away the const qualifier).
 */
-void
-cuckoo_hash_remove(struct cuckoo_hash *hash,
-                   const struct cuckoo_hash_item *hash_item);
+int
+cuckoo_hash_remove(struct cuckoo_hash *hash, paddr_t key, paddr_t *value,
+                   uint32_t *index, uint32_t *range);
 
 #ifdef __cplusplus
 }      /* extern "C" */

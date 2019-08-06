@@ -28,13 +28,13 @@ int cuckoohash_initialize(const idx_spec_t *idx_spec,
                          idx_struct_t *idx_struct, paddr_t *location);
 
 ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
-                         laddr_t laddr, size_t size, paddr_t *new_paddr);
+                          laddr_t laddr, size_t size, paddr_t *new_paddr);
 
 ssize_t cuckoohash_lookup(idx_struct_t *idx_struct, inum_t inum,
-                         laddr_t laddr, size_t max, paddr_t* paddr);
+                          laddr_t laddr, size_t max, paddr_t* paddr);
 
 ssize_t cuckoohash_remove(idx_struct_t *idx_struct,
-                         inum_t inum, laddr_t laddr, size_t size);
+                          inum_t inum, laddr_t laddr, size_t size);
 
 int cuckoohash_set_caching(idx_struct_t *idx_struct, bool enable);
 int cuckoohash_set_locking(idx_struct_t *idx_struct, bool enable);

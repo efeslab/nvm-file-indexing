@@ -41,8 +41,6 @@ int cuckoohash_initialize(const idx_spec_t *idx_spec,
 // returns 1 on success, 0 if key already existed
 ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t size, paddr_t *paddr) {
-#if 0
-    trace_me();
     CUCKOOHASH(idx_struct, ht);
 
     ssize_t nalloc = CB(idx_struct, cb_alloc_data, size, paddr);
@@ -56,10 +54,10 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
     for (size_t blkno = 0; blkno < nalloc; ++blkno) {
         hash_key_t k = MAKEKEY(inum, laddr + blkno);
         // Range: how many more logical blocks are contiguous after this one?
-        size_t range = nalloc - blkno;
+        uint32_t range = (uint32_t)(nalloc - blkno);
         // Index: how many more logical blocks are contiguous before this one?
-        size_t index = blkno;
-        int err = nvm_hash_table_insert(ht, k, (*paddr) + blkno, index, range);
+        uint32_t index = (uint32_t)blkno;
+        int err = cuckoo_hash_insert(ht, k, (*paddr) + blkno, index, range);
         if (!err) {
             ssize_t dealloc = CB(idx_struct, cb_dealloc_data, nalloc, *paddr);
             if_then_panic(nalloc != dealloc, "could not free data blocks!\n");
@@ -69,9 +67,6 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
     }
 
     return nalloc;
-#else
-    return -ENOMEM;
-#endif
 }
 
 /*
@@ -79,18 +74,16 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
  */
 ssize_t cuckoohash_lookup(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t max, paddr_t* paddr) {
-#if 0
-    trace_me();
     CUCKOOHASH(idx_struct, ht);
 
     hash_key_t k = MAKEKEY(inum, laddr);
-    size_t size;
-    nvm_hash_table_lookup(ht, k, paddr, &size, false);
+    uint32_t size;
+    int err = cuckoo_hash_lookup(ht, k, paddr, &size);
+    if (err) return err;
+
     if (*paddr != 0) return (ssize_t)size;
+
     return -ENOENT;
-#else
-    return -ENOENT;
-#endif
 }
 
 /*
@@ -100,23 +93,21 @@ ssize_t cuckoohash_lookup(idx_struct_t *idx_struct, inum_t inum,
  */
 ssize_t cuckoohash_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
                          size_t size) {
-#if 0
-    trace_me();
     CUCKOOHASH(idx_struct, ht);
 
     if (size == 0) return -EINVAL;
 
     ssize_t ret = 0;
-    size_t smallest_idx = UINT64_MAX;
+    uint32_t smallest_idx = UINT32_MAX;
     laddr_t smallest_lblk;
     size_t new_size;
     laddr_t range_start;
     for (laddr_t lblk = laddr; lblk < laddr + size; ++lblk) {
         hash_key_t k = MAKEKEY(inum, lblk);
-        size_t removed;
-        size_t index;
-        size_t range;
-        ssize_t was_removed = nvm_hash_table_remove(ht, k, &removed, &index, &range);
+        paddr_t removed;
+        uint32_t index, range;
+        int err = cuckoo_hash_remove(ht, k, &removed, &index, &range);
+        if (err) return err;
         if_then_panic(!range, "size was 0 on delete!");
 
         if (lblk == laddr) {
@@ -132,26 +123,18 @@ ssize_t cuckoohash_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
             smallest_lblk = lblk;
         }
 
-        if (was_removed > 0) {
-            ssize_t ndeleted = CB(idx_struct, cb_dealloc_data, was_removed, removed);
-            if_then_panic(ndeleted < 0, "error in dealloc!");
-            if_then_panic(was_removed != (size_t)ndeleted, "could not deallocate!");
-            ret += was_removed;
-        } else {
-            printf("Could not remove requested block %u from %u, returned %ld\n", 
-                    lblk, inum, was_removed);
-        }
-
+        ssize_t ndeleted = CB(idx_struct, cb_dealloc_data, 1, removed);
+        if_then_panic(ndeleted < 0, "error in dealloc!");
+        ++ret;
     }
 
     if (new_size > 0) {
-        //for (laddr_t lblk = smallest_lblk; lblk >= range_start; --lblk) {
         for (laddr_t lblk = range_start; lblk < smallest_lblk; ++lblk) {
             hash_key_t k = MAKEKEY(inum, lblk);
             size_t new_range = new_size - lblk;
             if_then_panic(new_range == 0, "Cannot insert with size 0!");
-            int was_updated = nvm_hash_table_update(ht, k, new_range);
-            if_then_panic(!was_updated, "could not update range size!\n");
+            int uerr = cuckoo_hash_update(ht, k, new_range);
+            if_then_panic(uerr, "could not update range size!\n");
         }
     }
 
@@ -160,9 +143,6 @@ ssize_t cuckoohash_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     if (ret != size) printf("Only freed %lu of %lu blocks!\n", ret, size);
 
     return ret;
-#else
-    return 0;
-#endif
 }
 
 int cuckoohash_set_caching(idx_struct_t *idx_struct, bool enable) {

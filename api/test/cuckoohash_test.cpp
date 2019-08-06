@@ -26,14 +26,13 @@ TEST_F(CuckooHashFixture, InitExists) {
     ASSERT_EQ(0, strncmp((char*)&hash_copy, (char*)&cht, sizeof(cht)));
 }
 
-#if 0
 TEST_F(CuckooHashFixture, InsertSingle) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
     size_t npages = 1;
 
-    ssize_t ret = cuckoohash_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 }
@@ -44,12 +43,12 @@ TEST_F(CuckooHashFixture, InsertRepeat) {
     paddr_t pblk  = 0;
     size_t npages = 1;
 
-    ssize_t ret = cuckoohash_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 
     paddr_t lookup_paddr;
-    ret = cuckoohash_create(&hashtable, inum, lblk, npages, &lookup_paddr);
+    ret = cuckoohash_create(&cht, inum, lblk, npages, &lookup_paddr);
     ASSERT_LT(ret, 0);
     ASSERT_EQ(0, lookup_paddr);
 }
@@ -60,7 +59,7 @@ TEST_F(CuckooHashFixture, InsertMulti) {
     paddr_t pblk  = 0;
     size_t npages = 20;
 
-    ssize_t ret = cuckoohash_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 }
@@ -71,12 +70,12 @@ TEST_F(CuckooHashFixture, LookupSingle) {
     paddr_t pblk  = 0;
     size_t npages = 1;
 
-    ssize_t ret = cuckoohash_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 
     paddr_t check_paddr;
-    ssize_t check_size = cuckoohash_lookup(&hashtable, inum, lblk, npages, &check_paddr);
+    ssize_t check_size = cuckoohash_lookup(&cht, inum, lblk, npages, &check_paddr);
     ASSERT_EQ(pblk, check_paddr);
     ASSERT_EQ(npages, check_size);
 }
@@ -87,13 +86,13 @@ TEST_F(CuckooHashFixture, LookupMulti) {
     paddr_t pblk  = 0;
     size_t npages = 20;
 
-    ssize_t ret = cuckoohash_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 
     for (size_t p = 0; p < npages; ++p) {
         paddr_t check_paddr;
-        ssize_t check_size = cuckoohash_lookup(&hashtable, inum, lblk + p, npages - p, &check_paddr);
+        ssize_t check_size = cuckoohash_lookup(&cht, inum, lblk + p, npages - p, &check_paddr);
         ASSERT_EQ(pblk + p, check_paddr);
         ASSERT_EQ(npages - p, check_size);
     }
@@ -105,15 +104,15 @@ TEST_F(CuckooHashFixture, EraseSingle) {
     paddr_t pblk  = 0;
     size_t npages = 1;
 
-    ssize_t ret = cuckoohash_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 
-    ssize_t check_size = cuckoohash_remove(&hashtable, inum, lblk, npages);
+    ssize_t check_size = cuckoohash_remove(&cht, inum, lblk, npages);
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = cuckoohash_lookup(&hashtable, inum, lblk, npages, &check_paddr);
+    check_size = cuckoohash_lookup(&cht, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
@@ -125,21 +124,21 @@ TEST_F(CuckooHashFixture, EraseRecreate) {
     paddr_t pblk  = 0;
     size_t npages = 10;
 
-    ssize_t ret = cuckoohash_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 
-    ssize_t check_size = cuckoohash_remove(&hashtable, inum, lblk, npages);
+    ssize_t check_size = cuckoohash_remove(&cht, inum, lblk, npages);
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = cuckoohash_lookup(&hashtable, inum, lblk, npages, &check_paddr);
+    check_size = cuckoohash_lookup(&cht, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
 
-    ret = cuckoohash_create(&hashtable, inum, lblk, npages, &pblk);
-    ASSERT_EQ(npages, ret);
+    ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret) << strerror(ret);
     ASSERT_GT(pblk, 0);
 }
 
@@ -149,15 +148,15 @@ TEST_F(CuckooHashFixture, EraseMulti) {
     paddr_t pblk  = 0;
     size_t npages = 20;
 
-    ssize_t ret = cuckoohash_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 
-    ssize_t check_size = cuckoohash_remove(&hashtable, inum, lblk, npages);
+    ssize_t check_size = cuckoohash_remove(&cht, inum, lblk, npages);
     ASSERT_EQ(npages, check_size);
 
     paddr_t check_paddr = 0;
-    check_size = cuckoohash_lookup(&hashtable, inum, lblk, npages, &check_paddr);
+    check_size = cuckoohash_lookup(&cht, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
@@ -169,17 +168,17 @@ TEST_F(CuckooHashFixture, ErasePartial) {
     size_t npages  = 20;
     size_t nremove = 7;
 
-    ssize_t ret = cuckoohash_create(&hashtable, inum, 0, npages, &pblk);
+    ssize_t ret = cuckoohash_create(&cht, inum, 0, npages, &pblk);
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 
-    ssize_t check_size = cuckoohash_remove(&hashtable, inum, 
+    ssize_t check_size = cuckoohash_remove(&cht, inum, 
                                           (npages - nremove), nremove);
     ASSERT_EQ(nremove, check_size);
 
     for (laddr_t l = 0; l < (npages - nremove); ++l) {
         paddr_t check_paddr = 0;
-        check_size = cuckoohash_lookup(&hashtable, inum, l, 
+        check_size = cuckoohash_lookup(&cht, inum, l, 
                                       npages - nremove - l, &check_paddr);
         ASSERT_EQ(pblk + l, check_paddr);
         ASSERT_EQ(npages - nremove - l, check_size);
@@ -187,7 +186,7 @@ TEST_F(CuckooHashFixture, ErasePartial) {
 
     for (laddr_t l = (npages - nremove); l < npages; ++l) {
         paddr_t check_paddr = 0;
-        check_size = cuckoohash_lookup(&hashtable, inum, l, 1, &check_paddr);
+        check_size = cuckoohash_lookup(&cht, inum, l, 1, &check_paddr);
         ASSERT_LT(check_size, 0);
         ASSERT_EQ(0, check_paddr);
     }
@@ -201,18 +200,17 @@ TEST_F(CuckooHashFixture, EraseDeallocate) {
 
     size_t nalloced_meta_only = device.num_allocated();
 
-    ssize_t ret = cuckoohash_create(&hashtable, inum, lblk, npages, &pblk);
+    ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
     ASSERT_EQ(npages, ret);
     ASSERT_GT(pblk, 0);
 
-    ssize_t check_size = cuckoohash_remove(&hashtable, inum, lblk, npages);
+    ssize_t check_size = cuckoohash_remove(&cht, inum, lblk, npages);
     ASSERT_EQ(npages, check_size);
     ASSERT_EQ(nalloced_meta_only, device.num_allocated());
 
     paddr_t check_paddr = 0;
-    check_size = cuckoohash_lookup(&hashtable, inum, lblk, npages, &check_paddr);
+    check_size = cuckoohash_lookup(&cht, inum, lblk, npages, &check_paddr);
     ASSERT_NE(pblk, check_paddr);
     ASSERT_NE(npages, check_size);
     ASSERT_LE(check_size, 0);
 }
-#endif
