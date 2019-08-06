@@ -61,7 +61,10 @@ cuckoo_hash_init(nvm_cuckoo_idx_t **ht, paddr_t meta_block,
         hash->meta.magic = CUCKOO_MAGIC;
 
         // Allocate the element array.
-        size_t nblk = (max_entries * sizeof(*hash->table)) / devinfo.di_block_size;
+        size_t nbytes = max_entries * sizeof(*hash->table);
+        size_t nblk = nbytes / devinfo.di_block_size;
+        if (nbytes % devinfo.di_block_size) ++nblk;
+
         ssize_t nalloc = CB(idx_spec, cb_alloc_metadata, nblk, 
                                       &(hash->meta.elem_start_blk));
         if_then_panic(nalloc < nblk, "no large contiguous region!");

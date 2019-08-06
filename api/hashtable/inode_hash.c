@@ -47,7 +47,8 @@ int hashtable_initialize(const idx_spec_t *idx_spec,
         if_then_panic(nalloc < 1, "no room for metadata!");
     }
 
-    ht = nvm_hash_table_new(nvm_xxhash, devinfo.di_size_blocks,
+    //ht = nvm_hash_table_new(nvm_xxhash, devinfo.di_size_blocks,
+    ht = nvm_hash_table_new(nvm_idx_direct_hash, devinfo.di_size_blocks,
                             devinfo.di_block_size, 1, *location, idx_spec);
     if_then_panic(ht == NULL, "could not allocate hash table");
 

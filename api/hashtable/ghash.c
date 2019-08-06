@@ -44,7 +44,7 @@ uint64_t reads;
 uint64_t writes;
 uint64_t blocks;
 
-#if 0
+#if 1
 #define pthread_rwlock_rdlock(x) 0
 #define pthread_rwlock_wrlock(x) 0
 #define pthread_rwlock_unlock(x) 0
@@ -199,7 +199,7 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
   }
 #endif
 
-  if (hash_table->enable_stats) hash_table->stats.n_lookups++;
+  if (unlikely(hash_table->enable_stats)) hash_table->stats.n_lookups++;
   uint64_t count = 0;
 
   //pthread_rwlock_rdlock(hash_table->cache_lock);
@@ -212,23 +212,9 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
   if (hash_table->do_lock) pthread_rwlock_rdlock(hash_table->locks + node_index);
 #endif
 
-    __builtin_prefetch((void*)((hash_table->data_ptr) + (node_index * 16)));
+    nvm_read_entry(hash_table, node_index, &cur, force);
 
-  nvm_read_entry(hash_table, node_index, &cur, force);
-  //cur = hash_table->cache[BLK_NUM(node_index)][BLK_IDX(node_index)];
-
-#define CL(n) (n * 64)
-#if 0
-    __builtin_prefetch((void*)( ((char*)cur) + CL(2) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(1) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(0) ));
-#elif 1
-    for (int i = 0; i < 11; ++i) {
-        __builtin_prefetch((void*)( cur + i ), 0, 3);
-    }
-#endif
-
-  count++;
+    count++;
 
     DECLARE_TIMING();
     START_TIMING();
@@ -299,11 +285,9 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
 #endif
 
   while (!HASH_ENT_IS_EMPTY(*cur)) {
-    DECLARE_TIMING();
-    START_TIMING();
     if (likely(cur->key == key && HASH_ENT_IS_VALID(*cur))) {
       *ent_return = cur;
-#if 1
+
       if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
       //pthread_rwlock_unlock(hash_table->cache_lock);
       
@@ -321,13 +305,13 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
 
           UPDATE_TIMING(&(hash_table->stats), loop_time);
       }
-#endif
+
       return node_index;
-    }
-    else if (unlikely(HASH_ENT_IS_TOMBSTONE(*cur) && !have_tombstone)) {
+    } else if (unlikely(HASH_ENT_IS_TOMBSTONE(*cur) && !have_tombstone)) {
       first_tombstone = node_index;
       have_tombstone = TRUE;
     }
+
 #ifndef SEQ_STEP
     step++;
 #endif
