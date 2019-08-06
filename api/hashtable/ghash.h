@@ -35,9 +35,7 @@ extern "C" {
 
 // from common
 #include "common/common.h"
-
-// local includes
-#include "hash_functions.h"
+#include "common/hash_functions.h"
 
 #define SIMPLE_ENTRIES
 #undef SIMPLE_ENTRIES

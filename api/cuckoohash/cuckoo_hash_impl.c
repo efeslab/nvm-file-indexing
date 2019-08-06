@@ -26,6 +26,7 @@ static inline
 void
 compute_hash(paddr_t key, uint32_t *h1, uint32_t *h2)
 {
+#if 0
     extern void hashlittle2(const void *key, size_t length,
                             uint32_t *pc, uint32_t *pb);
 
@@ -34,6 +35,10 @@ compute_hash(paddr_t key, uint32_t *h1, uint32_t *h2)
     *h2 = 0x6d7839d0;
     // TODO: might be inefficient
     hashlittle2(&key, sizeof(key), h1, h2);
+#else
+    *h1 = (uint32_t)key;
+    *h2 = ~*h1;
+#endif
     if (*h1 == *h2) {
         *h2 = ~*h2;
     }
