@@ -50,10 +50,11 @@ _Static_assert(sz == 1 || !(sz & (sz - 1)) , "Must be a power of 2!");
 
 #undef sz
 
+#define CUCKOO_MAGIC 0xcafebabe
 typedef struct cuckoo_meta {
+    uint32_t magic;
     paddr_t elem_start_blk;
     size_t max_size;
-    size_t num_elements;
 } nvm_cuckoo_metadata_t;
 
 typedef struct cuckoo_hash {
@@ -67,11 +68,11 @@ typedef struct cuckoo_hash {
   Initialize the hash.  power controls the initial hash table size,
   which is (bin_size << power), i.e., 4*2^power.  Zero means one.
 
-  Return true on success, false if initialization failed (memory
-  exhausted).
+  Return 0 on success, -errno if initialization failed.
 */
-bool
-cuckoo_hash_init(struct cuckoo_hash *hash, unsigned char power);
+int
+cuckoo_hash_init(nvm_cuckoo_idx_t **ht, paddr_t meta_block, size_t max_entries, 
+                 idx_spec_t *idx_spec);
 
 
 /*
@@ -92,7 +93,7 @@ static inline
 size_t
 cuckoo_hash_count(struct cuckoo_hash *hash)
 {
-  return hash->count;
+  return 0;
 }
 
 
@@ -152,56 +153,6 @@ cuckoo_hash_lookup(const struct cuckoo_hash *hash,
 void
 cuckoo_hash_remove(struct cuckoo_hash *hash,
                    const struct cuckoo_hash_item *hash_item);
-
-
-/*
-  cuckoo_hash_next(hash, hash_item):
-
-  Get the next hash item.  Pass NULL as the hash_item on the first
-  call, and the result of the previous call on subsequent calls.
-  Normally you do not call this function directly, but use
-  cuckoo_hash_each() loop instead.
-*/
-struct cuckoo_hash_item *
-cuckoo_hash_next(const struct cuckoo_hash *hash,
-                 const struct cuckoo_hash_item *hash_item);
-
-
-/*
-  cuckoo_hash_each(it, hash):
-
-  Iterate over all elements in the hash.  it is an iterator variable
-  of type struct cuckoo_hash_item *.  To be used as
-
-    struct cuckoo_hash_item *it;
-    ...
-    for (cuckoo_hash_each(it, hash))
-      {
-        // work with it.
-      }
-
-  or as
-
-    for (struct cuckoo_hash_item *cuckoo_hash_each(it, hash))
-      {
-        // work with it.
-      }
-
-  to make it local to the loop.
-
-  It is safe to modify it->value (but do not change it->key or
-  it->key_len), or to call cuckoo_hash_remove(hash, it).
-
-  Calling cuckoo_hash_insert() inside the loop will reorder the
-  elements so that some may then be visited twice, while others
-  (including the new one) may not be visited at all.  In other words,
-  don't do this.
-*/
-#define cuckoo_hash_each(it, hash)              \
-  (it) = cuckoo_hash_next((hash), NULL);        \
-  (it) != NULL;                                 \
-  (it) = cuckoo_hash_next((hash), (it))
-
 
 #ifdef __cplusplus
 }      /* extern "C" */
