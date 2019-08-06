@@ -7,7 +7,8 @@ Function: F_HASH()
 uint64_t F_HASH(level_hash_t *level, laddr_t key) {
     DECLARE_TIMING();
     if (level->enable_stats) START_TIMING();
-    uint64_t h = (hash((void *)&key, sizeof(key), level->f_seed));
+    //uint64_t h = (hash((void *)&key, sizeof(key), level->f_seed));
+    uint64_t h = ((uint64_t)key) ^ level->f_seed;
     if (level->enable_stats) UPDATE_TIMING(level->stats, compute_hash);
     return h;
 }
@@ -19,7 +20,8 @@ Function: S_HASH()
 uint64_t S_HASH(level_hash_t *level, laddr_t key) {
     DECLARE_TIMING();
     if (level->enable_stats) START_TIMING();
-    uint64_t h = (hash((void *)&key, sizeof(key), level->s_seed));
+    //uint64_t h = (hash((void *)&key, sizeof(key), level->s_seed));
+    uint64_t h = ((uint64_t)key) ^ level->s_seed;
     if (level->enable_stats) UPDATE_TIMING(level->stats, compute_hash);
     return h;
 }
