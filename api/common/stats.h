@@ -62,12 +62,14 @@ static inline unsigned long long _asm_rdtscp(void)
 #define DECLARE_TIMING() uint64_t _start_tsc
 #define START_TIMING() _start_tsc = _asm_rdtscp()
 #define UPDATE_TIMING(s, f) \
-    (s)->f ## _tsc += _asm_rdtscp() - _start_tsc;\
-    (s)->f ## _nr++
+    (void)__sync_add_and_fetch(&((s)->f ## _tsc), _asm_rdtscp() - _start_tsc);\
+    (void)__sync_add_and_fetch(&((s)->f ## _nr), 1)
 
 #define UPDATE_STAT(s, f, v) \
-    (s)->f ## _tsc += _asm_rdtscp() - v;\
-    (s)->f ## _nr++
+    (void)__sync_add_and_fetch(&((s)->f ## _tsc), _asm_rdtscp() - v);\
+    (void)__sync_add_and_fetch(&((s)->f ## _nr), 1)
+
+#define INCR_STAT(s, f) (void)__sync_add_and_fetch(&((s)->f), 1)
 
 #define INIT_STATS(s) memset(s, 0, sizeof(*s))
 
