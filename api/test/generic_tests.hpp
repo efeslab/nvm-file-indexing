@@ -3,6 +3,7 @@
 #include "test/test_utils.hpp"
 #include "extents/extents.h"
 #include "hashtable/hashtable.h"
+#include "cuckoohash/cuckoohash.h"
 #include "levelhash/levelhash.h"
 #include "radixtree/radixtree.h"
 

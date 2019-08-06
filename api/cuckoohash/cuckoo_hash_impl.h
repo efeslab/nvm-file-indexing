@@ -15,8 +15,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __NVM_IDX_CUCKOO_HASH__
-#define __NVM_IDX_CUCKOO_HASH__ 1
+#ifndef __NVM_IDX_CUCKOO_HASH_IMPL__
+#define __NVM_IDX_CUCKOO_HASH_IMPL__ 1
 
 #include <stddef.h>
 #include <stdbool.h>

@@ -58,12 +58,18 @@ cuckoo_hash_init(nvm_cuckoo_idx_t **ht, paddr_t meta_block,
         if_then_panic(ret, "Could not get device info!");
 
         hash->meta.max_size = max_entries;
+        hash->meta.magic = CUCKOO_MAGIC;
 
         // Allocate the element array.
         size_t nblk = (max_entries * sizeof(*hash->table)) / devinfo.di_block_size;
         ssize_t nalloc = CB(idx_spec, cb_alloc_metadata, nblk, 
                                       &(hash->meta.elem_start_blk));
         if_then_panic(nalloc < nblk, "no large contiguous region!");
+
+        // Now write back the metadata.
+        ssize_t werr = CB(idx_spec, cb_write, meta_block, 0, 
+                          sizeof(hash->meta), (char*)&(hash->meta));
+        if (werr != sizeof(hash->meta)) return err;
     }
 
     // Always have to retrieve the pointer.
@@ -124,6 +130,8 @@ int
 cuckoo_hash_lookup(const struct cuckoo_hash *hash,
                    paddr_t key, paddr_t *value, uint32_t *size)
 {
+    *value = *size = 0;
+
     uint32_t h1, h2;
     compute_hash(key, &h1, &h2);
 

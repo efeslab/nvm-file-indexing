@@ -1,5 +1,5 @@
-#ifndef __NVM_IDX_INODE_HASH__
-#define __NVM_IDX_INODE_HASH__ 1
+#ifndef __NVM_IDX_CUCKOO_HASH__
+#define __NVM_IDX_CUCKOO_HASH__ 1
 
 #include <malloc.h>
 #include <memory.h>
@@ -45,4 +45,4 @@ int cuckoohash_invalidate_caches(idx_struct_t *idx_struct);
 }
 #endif
 
-#endif  // __NVM_IDX_INODE_HASH__
+#endif  // __NVM_IDX_CUCKOO_HASH__
