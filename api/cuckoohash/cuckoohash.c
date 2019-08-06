@@ -1,22 +1,10 @@
 #include <stdbool.h>
 #include "cuckoohash.h"
 
-#if 0
-#define trace_me() \
-	do { \
-		fprintf(stdout, "[%s.%s():%d] trace\n",  \
-			    __FILE__, __func__, __LINE__); \
-		fflush(stdout); \
-	} while (0)
-#else
-#define trace_me() 0
-#endif
-
 int cuckoohash_initialize(const idx_spec_t *idx_spec,
                          idx_struct_t *idx_struct,
                          paddr_t *location) {
-#if 0
-    trace_me();
+
     if_then_panic(!idx_spec, "idx_spec cannot be null!");
     if_then_panic(!idx_struct, "idx_struct cannot be null!");
     if_then_panic(!location, "location ptr cannot be null!");
@@ -27,20 +15,12 @@ int cuckoohash_initialize(const idx_spec_t *idx_spec,
 
     idx_struct->idx_mem_man   = idx_spec->idx_mem_man;
     idx_struct->idx_callbacks = idx_spec->idx_callbacks;
-    idx_struct->idx_fns       = &hash_fns;
+    idx_struct->idx_fns       = &cuckoohash_fns;
 
     device_info_t devinfo;
     int ret = CB(idx_struct, cb_get_dev_info, &devinfo);
 
     // Allocate space on device.
-    if_then_panic(devinfo.di_block_size % sizeof(hash_ent_t) != 0,
-                  "bad hash_entry_t size: %lu %% %lu = %lu overflow\n",
-                  devinfo.di_block_size, sizeof(hash_ent_t),
-                  devinfo.di_block_size % sizeof(hash_ent_t));
-
-    size_t entries_per_block = devinfo.di_block_size / sizeof(hash_ent_t);
-
-    size_t nbytes = devinfo.di_size_blocks * sizeof(hash_ent_t);
 
     if (!*location) {
         ssize_t nalloc = CB(idx_struct, cb_alloc_metadata, 1, location);
@@ -48,16 +28,12 @@ int cuckoohash_initialize(const idx_spec_t *idx_spec,
         if_then_panic(nalloc < 1, "no room for metadata!");
     }
 
-    ht = nvm_hash_table_new(nvm_xxhash, devinfo.di_size_blocks,
-                            devinfo.di_block_size, 1, *location, idx_spec);
-    if_then_panic(ht == NULL, "could not allocate hash table");
+    ret = cuckoo_hash_init(&ht, *location, devinfo.di_size_blocks, idx_spec);
+    if_then_panic(ret, "could not allocate hash table");
 
     idx_struct->idx_metadata = (void*)ht;
 
     return 0;
-#else
-    return -EBUSY;
-#endif
 }
 
 // if not exists, then the value was not already in the table, therefore

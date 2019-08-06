@@ -28,7 +28,7 @@ compute_hash(const void *key, size_t key_len,
              uint32_t *h1, uint32_t *h2)
 {
     extern void hashlittle2(const void *key, size_t length,
-                          uint32_t *pc, uint32_t *pb);
+                            uint32_t *pc, uint32_t *pb);
 
     /* Initial values are arbitrary.  */
     *h1 = 0x3ac5d673;
@@ -50,7 +50,7 @@ cuckoo_hash_init(nvm_cuckoo_idx_t **ht, paddr_t meta_block,
     // Read metadata to see if it exists or not.
     ssize_t err = CB(idx_spec, cb_read, meta_block, 0, 
                                         sizeof(hash->meta), (char*)&(hash->meta));
-    if (err) return err;
+    if (err != sizeof(hash->meta)) return err;
 
     if (hash->meta.magic != CUCKOO_MAGIC) {
         device_info_t devinfo;

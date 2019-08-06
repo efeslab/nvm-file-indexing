@@ -15,10 +15,10 @@ class CuckooHashFixture : public TestFixture {
     protected:
         void SetUp() override {
             TestFixture::SetUp();
-            init_err = cuckoohash_initialize(&idx_spec, &hashtable, &metadata_loc);
+            init_err = cuckoohash_initialize(&idx_spec, &cht, &metadata_loc);
         }
 
-        idx_struct_t hashtable = {};
+        idx_struct_t cht = {};
         paddr_t metadata_loc = 0;
         int init_err = 0;
 };

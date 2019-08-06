@@ -16,6 +16,8 @@ extern "C" {
 
 typedef paddr_t hash_key_t;
 
+extern idx_fns_t cuckoohash_fns;
+
 /*
  * Generic hash table functions.
  */
