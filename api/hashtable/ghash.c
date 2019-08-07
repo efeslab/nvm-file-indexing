@@ -132,7 +132,7 @@ nvm_hash_table_find_closest_shift (int n) {
 }
 
 static void
-nvm_hash_table_set_shift_from_size (nvm_hash_idx_t *hash_table, int size) {
+nvm_hash_table_set_shift_from_size(nvm_hash_idx_t *hash_table, int size) {
   int shift;
 
   shift = nvm_hash_table_find_closest_shift(size);
@@ -718,7 +718,8 @@ nvm_hash_table_update_internal(nvm_hash_idx_t *hash_table,
 {
 #ifndef SIMPLE_ENTRIES
     ent->size = new_range;
-    nvm_update(hash_table, node_index);
+    nvm_persist_struct(ent->size);
+    //nvm_update(hash_table, node_index);
 #endif
 }
 // Very similar to lookup, but we also update the entry at the end.
@@ -815,36 +816,12 @@ static void nvm_hash_table_remove_node (nvm_hash_idx_t  *hash_table,
 #endif
 
   /* Erect tombstone */
-  nvm_update(hash_table, i);
+  //nvm_update(hash_table, i);
+  nvm_persist_struct(*ent);
 
   hash_table->nnodes--;
 
   //pthread_rwlock_unlock(hash_table->locks + i);
-}
-
-/*
- * nvm_hash_table_maybe_resize:
- * @hash_table: our #nvm_hash_idx_t
- *
- * Resizes the hash table, if needed.
- *
- * Essentially, calls nvm_hash_table_resize() if the table has strayed
- * too far from its ideal size for its number of nodes.
- *
- * iangneal: Hijacking this function to assure that we haven't over-committed.
- */
-static inline void
-nvm_hash_table_maybe_resize (nvm_hash_idx_t *hash_table) {
-#if 0
-  int noccupied = hash_table->noccupied;
-  int size = hash_table->size;
-
-  assert(noccupied <= size);
-  if ((size > hash_table->nnodes * 4 && size > 1 << HASH_TABLE_MIN_SHIFT) ||
-      (size <= noccupied + (noccupied / 16))) {
-    nvm_hash_table_resize (hash_table);
-  }
-#endif
 }
 
 /**
@@ -1026,30 +1003,11 @@ nvm_hash_table_insert_node(nvm_hash_idx_t *hash_table,
     ent->index = new_index;
     ent->size = new_range;
 #endif
-    nvm_update(hash_table, node_index);
+    //nvm_update(hash_table, node_index);
+    nvm_persist_struct(*ent);
   }
 
   return !already_exists;
-}
-
-/**
- * nvm_hash_table_destroy:
- * @hash_table: a #nvm_hash_idx_t
- *
- * Destroys all keys and values in the #nvm_hash_idx_t and decrements its
- * reference count by 1. If keys and/or values are dynamically allocated,
- * you should either free them first or create the #nvm_hash_idx_t with destroy
- * destruction phase.
- */
-void
-nvm_hash_table_destroy (nvm_hash_idx_t *hash_table)
-{
-  assert (hash_table != NULL);
-
-  for (size_t i = 0; i < hash_table->nvram_size; ++i) {
-    int err = pthread_rwlock_destroy(hash_table->locks + i);
-    if (err) panic("Could not destroy rwlock!");
-  }
 }
 
 /**
