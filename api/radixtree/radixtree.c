@@ -135,133 +135,6 @@ static int write_metadata(radixtree_meta_t *radix) {
 static int create_radix_node(radixtree_meta_t *radix, paddr_t page, 
                              int depth, radix_node_t *node);
 
-#if 0
-static int read_radix_node(radixtree_meta_t *radix, radix_node_t *node) {
-    int err = 0;
-    if (radix->cached) {
-        err = read_page(radix, node->rn_page, node->rn_dev_contents);
-        if (err) return err;
-
-        for (size_t i = 0; i < radix->ents_per_node; ++i) {
-            radix_node_t *n = &(node->rn_cache_tree[i]);
-
-            paddr_t entry = node->rn_dev_contents[i];
-            int depth = node->rn_depth + 1;
-            n->rn_depth = depth;
-            n->rn_page  = entry;
-        }
-    } else {
-        err = get_page(radix, node->rn_page, &(node->rn_dev_contents));
-        if (err) return err;
-    }
-
-    return err;
-}
-
-static int create_radix_node(radixtree_meta_t *radix, paddr_t page, 
-                             int depth, radix_node_t *node) 
-{
-    if_then_panic(!node, "Must be preallocated!\n");
-
-    node->rn_page = page;
-    node->rn_depth = depth;
-    node->rn_cache_tree = ZALLOC(radix, radix->ents_per_node * sizeof(*node));
-    if (!node->rn_cache_tree) return -ENOMEM;
-
-    if (radix->cached) {
-        node->rn_dev_contents = ZALLOC(radix, radix->node_nbytes);
-        node->rn_cache_state = ZALLOC(radix, radix->ents_per_node * sizeof(int8_t));
-        if (!node->rn_dev_contents || 
-            !node->rn_cache_tree ||
-            !node->rn_cache_state) {
-            return -ENOMEM;
-        }
-    }
-
-    if (page > 0) {
-        if (radix->cached) {
-            memset(node->rn_cache_state, -1, radix->ents_per_node); 
-        }
-        return read_radix_node(radix, node);
-    }
-
-    return 0;
-}
-
-static int write_radix_node(radixtree_meta_t *radix, radix_node_t *node) {
-    if (!radix->cached) return 0;
-
-    int ret = write_page(radix, node->rn_page, node->rn_dev_contents);
-    return ret;
-}
-
-static int read_radix_node_entry(radixtree_meta_t *radix, 
-                                 radix_node_t *node, size_t idx) 
-{
-    int err = 0;
-    if (radix->cached && node->rn_cache_state[idx] < 0) {
-        err = read_entry(radix, node->rn_page, idx, node->rn_dev_contents);
-        if (!err) node->rn_cache_state[idx] = 0;
-    } else {
-        err = get_page(radix, node->rn_page, &(node->rn_dev_contents));
-    }
-
-    return err;
-}
-
-static int write_radix_node_entry(radixtree_meta_t *radix, 
-                                 radix_node_t *node, size_t idx) 
-{
-    int err = 0;
-    if (radix->cached && node->rn_cache_state[idx] > 0) {
-        int err = write_entry(radix, node->rn_page, idx, node->rn_dev_contents);
-        if (!err) node->rn_cache_state[idx] = 0;
-    }
-
-    return err;
-}
-
-static radix_node_t* index_node(radixtree_meta_t *radix, 
-                                radix_node_t *node, size_t idx) 
-{
-    if_then_panic(idx >= radix->ents_per_node, 
-                  "Bad index calculation! (%lu)\n", idx);
-    if_then_panic(!node, "Can't index nullptr!\n");
-    if_then_panic(node->rn_depth >= radix->max_depth, 
-                  "Cannot index further!\n");
-
-    int rerr = read_radix_node_entry(radix, node, idx);
-    if (rerr) return NULL;
-
-    radix_node_t *child = &(node->rn_cache_tree[idx]);
-
-    paddr_t entry = node->rn_dev_contents[idx];
-    if (!entry) {
-        // We need to allocate this page!
-        ssize_t nalloc = CB(radix, cb_alloc_metadata,
-                            radix->nblk_per_node, &entry);
-        if_then_panic(nalloc != radix->nblk_per_node, "Could not allocate!");
-
-        node->rn_dev_contents[idx] = entry;
-        if (radix->cached) {
-            node->rn_cache_state[idx] = -1;
-        }
-
-        child->rn_page = entry;
-        child->rn_depth = node->rn_depth + 1;
-        int ret = write_entry(radix, node->rn_page, idx, node->rn_dev_contents);
-        if (ret) return NULL;
-    }
-
-    if (!child->rn_dev_contents) {
-        int err = create_radix_node(radix, entry, child->rn_depth, child);
-        if (err) return NULL;
-    }
-
-    return child;
-}
-#endif
-
 static inline paddr_t index_dev_node(radixtree_meta_t *radix, int level, 
                               paddr_t node, size_t idx) 
 {
@@ -351,6 +224,7 @@ static paddr_t index_create_dev_node(radixtree_meta_t *radix, int level,
         //if_then_panic(idx % 2, "You ruined it Scott!\n");
 
         node_contents[idx] = entry;
+        nvm_persist_struct(node_contents[idx]);
         //node_contents[idx + 1] = entry;
     }
 
@@ -363,42 +237,6 @@ static paddr_t index_create_dev_node(radixtree_meta_t *radix, int level,
 
     return entry;
 }
-
-#if 0
-static int insert_entry(radixtree_meta_t *radix, radix_node_t *node, 
-                        size_t idx, paddr_t entry)
-{
-    if (radix->cached) {
-        if_then_panic(node->rn_depth != radix->max_depth, 
-                      "Don't use this for data blocks!\n");
-    }
-
-    int rerr = read_radix_node_entry(radix, node, idx);
-    if (rerr) return rerr;
-
-    node->rn_dev_contents[idx] = entry;
-    if (radix->cached) {
-        node->rn_cache_state[1] = 1;
-    }
-
-    return write_radix_node_entry(radix, node, idx);
-}
-
-static int lookup_entry(radixtree_meta_t *radix, radix_node_t *node, 
-                        size_t idx, paddr_t *entry)
-{
-    if (radix->cached) {
-        if_then_panic(node->rn_depth != radix->max_depth, 
-                      "Don't use this for data blocks!\n");
-    }
-
-    int rerr = read_radix_node_entry(radix, node, idx);
-    if (rerr) return rerr;
-
-    *entry = node->rn_dev_contents[idx];
-    return 0;
-}
-#endif
 
 static inline int lookup_dev_entry(radixtree_meta_t *radix, paddr_t node, 
                                 size_t idx, paddr_t *entry)
@@ -425,6 +263,7 @@ static inline int insert_dev_entry(radixtree_meta_t *radix, paddr_t node,
     //if (rerr) return rerr;
 
     node_contents[idx] = entry;
+    nvm_persist_struct(node_contents[idx]);
     return 0;
 }
 
@@ -683,21 +522,6 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     ssize_t nalloc = CB(radix, cb_alloc_data, npages, paddr);
     if (nalloc == 0) return -ENOMEM;
     if (nalloc < 0) return nalloc;
-
-    #if 0
-    // Gotta create the top page if it disappeared.
-    if (!radix->top_page) {
-        // Need to first allocate the top page.
-        ssize_t nalloc = CB(radix, cb_alloc_metadata, 
-                            radix->nblk_per_node, &(radix->top_page));
-        if (nalloc != radix->nblk_per_node) return -ENOMEM;
-
-        radix->nlevels = 1;
-
-        int werr = write_metadata(radix);
-        if (werr) return werr;
-    }
-    #endif
 
     ssize_t ninserted = 0;
     while (ninserted < nalloc) {
