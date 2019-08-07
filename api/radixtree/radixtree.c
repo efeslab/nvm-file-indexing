@@ -90,13 +90,12 @@ static int read_metadata(radixtree_meta_t *radix) {
     if (ret != sizeof(ondev)) return -EIO;
 
     radix->reread_meta = false;
+    radix->direct_entries = get_direct(radix);
     
     // Is initialized
-    if (!ondev.nlevels || ondev.direct_entries[0]) {
+    if (!ondev.nlevels || radix->direct_entries[0]) {
         memset(radix->prev_path, 0, sizeof(radix->prev_path));
-        memcpy(radix->direct_entries, ondev.direct_entries, 
-                sizeof(ondev.direct_entries));
-        radix->top_page   = ondev.direct_entries[0];
+        radix->top_page   = radix->direct_entries[0];
         radix->use_direct = !ondev.nlevels;
         radix->nlevels    = ondev.nlevels;
         radix->nentries   = ondev.nentries;
@@ -109,12 +108,13 @@ static int read_metadata(radixtree_meta_t *radix) {
 
 // Returns 0 on success, or -errno otherwise.
 static int write_metadata(radixtree_meta_t *radix) {
+    if (!radix->rewrite_meta) return 0;
+    radix->rewrite_meta = false;
+
     ondev_radix_meta_t ondev = {
         .nlevels        = radix->nlevels,
         .nentries       = radix->nentries,
     };
-    memcpy(ondev.direct_entries, radix->direct_entries, 
-           sizeof(ondev.direct_entries));
 
     paddr_range_t *meta = &(radix->metadata_loc);
     if_then_panic(meta->pr_nbytes < sizeof(ondev), 
@@ -299,7 +299,9 @@ int radixtree_init(const idx_spec_t *idx_spec,
     radix->idx_mem_man   = idx_spec->idx_mem_man; 
     radix->cached        = false;
     radix->use_direct    = true;
-    memset(radix->direct_entries, 0, sizeof(radix->direct_entries));
+
+    ssize_t aerr = CB(radix, cb_get_addr, 0, 0, &(radix->dev_addr));
+    if (aerr) return aerr;
 
     // Check status of metadata.
     int merr = read_metadata(radix);
@@ -318,9 +320,6 @@ int radixtree_init(const idx_spec_t *idx_spec,
     idx_struct->idx_callbacks = idx_spec->idx_callbacks;
     idx_struct->idx_mem_man   = idx_spec->idx_mem_man;
     idx_struct->idx_fns       = &radixtree_fns;
-
-    ssize_t aerr = CB(radix, cb_get_addr, 0, 0, &(radix->dev_addr));
-    if (aerr) return aerr;
 
     return 0;
 }
@@ -536,6 +535,7 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
         ninserted += ret;
         radix->nentries += ret;
+        radix->rewrite_meta = true;
 
         if (is_full(radix) && can_grow(radix)) {
             paddr_t old_top = radix->top_page;
@@ -562,6 +562,7 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
             radix->direct_entries[0] = radix->top_page;
             
             ++radix->nlevels;
+            radix->rewrite_meta = true;
             
         } else if (is_full(radix)) {
             return ninserted ? ninserted : -ENOSPC;
@@ -652,6 +653,7 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     if (ret < npages) return ret;
 
     radix->nentries -= ret;
+    radix->rewrite_meta = true;
 
     while (can_shrink(radix)) {
         paddr_t old_top = radix->top_page;
@@ -667,6 +669,7 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         if_then_panic(dealloc_ret != 1, "Could not remove data page!");
 
         radix->nlevels -= 1;
+        radix->rewrite_meta = true;
         radix->use_direct = radix->nlevels == 0; 
     }
 

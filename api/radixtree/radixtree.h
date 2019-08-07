@@ -44,14 +44,11 @@ typedef struct radixtree_path {
 //#undef METADATA_CACHING
 
 #define RADIX_NDIRECT 7
-#pragma pack(push, 1)
+
 typedef struct ondevice_radixtree_metadata {
     uint32_t nentries;  
-    uint8_t nlevels;
-
-    paddr_t direct_entries[RADIX_NDIRECT];
+    uint32_t nlevels;
 } ondev_radix_meta_t;
-#pragma pack(pop)
 
 _Static_assert(sizeof(ondev_radix_meta_t) <= 64, "On-device metadata > 64!");
 
@@ -67,7 +64,8 @@ typedef struct radixtree_metadata {
     // ---- Metadata
     bool reread_meta;
     bool use_direct;
-    paddr_t direct_entries[RADIX_NDIRECT];
+    bool rewrite_meta;
+    paddr_t *direct_entries;
     // ---- General
     radix_node_t *cached_tree;
 
@@ -93,6 +91,9 @@ typedef struct radixtree_metadata {
 } radixtree_meta_t;
 
 #define get_contents(r, pblk) (paddr_t*)(r->dev_addr + (r->blksz * pblk))
+#define rmeta(r) (&((r)->metadata_loc))
+#define get_direct(r) (paddr_t*)(r->dev_addr + (r->blksz * rmeta(r)->pr_start) \
+                                + rmeta(r)->pr_blk_offset + sizeof(ondev_radix_meta_t))
 
 int radixtree_init(const idx_spec_t *idx_spec,
                    const paddr_range_t *metadata_location,
