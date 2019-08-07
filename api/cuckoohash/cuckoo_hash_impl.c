@@ -93,6 +93,7 @@ cuckoo_hash_init(nvm_cuckoo_idx_t **ht, paddr_t meta_block,
 void
 cuckoo_hash_destroy(const struct cuckoo_hash *hash)
 {
+    if_then_panic(true, "Can't be in here!\n");
     free(hash->table);
 }
 
@@ -162,6 +163,7 @@ cuckoo_hash_update(const struct cuckoo_hash *hash, paddr_t key, uint32_t size)
 
     // TODO: make pmem
     elem->hash_item.range = size;
+    nvm_persist_struct(elem->hash_item.range);
     return 0;
 }
 
@@ -181,6 +183,7 @@ cuckoo_hash_remove(struct cuckoo_hash *hash, paddr_t key, paddr_t *value,
 
     // TODO: make pmem persistent
     memset((void*)elem, 0, sizeof(*elem));
+    nvm_persist_struct(*elem);
 
     return 0;
 }
@@ -202,6 +205,8 @@ undo_insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item,
         elem->hash1     = item->hash2;
         elem->hash2     = item->hash1;
 
+        nvm_persist_struct(*elem);
+
         uint32_t h1m = victim.hash1 % mod;
         if (h1m != h2m) {
             assert(depth >= max_depth);
@@ -210,6 +215,7 @@ undo_insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item,
         }
 
         *item = victim;
+        nvm_persist_struct(*item);
     }
 
     return false;
@@ -237,10 +243,12 @@ insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item)
         cuckoo_elem_t victim = *elem;
 
         *elem = *item;
+        nvm_persist_struct(*elem);
 
         item->hash_item = victim.hash_item;
         item->hash1     = victim.hash2;
         item->hash2     = victim.hash1;
+        nvm_persist_struct(*item);
     }
 
     return undo_insert(hash, item, max_depth);

@@ -9,6 +9,7 @@ extern "C" {
 #include "util.h"
 #include "kerncompat.h"
 #include "stats.h"
+#include "persistence.h"
 
 #ifdef __cplusplus
 }
