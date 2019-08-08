@@ -549,7 +549,7 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
                                                 radix->direct_entries[i]);
                     if (err) return err;
                 }
-                memset(radix->direct_entries, 0, sizeof(radix->direct_entries));
+                memset(radix->direct_entries, 0, sizeof(*radix->direct_entries));
 
                 radix->use_direct = false;
             } else {
