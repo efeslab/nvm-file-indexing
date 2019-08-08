@@ -149,17 +149,24 @@ static inline extent_header_t *ext_header(const idx_struct_t *ext_idx)
 static inline int write_ext_direct_data(const idx_struct_t *ext_idx)
 {
     EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, eh);
-    ssize_t nbytes = CB(ext_idx, cb_write,
+    if (ext_meta->et_cached) {
+        ssize_t nbytes = CB(ext_idx, cb_write,
                         ext_meta->et_direct_range.pr_start,
                         ext_meta->et_direct_range.pr_blk_offset,
                         ext_meta->et_direct_range.pr_nbytes,
                         (char*)ext_meta->et_direct_data);
-    if (nbytes != ext_meta->et_direct_range.pr_nbytes) {
-        printf("nbytes = %lu, but wrote %lu\n",
-                ext_meta->et_direct_range.pr_nbytes,
-                nbytes);
-        return -EIO;
+        if (nbytes != ext_meta->et_direct_range.pr_nbytes) {
+            printf("nbytes = %lu, but wrote %lu\n",
+                    ext_meta->et_direct_range.pr_nbytes,
+                    nbytes);
+            return -EIO;
+        }
+    } else {
+        // All we need to do is ensure persistence
+        pmem_persist(ext_meta->et_direct_data, 
+                     ext_meta->et_direct_range.pr_nbytes);
     }
+    
 
     return 0;
 }
