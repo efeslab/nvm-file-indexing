@@ -22,6 +22,8 @@
 
 #include "cuckoo_hash_impl.h"
 
+nvm_cuckoo_stats_t cstats;
+
 static inline
 void
 compute_hash(paddr_t key, uint32_t *h1, uint32_t *h2)
@@ -161,9 +163,11 @@ cuckoo_hash_update(const struct cuckoo_hash *hash, paddr_t key, uint32_t size)
     cuckoo_elem_t *elem = lookup(hash, key, h1, h2);
     if (!elem) return -ENOENT;
 
-    // TODO: make pmem
     elem->hash_item.range = size;
     nvm_persist_struct(elem->hash_item.range);
+    if (hash->do_stats) {
+        INCR_NR_CACHELINE(&cstats, ncachelines_written, sizeof(elem->hash_item.range));
+    }
     return 0;
 }
 
@@ -206,6 +210,9 @@ undo_insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item,
         elem->hash2     = item->hash1;
 
         nvm_persist_struct(*elem);
+        if (hash->do_stats) {
+            INCR_NR_CACHELINE(&cstats, ncachelines_written, sizeof(*elem));
+        }
 
         uint32_t h1m = victim.hash1 % mod;
         if (h1m != h2m) {
@@ -216,6 +223,9 @@ undo_insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item,
 
         *item = victim;
         nvm_persist_struct(*item);
+        if (hash->do_stats) {
+            INCR_NR_CACHELINE(&cstats, ncachelines_written, sizeof(*item));
+        }
     }
 
     return false;
@@ -244,11 +254,17 @@ insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item)
 
         *elem = *item;
         nvm_persist_struct(*elem);
+        if (hash->do_stats) {
+            INCR_NR_CACHELINE(&cstats, ncachelines_written, sizeof(*elem));
+        }
 
         item->hash_item = victim.hash_item;
         item->hash1     = victim.hash2;
         item->hash2     = victim.hash1;
         nvm_persist_struct(*item);
+        if (hash->do_stats) {
+            INCR_NR_CACHELINE(&cstats, ncachelines_written, sizeof(*item));
+        }
     }
 
     return undo_insert(hash, item, max_depth);

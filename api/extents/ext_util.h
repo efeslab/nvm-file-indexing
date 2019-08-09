@@ -166,7 +166,6 @@ static inline int write_ext_direct_data(const idx_struct_t *ext_idx)
         pmem_persist(ext_meta->et_direct_data, 
                      ext_meta->et_direct_range.pr_nbytes);
     }
-    
 
     return 0;
 }
@@ -321,6 +320,7 @@ static inline void idx_set_pblock(extent_branch_t *ix,
 {
     ix->ei_leaf_lo = (unsigned long)(pb & 0xffffffff);
     ix->ei_leaf_hi = (unsigned long)((pb >> 31) >> 1) & 0xffff;
+    nvm_persist_struct(ix);
 }
 
 static inline void idx_store_pblock(extent_branch_t *ix,
@@ -328,6 +328,7 @@ static inline void idx_store_pblock(extent_branch_t *ix,
 {
     ix->ei_leaf_lo = (unsigned long)(pb & 0xffffffff);
     ix->ei_leaf_hi = (unsigned long)((pb >> 31) >> 1) & 0xffff;
+    nvm_persist_struct(ix);
 }
 
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

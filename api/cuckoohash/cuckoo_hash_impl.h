@@ -61,7 +61,16 @@ typedef struct cuckoo_meta {
 typedef struct cuckoo_hash {
     nvm_cuckoo_metadata_t meta;
     cuckoo_elem_t *table;
+    bool do_stats;
 } nvm_cuckoo_idx_t;
+
+typedef struct cuckoo_hash_stats {
+    uint64_t ncachelines_written;
+    uint64_t nblocks_inserted;
+    uint64_t nwrites;
+} nvm_cuckoo_stats_t;
+
+extern nvm_cuckoo_stats_t cstats;
 
 /*
   cuckoo_hash_init(hash, power):

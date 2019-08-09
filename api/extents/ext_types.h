@@ -135,6 +135,10 @@ typedef struct nvm_api_extent_tree_metadata {
     extent_path_t *path;
     extent_path_t *prev_path;
 
+    // To avoid cb_get_addr overhead
+    char *devaddr;
+    size_t blksz;
+
     // -- Force re-read of metadata
     bool reread_meta;
 
@@ -145,6 +149,8 @@ typedef struct nvm_api_extent_tree_metadata {
     // could be extent leaf or branch nodes
     void *et_direct_data_cache;
 } ext_meta_t;
+
+#define getaddr(em, pblk) ((em)->devaddr + ((pblk) * (em)->blksz))
 
 #ifdef __cplusplus
 }

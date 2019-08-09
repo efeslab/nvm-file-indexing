@@ -58,6 +58,9 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
         // Index: how many more logical blocks are contiguous before this one?
         uint32_t index = (uint32_t)blkno;
         int err = cuckoo_hash_insert(ht, k, (*paddr) + blkno, index, range);
+
+        if (ht->do_stats) INCR_STAT(&cstats, nblocks_inserted);
+        
         if (!err) {
             ssize_t dealloc = CB(idx_struct, cb_dealloc_data, nalloc, *paddr);
             if_then_panic(nalloc != dealloc, "could not free data blocks!\n");
@@ -65,6 +68,8 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
             return -EEXIST;
         }
     }
+
+    if (ht->do_stats) INCR_STAT(&cstats, nwrites);
 
     return nalloc;
 }
@@ -162,25 +167,34 @@ int cuckoohash_invalidate_caches(idx_struct_t *idx_struct) {
 }
 
 void cuckoohash_set_stats(idx_struct_t *idx_struct, bool enable) {
-    return;
+    CUCKOOHASH(idx_struct, ht);
+    ht->do_stats = enable;
 }
 
 void cuckoohash_print_stats(idx_struct_t *idx_struct) {
-    return;
+    cuckoohash_print_global_stats();
+}
+
+void cuckoohash_print_global_stats(void) {
+    printf("CUCKOO HASH TABLE:\n");
+    printf("\tInserts: %.1f cachelines per op (%lu / %lu)\n",
+        (float)cstats.ncachelines_written / (float)cstats.nwrites, 
+        cstats.ncachelines_written, cstats.nwrites);
 }
 
 idx_fns_t cuckoohash_fns = {
-    .im_init          = cuckoohash_initialize,
-    .im_init_prealloc = NULL,
-    .im_lookup        = cuckoohash_lookup,
-    .im_create        = cuckoohash_create,
-    .im_remove        = cuckoohash_remove,
+    .im_init               = cuckoohash_initialize,
+    .im_init_prealloc      = NULL,
+    .im_lookup             = cuckoohash_lookup,
+    .im_create             = cuckoohash_create,
+    .im_remove             = cuckoohash_remove,
 
-    .im_set_caching   = cuckoohash_set_caching,
-    .im_set_locking   = cuckoohash_set_locking,
-    .im_persist       = cuckoohash_persist_updates,
-    .im_invalidate    = cuckoohash_invalidate_caches,
+    .im_set_caching        = cuckoohash_set_caching,
+    .im_set_locking        = cuckoohash_set_locking,
+    .im_persist            = cuckoohash_persist_updates,
+    .im_invalidate         = cuckoohash_invalidate_caches,
 
-    .im_set_stats     = cuckoohash_set_stats,
-    .im_print_stats   = cuckoohash_print_stats
+    .im_set_stats          = cuckoohash_set_stats,
+    .im_print_stats        = cuckoohash_print_stats,
+    .im_print_global_stats = cuckoohash_print_global_stats,
 };

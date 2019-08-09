@@ -41,6 +41,8 @@ int cuckoohash_set_locking(idx_struct_t *idx_struct, bool enable);
 int cuckoohash_persist_updates(idx_struct_t *idx_struct);
 int cuckoohash_invalidate_caches(idx_struct_t *idx_struct);
 
+void cuckoohash_print_global_stats(void);
+
 #ifdef __cplusplus
 }
 #endif
