@@ -207,46 +207,6 @@ static inline int test_bit(int nr, const volatile unsigned long *addr)
 }
 #endif
 
-/*
- * min()/max()/clamp() macros that also do
- * strict type-checking.. See the
- * "unnecessary" pointer comparison.
- */
-#ifndef __cplusplus
-#define min(a, b) ({\
-		__typeof__(a) _a = a;\
-		__typeof__(b) _b = b;\
-		_a < _b ? _a : _b; })
-
-#define max(a, b) ({\
-		__typeof__(a) _a = a;\
-		__typeof__(b) _b = b;\
-		_a > _b ? _a : _b; })
-#endif
-
-#define min3(x, y, z) min((__typeof__(x))min(x, y), z)
-#define max3(x, y, z) max((__typeof__(x))max(x, y), z)
-
-/**
- * min_not_zero - return the minimum that is _not_ zero, unless both are zero
- * @x: value1
- * @y: value2
- */
-#define min_not_zero(x, y) ({			\
-	__typeof__(x) __x = (x);			\
-	__typeof__(y) __y = (y);			\
-	__x == 0 ? __y : ((__y == 0) ? __x : min(__x, __y)); })
-
-/**
- * clamp - return a value clamped to a given range with strict typechecking
- * @val: current value
- * @lo: lowest allowable value
- * @hi: highest allowable value
- *
- * This macro does strict typechecking of lo/hi to make sure they are of the
- * same type as val.  See the unnecessary pointer comparisons.
- */
-#define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
 
 /*
  * ..and if you can't take the strict

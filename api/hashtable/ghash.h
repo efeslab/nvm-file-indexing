@@ -40,6 +40,9 @@ extern "C" {
 #define SIMPLE_ENTRIES
 #undef SIMPLE_ENTRIES
 
+#define MAX(x,y) (x > y ? x : y)
+#define MIN(x,y) (x < y ? x : y)
+
 // For the big hash table, mapping (inode, lblk) -> single block
 typedef struct hash_index_entry {
 #ifdef SIMPLE_ENTRIES

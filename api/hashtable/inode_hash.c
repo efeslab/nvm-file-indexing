@@ -67,7 +67,7 @@ ssize_t hashtable_create(idx_struct_t *idx_struct, inum_t inum,
 #ifdef SIMPLE_ENTRIES
     size = 1;
 #else
-    size = min(size, 255);
+    size = MIN(size, 255);
 #endif
 
     ssize_t nalloc = CB(idx_struct, cb_alloc_data, size, paddr);

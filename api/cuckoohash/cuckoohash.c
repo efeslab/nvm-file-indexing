@@ -59,8 +59,6 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
         uint32_t index = (uint32_t)blkno;
         int err = cuckoo_hash_insert(ht, k, (*paddr) + blkno, index, range);
 
-        if (ht->do_stats) INCR_STAT(&cstats, nblocks_inserted);
-
         if (!err) {
             ssize_t dealloc = CB(idx_struct, cb_dealloc_data, nalloc, *paddr);
             if_then_panic(nalloc != dealloc, "could not free data blocks!\n");
@@ -69,7 +67,10 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
         }
     }
 
-    if (ht->do_stats) INCR_STAT(&cstats, nwrites);
+    if (ht->do_stats) {
+        INCR_STAT(&cstats, nwrites);
+        ADD_STAT(&cstats, nblocks_inserted, nalloc);
+    }
 
     return nalloc;
 }
@@ -94,7 +95,6 @@ ssize_t cuckoohash_lookup(idx_struct_t *idx_struct, inum_t inum,
 /*
  * Returns FALSE if the requested logical block was not present in any of the
  * two hash tables.
- * TODO need to deallocate here!
  */
 ssize_t cuckoohash_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
                          size_t size) {
@@ -177,6 +177,9 @@ void cuckoohash_print_stats(idx_struct_t *idx_struct) {
 
 void cuckoohash_print_global_stats(void) {
     printf("CUCKOO HASH TABLE:\n");
+    printf("\tInserts: %.1f blocks per op (%lu / %lu)\n",
+        (float)cstats.nblocks_inserted / (float)cstats.nwrites,
+        cstats.nblocks_inserted, cstats.nwrites);
     printf("\tInserts: %.1f cachelines per op (%lu / %lu)\n",
         (float)cstats.ncachelines_written / (float)cstats.nwrites, 
         cstats.ncachelines_written, cstats.nwrites);

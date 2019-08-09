@@ -35,10 +35,6 @@
 
 #include "ghash.h"
 
-#define G_DISABLE_ASSERT
-
-#define MAX(x,y) (x > y ? x : y)
-
 // stats
 uint64_t reads;
 uint64_t writes;
@@ -298,9 +294,9 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
               hash_table->stats.n_min_ents_per_lookup = count;
           }
 
-          hash_table->stats.n_min_ents_per_lookup = min(count,
+          hash_table->stats.n_min_ents_per_lookup = MIN(count,
                   hash_table->stats.n_min_ents_per_lookup);
-          hash_table->stats.n_max_ents_per_lookup = max(count,
+          hash_table->stats.n_max_ents_per_lookup = MAX(count,
                   hash_table->stats.n_max_ents_per_lookup);
 
           UPDATE_TIMING(&(hash_table->stats), loop_time);

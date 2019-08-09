@@ -69,9 +69,9 @@ static inline unsigned long long _asm_rdtscp(void)
     (void)__sync_add_and_fetch(&((s)->f ## _tsc), _asm_rdtscp() - v);\
     (void)__sync_add_and_fetch(&((s)->f ## _nr), 1)
 
-#define ADD_STAT(s, f, n) (void)__sync_add_and_fetch(&((s)->f), n)
+#define ADD_STAT(s, f, n) (void)__sync_add_and_fetch(&((s)->f), (n))
 #define INCR_STAT(s, f) ADD_STAT(s, f, 1)
-#define INCR_NR_CACHELINE(s, f, sz) ADD_STAT(s, f, max(sz / 64, 1))
+#define INCR_NR_CACHELINE(s, f, sz) ADD_STAT(s, f, ((sz) / 64) > 1 ? ((sz) / 64) : 1)
 
 #define INIT_STATS(s) memset(s, 0, sizeof(*s))
 
