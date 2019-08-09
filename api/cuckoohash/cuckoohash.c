@@ -60,7 +60,7 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
         int err = cuckoo_hash_insert(ht, k, (*paddr) + blkno, index, range);
 
         if (ht->do_stats) INCR_STAT(&cstats, nblocks_inserted);
-        
+
         if (!err) {
             ssize_t dealloc = CB(idx_struct, cb_dealloc_data, nalloc, *paddr);
             if_then_panic(nalloc != dealloc, "could not free data blocks!\n");
