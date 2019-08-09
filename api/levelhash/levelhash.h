@@ -33,7 +33,7 @@ int levelhash_invalidate_caches(idx_struct_t*);
 void levelhash_clear_metadata(idx_struct_t*);
 
 void levelhash_set_stats(idx_struct_t* level_idx, bool enable);
-void levelhash_print_stats(idx_struct_t* level_idx);
+void levelhash_print_global_stats(void);
 
 /*
  * Convenience macros.

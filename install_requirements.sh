@@ -1,8 +1,8 @@
 #! /usr/bin/sudo /bin/bash
 
 COMMON_PACKAGES="cmake gcc"
-DNF_PACKAGES="$COMMON_PACKAGES gcc-c++"
-APT_PACKAGES="$COMMON_PACKAGES g++"
+DNF_PACKAGES="$COMMON_PACKAGES gcc-c++ libpmem-devel"
+APT_PACKAGES="$COMMON_PACKAGES g++ libpmem-dev"
 
 which apt > /dev/null 2>&1
 if [ $? == 0 ]; then

@@ -12,6 +12,7 @@ extern "C" {
 
 #include "common/common.h"
 #include "extents/extents.h"
+#include "cuckoohash/cuckoohash.h"
 #include "hashtable/hashtable.h"
 #include "levelhash/levelhash.h"
 #include "radixtree/radixtree.h"

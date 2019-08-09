@@ -149,16 +149,22 @@ static inline extent_header_t *ext_header(const idx_struct_t *ext_idx)
 static inline int write_ext_direct_data(const idx_struct_t *ext_idx)
 {
     EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, eh);
-    ssize_t nbytes = CB(ext_idx, cb_write,
+    if (ext_meta->et_cached) {
+        ssize_t nbytes = CB(ext_idx, cb_write,
                         ext_meta->et_direct_range.pr_start,
                         ext_meta->et_direct_range.pr_blk_offset,
                         ext_meta->et_direct_range.pr_nbytes,
                         (char*)ext_meta->et_direct_data);
-    if (nbytes != ext_meta->et_direct_range.pr_nbytes) {
-        printf("nbytes = %lu, but wrote %lu\n",
-                ext_meta->et_direct_range.pr_nbytes,
-                nbytes);
-        return -EIO;
+        if (nbytes != ext_meta->et_direct_range.pr_nbytes) {
+            printf("nbytes = %lu, but wrote %lu\n",
+                    ext_meta->et_direct_range.pr_nbytes,
+                    nbytes);
+            return -EIO;
+        }
+    } else {
+        // All we need to do is ensure persistence
+        pmem_persist(ext_meta->et_direct_data, 
+                     ext_meta->et_direct_range.pr_nbytes);
     }
 
     return 0;
@@ -167,26 +173,30 @@ static inline int write_ext_direct_data(const idx_struct_t *ext_idx)
 static inline int read_ext_direct_data(const idx_struct_t *ext_idx) 
 {
     EXTMETA(ext_idx, ext_meta); 
-    EXTHDR(ext_meta, eh);
 
-    #ifndef METADATA_CACHING
-    if (!ext_meta->et_cached || ext_meta->et_direct_data_cache_state < 0) {
-    #else
-    if (ext_meta->reread_meta) {
-    #endif
+    if (ext_meta->et_cached && ext_meta->reread_meta) {
         ssize_t nmeta = CB(ext_idx, cb_read,
                            ext_meta->et_direct_range.pr_start,
                            ext_meta->et_direct_range.pr_blk_offset,
                            ext_meta->et_direct_range.pr_nbytes,
-                           (char*)ext_meta->et_direct_data);
+                           (char*)ext_meta->et_direct_data_cache);
         if(nmeta != ext_meta->et_direct_range.pr_nbytes) return -EIO;
 
         ext_meta->et_direct_data_cache_state = 0;
-        #ifdef METADATA_CACHING
         ext_meta->reread_meta = false;
-        #endif
 
-        memset(ext_meta->prev_path, 0, sizeof(ext_meta->prev_path));
+        ext_meta->et_direct_data = ext_meta->et_direct_data_cache;
+
+        memset(ext_meta->prev_path, 0, sizeof(*ext_meta->prev_path) * MAX_DEPTH);
+        memset(ext_meta->path, 0, sizeof(*ext_meta->path) * MAX_DEPTH);
+    } else if (!ext_meta->et_direct_data || ext_meta->reread_meta) {
+        int err = CB(ext_idx, cb_get_addr, ext_meta->et_direct_range.pr_start,
+                                    ext_meta->et_direct_range.pr_blk_offset,
+                                    (char**)&(ext_meta->et_direct_data));
+        if (err) return -EIO;
+
+        memset(ext_meta->prev_path, 0, sizeof(*ext_meta->prev_path) * MAX_DEPTH);
+        memset(ext_meta->path, 0, sizeof(*ext_meta->path) * MAX_DEPTH);
     }
 
     return 0;
@@ -310,6 +320,7 @@ static inline void idx_set_pblock(extent_branch_t *ix,
 {
     ix->ei_leaf_lo = (unsigned long)(pb & 0xffffffff);
     ix->ei_leaf_hi = (unsigned long)((pb >> 31) >> 1) & 0xffff;
+    nvm_persist_struct(ix);
 }
 
 static inline void idx_store_pblock(extent_branch_t *ix,
@@ -317,6 +328,7 @@ static inline void idx_store_pblock(extent_branch_t *ix,
 {
     ix->ei_leaf_lo = (unsigned long)(pb & 0xffffffff);
     ix->ei_leaf_hi = (unsigned long)((pb >> 31) >> 1) & 0xffff;
+    nvm_persist_struct(ix);
 }
 
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

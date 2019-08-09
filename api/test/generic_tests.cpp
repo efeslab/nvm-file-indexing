@@ -8,6 +8,7 @@ INSTANTIATE_TEST_CASE_P(AllStructures,
                         GenericTestFixture,
                         ::testing::Values(&extent_tree_fns, 
                                           &hash_fns, 
+                                          &cuckoohash_fns,
                                           &levelhash_fns,
                                           &radixtree_fns));
 
@@ -49,7 +50,7 @@ TEST_P(GenericTestFixture, InsertPersistCheckEach) {
                            &idx_other, inum, l, npages - l, &p);
 
 
-            ASSERT_LE(1, r) << strerror(-r) << " on lblk " << l 
+            ASSERT_LE(1, r) << "\"" << strerror(-r) << "\" on lblk " << l 
                                             << " after insertion of " << lblk;
             ASSERT_LE(ret, npages - l);
             ASSERT_TRUE(mapping[l] == p);

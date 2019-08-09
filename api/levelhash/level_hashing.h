@@ -73,12 +73,14 @@ static void print_level_stats(level_stats_t *s) {
     PFIELD(s, per_read);
     PFIELD(s, per_loop);
     PFIELD(s, read_entries);
-    printf("\t Ratio: %llu / %llu (%lf)\n", s->nchecked, s->nreads, 
+    printf("\t Ratio: %lu / %lu (%lf)\n", s->nchecked, s->nreads, 
             (double)s->nchecked / (double)s->nreads);
 }
 
 #define METADATA_CACHING
 //#undef METADATA_CACHING
+
+extern level_stats_t level_stats;
 
 typedef struct level_hash {            // A Level hash table
     level_bucket_t *buckets[2];        // The top level and bottom level in the Level hash table
@@ -104,7 +106,6 @@ typedef struct level_hash {            // A Level hash table
     bool reread_meta;                  // If we need to reread metadata or not.
     // stats struct
     bool enable_stats;
-    level_stats_t *stats;
 } level_hash_t;
 
 int read_metadata(const idx_spec_t *idx_spec, 

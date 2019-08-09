@@ -70,6 +70,7 @@ typedef void (*clear_metadata_cache_fn_t)(idx_struct_t*);
 
 typedef void (*set_stats_t)(idx_struct_t*, bool);
 typedef void (*print_stats_t)(idx_struct_t*);
+typedef void (*print_global_stats_t)(void);
 
 
 /*******************************************************************************
@@ -91,6 +92,7 @@ typedef struct indexing_functions {
 
     set_stats_t               im_set_stats;
     print_stats_t             im_print_stats;
+    print_global_stats_t      im_print_global_stats;
 } idx_fns_t;
 
 #endif  // __INDEXING_METHODS_H__

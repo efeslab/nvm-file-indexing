@@ -1,19 +1,19 @@
 #include "levelhash.h"
 
 idx_fns_t levelhash_fns = {
-    .im_init           = NULL,
-    .im_init_prealloc  = levelhash_init,
-    .im_lookup         = levelhash_lookup,
-    .im_create         = levelhash_create,
-    .im_remove         = levelhash_remove,
+    .im_init               = NULL,
+    .im_init_prealloc      = levelhash_init,
+    .im_lookup             = levelhash_lookup,
+    .im_create             = levelhash_create,
+    .im_remove             = levelhash_remove,
 
-    .im_set_caching    = levelhash_set_caching,
-    .im_persist        = levelhash_persist_updates,
-    .im_invalidate     = levelhash_invalidate_caches,
-    .im_clear_metadata = levelhash_clear_metadata,
+    .im_set_caching        = levelhash_set_caching,
+    .im_persist            = levelhash_persist_updates,
+    .im_invalidate         = levelhash_invalidate_caches,
+    .im_clear_metadata     = levelhash_clear_metadata,
 
-    .im_set_stats      = levelhash_set_stats,
-    .im_print_stats    = levelhash_print_stats
+    .im_set_stats          = levelhash_set_stats,
+    .im_print_global_stats = levelhash_print_global_stats
 };
 
 int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents, 
@@ -33,7 +33,6 @@ int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents,
 ssize_t levelhash_lookup(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, size_t max, paddr_t* paddr) {
     LEVELMETA(level_idx, lh);
-    if (reread_metadata(lh)) return -EIO;
 
     DECLARE_TIMING();
     if (lh->enable_stats) START_TIMING();
@@ -42,7 +41,7 @@ ssize_t levelhash_lookup(idx_struct_t* level_idx, inum_t inum,
 #else
     size_t size = level_static_query(lh, laddr, paddr);
 #endif
-    if (lh->enable_stats) UPDATE_TIMING(lh->stats, read_entries);
+    if (lh->enable_stats) UPDATE_TIMING(&level_stats, read_entries);
 
     if (0 == size) return -ENOENT;
 
@@ -52,10 +51,9 @@ ssize_t levelhash_lookup(idx_struct_t* level_idx, inum_t inum,
 ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, size_t nblk, paddr_t* paddr) {
     LEVELMETA(level_idx, lh);
-#if 1
     ssize_t already_exists = levelhash_lookup(level_idx, inum, laddr, nblk, paddr);
     if (already_exists > 0) return already_exists;
-#endif
+
 
     nblk = nblk > LH_MAX_SIZE ? LH_MAX_SIZE : nblk;
 
@@ -92,7 +90,6 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
 ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, size_t nblk) {
     LEVELMETA(level_idx, lh);
-    if (reread_metadata(lh)) return -EIO;
 
     for (size_t blk = 0; blk < nblk; ++blk) {
         size_t idx;
@@ -103,7 +100,7 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
 
         uint8_t ret = level_delete(lh, cur_laddr, &paddr, &idx, &full_range);
         if (ret) {
-            printf("remove failed: laddr = %lu\n", cur_laddr);
+            printf("remove failed: laddr = %u\n", cur_laddr);
             (void)write_metadata(lh);
             return -EIO;
         }
@@ -116,7 +113,7 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
                 laddr_t lblk = (cur_laddr - idx) + l;
                 uint8_t r = level_update(lh, lblk, new_idx, new_size);
                 if (r) {
-                    printf("index update failed: laddr = %lu, %llu/%llu\n", 
+                    printf("index update failed: laddr = %u, %lu/%lu\n", 
                             lblk, blk + 1, nblk);
                     (void)write_metadata(lh);
                     return -EIO;
@@ -133,7 +130,7 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
                 laddr_t lblk = cur_laddr + l;
                 uint8_t r = level_update(lh, lblk, new_idx, new_size);
                 if (r) {
-                    printf("range update failed: laddr = %lu, %llu/%llu\n", 
+                    printf("range update failed: laddr = %u, %lu/%lu\n", 
                             lblk, blk + 1, nblk);
                     (void)write_metadata(lh);
                     return -EIO;
@@ -171,12 +168,12 @@ void levelhash_set_stats(idx_struct_t* level_idx, bool enable) {
     lh->enable_stats = enable;
 }
 
-void levelhash_print_stats(idx_struct_t* level_idx) {
-    LEVELMETA(level_idx, lh);
-    print_level_stats(lh->stats);
+void levelhash_print_global_stats() {
+    print_level_stats(&level_stats);
 }
 
 void levelhash_clear_metadata(idx_struct_t* level_idx) {
     LEVELMETA(level_idx, lh);
     lh->reread_meta = true;
+    if_then_panic(reread_metadata(lh), "could not reread metadata!");
 }

@@ -44,7 +44,7 @@ uint64_t reads;
 uint64_t writes;
 uint64_t blocks;
 
-#if 0
+#if 1
 #define pthread_rwlock_rdlock(x) 0
 #define pthread_rwlock_wrlock(x) 0
 #define pthread_rwlock_unlock(x) 0
@@ -132,7 +132,7 @@ nvm_hash_table_find_closest_shift (int n) {
 }
 
 static void
-nvm_hash_table_set_shift_from_size (nvm_hash_idx_t *hash_table, int size) {
+nvm_hash_table_set_shift_from_size(nvm_hash_idx_t *hash_table, int size) {
   int shift;
 
   shift = nvm_hash_table_find_closest_shift(size);
@@ -199,7 +199,7 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
   }
 #endif
 
-  if (hash_table->enable_stats) hash_table->stats.n_lookups++;
+  if (unlikely(hash_table->enable_stats)) hash_table->stats.n_lookups++;
   uint64_t count = 0;
 
   //pthread_rwlock_rdlock(hash_table->cache_lock);
@@ -212,23 +212,9 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
   if (hash_table->do_lock) pthread_rwlock_rdlock(hash_table->locks + node_index);
 #endif
 
-    __builtin_prefetch((void*)((hash_table->data_ptr) + (node_index * 16)));
+    nvm_read_entry(hash_table, node_index, &cur, force);
 
-  nvm_read_entry(hash_table, node_index, &cur, force);
-  //cur = hash_table->cache[BLK_NUM(node_index)][BLK_IDX(node_index)];
-
-#define CL(n) (n * 64)
-#if 0
-    __builtin_prefetch((void*)( ((char*)cur) + CL(2) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(1) ));
-    __builtin_prefetch((void*)( ((char*)cur) + CL(0) ));
-#elif 1
-    for (int i = 0; i < 11; ++i) {
-        __builtin_prefetch((void*)( cur + i ), 0, 3);
-    }
-#endif
-
-  count++;
+    count++;
 
     DECLARE_TIMING();
     START_TIMING();
@@ -299,11 +285,9 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
 #endif
 
   while (!HASH_ENT_IS_EMPTY(*cur)) {
-    DECLARE_TIMING();
-    START_TIMING();
     if (likely(cur->key == key && HASH_ENT_IS_VALID(*cur))) {
       *ent_return = cur;
-#if 1
+
       if (hash_table->do_lock) pthread_rwlock_unlock(hash_table->locks + node_index);
       //pthread_rwlock_unlock(hash_table->cache_lock);
       
@@ -321,13 +305,13 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
 
           UPDATE_TIMING(&(hash_table->stats), loop_time);
       }
-#endif
+
       return node_index;
-    }
-    else if (unlikely(HASH_ENT_IS_TOMBSTONE(*cur) && !have_tombstone)) {
+    } else if (unlikely(HASH_ENT_IS_TOMBSTONE(*cur) && !have_tombstone)) {
       first_tombstone = node_index;
       have_tombstone = TRUE;
     }
+
 #ifndef SEQ_STEP
     step++;
 #endif
@@ -734,7 +718,8 @@ nvm_hash_table_update_internal(nvm_hash_idx_t *hash_table,
 {
 #ifndef SIMPLE_ENTRIES
     ent->size = new_range;
-    nvm_update(hash_table, node_index);
+    nvm_persist_struct(ent->size);
+    //nvm_update(hash_table, node_index);
 #endif
 }
 // Very similar to lookup, but we also update the entry at the end.
@@ -831,36 +816,12 @@ static void nvm_hash_table_remove_node (nvm_hash_idx_t  *hash_table,
 #endif
 
   /* Erect tombstone */
-  nvm_update(hash_table, i);
+  //nvm_update(hash_table, i);
+  nvm_persist_struct(*ent);
 
   hash_table->nnodes--;
 
   //pthread_rwlock_unlock(hash_table->locks + i);
-}
-
-/*
- * nvm_hash_table_maybe_resize:
- * @hash_table: our #nvm_hash_idx_t
- *
- * Resizes the hash table, if needed.
- *
- * Essentially, calls nvm_hash_table_resize() if the table has strayed
- * too far from its ideal size for its number of nodes.
- *
- * iangneal: Hijacking this function to assure that we haven't over-committed.
- */
-static inline void
-nvm_hash_table_maybe_resize (nvm_hash_idx_t *hash_table) {
-#if 0
-  int noccupied = hash_table->noccupied;
-  int size = hash_table->size;
-
-  assert(noccupied <= size);
-  if ((size > hash_table->nnodes * 4 && size > 1 << HASH_TABLE_MIN_SHIFT) ||
-      (size <= noccupied + (noccupied / 16))) {
-    nvm_hash_table_resize (hash_table);
-  }
-#endif
 }
 
 /**
@@ -1042,30 +1003,11 @@ nvm_hash_table_insert_node(nvm_hash_idx_t *hash_table,
     ent->index = new_index;
     ent->size = new_range;
 #endif
-    nvm_update(hash_table, node_index);
+    //nvm_update(hash_table, node_index);
+    nvm_persist_struct(*ent);
   }
 
   return !already_exists;
-}
-
-/**
- * nvm_hash_table_destroy:
- * @hash_table: a #nvm_hash_idx_t
- *
- * Destroys all keys and values in the #nvm_hash_idx_t and decrements its
- * reference count by 1. If keys and/or values are dynamically allocated,
- * you should either free them first or create the #nvm_hash_idx_t with destroy
- * destruction phase.
- */
-void
-nvm_hash_table_destroy (nvm_hash_idx_t *hash_table)
-{
-  assert (hash_table != NULL);
-
-  for (size_t i = 0; i < hash_table->nvram_size; ++i) {
-    int err = pthread_rwlock_destroy(hash_table->locks + i);
-    if (err) panic("Could not destroy rwlock!");
-  }
 }
 
 /**

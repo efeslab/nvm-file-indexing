@@ -129,12 +129,15 @@ typedef struct nvm_api_extent_tree_metadata {
     ext_stats_t *et_stats;
     // buffers for the paths
     char **et_buffers;
-    // could be extent leaf or branch nodes
     void *et_direct_data;
 
     // To avoid malloc/free overhead
-    extent_path_t path[MAX_DEPTH];
-    extent_path_t prev_path[MAX_DEPTH];
+    extent_path_t *path;
+    extent_path_t *prev_path;
+
+    // To avoid cb_get_addr overhead
+    char *devaddr;
+    size_t blksz;
 
     // -- Force re-read of metadata
     bool reread_meta;
@@ -143,7 +146,11 @@ typedef struct nvm_api_extent_tree_metadata {
     bool et_cached;
     int8_t et_direct_data_cache_state;
     extent_cache_t *et_direct_cache;
+    // could be extent leaf or branch nodes
+    void *et_direct_data_cache;
 } ext_meta_t;
+
+#define getaddr(em, pblk) ((em)->devaddr + ((pblk) * (em)->blksz))
 
 #ifdef __cplusplus
 }

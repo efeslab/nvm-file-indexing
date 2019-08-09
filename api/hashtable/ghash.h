@@ -35,9 +35,7 @@ extern "C" {
 
 // from common
 #include "common/common.h"
-
-// local includes
-#include "hash_functions.h"
+#include "common/hash_functions.h"
 
 #define SIMPLE_ENTRIES
 #undef SIMPLE_ENTRIES
@@ -120,8 +118,8 @@ typedef struct hashtable_stats {
 static void print_hashtable_stats(hash_stats_t *s) {
     printf("hashtable stats: \n");
     printf("\tAvg. collisions: %.2f\n", (double)s->n_ents / (double)s->n_lookups);
-    printf("\tMin. collisions: %llu\n", s->n_min_ents_per_lookup);
-    printf("\tMax. collisions: %llu\n", s->n_max_ents_per_lookup);
+    printf("\tMin. collisions: %lu\n", s->n_min_ents_per_lookup);
+    printf("\tMax. collisions: %lu\n", s->n_max_ents_per_lookup);
     PFIELD(s, loop_time);
 }
 
