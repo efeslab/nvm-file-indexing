@@ -109,6 +109,8 @@ typedef struct extent_stats {
     STAT_FIELD(read_from_device);
 } ext_stats_t;
 
+extern ext_stats_t estats;
+
 static void print_ext_stats(ext_stats_t *s) {
     printf("extent tree stats: \n");
     PFIELD(s, read_metadata_blocks);

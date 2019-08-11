@@ -5,6 +5,8 @@
 #include "ext_util.h"
 #include "extents.h"
 
+ext_stats_t estats = {0,};
+
 /*
  * used by extent splitting.
  */
@@ -200,7 +202,7 @@ static int read_extent_tree_block(idx_struct_t *ext_idx, char **buf,
     *buf = getaddr(ext_meta, pblk);
     #endif
     if (ext_meta->et_enable_stats) {
-        UPDATE_STAT(ext_meta->et_stats, read_from_device, second_tsc);
+        UPDATE_STAT(&estats, read_from_device, second_tsc);
     }
     #if 0
     if (nbytes != devinfo.di_block_size) {
@@ -216,7 +218,7 @@ static int read_extent_tree_block(idx_struct_t *ext_idx, char **buf,
     }
 
     if (ext_meta->et_enable_stats) {
-        UPDATE_TIMING(ext_meta->et_stats, read_metadata_blocks);
+        UPDATE_TIMING(&estats, read_metadata_blocks);
     }
 
     return 0;
@@ -2622,19 +2624,29 @@ void extent_tree_print_stats(idx_struct_t *ext_idx) {
     print_ext_stats(ext_meta->et_stats);
 }
 
+void extent_tree_print_global_stats(void) {
+    print_ext_stats(&estats);
+}
+
+void extent_tree_clean_global_stats(void) {
+    memset(&estats, 0, sizeof(estats));
+}
+
 
 idx_fns_t extent_tree_fns = {
-    .im_init           = NULL,
-    .im_init_prealloc  = extent_tree_init,
-    .im_lookup         = extent_tree_lookup,
-    .im_create         = extent_tree_create,
-    .im_remove         = extent_tree_remove,
+    .im_init               = NULL,
+    .im_init_prealloc      = extent_tree_init,
+    .im_lookup             = extent_tree_lookup,
+    .im_create             = extent_tree_create,
+    .im_remove             = extent_tree_remove,
 
-    .im_set_caching    = extent_tree_set_caching,
-    .im_persist        = extent_tree_persist_updates,
-    .im_invalidate     = extent_tree_invalidate_caches,
-    .im_clear_metadata = extent_tree_clear_metadata_cache,
+    .im_set_caching        = extent_tree_set_caching,
+    .im_persist            = extent_tree_persist_updates,
+    .im_invalidate         = extent_tree_invalidate_caches,
+    .im_clear_metadata     = extent_tree_clear_metadata_cache,
 
-    .im_set_stats      = extent_tree_set_stats,
-    .im_print_stats    = extent_tree_print_stats
+    .im_set_stats          = extent_tree_set_stats,
+    .im_print_stats        = extent_tree_print_stats,
+    .im_print_global_stats = extent_tree_print_global_stats,
+    .im_clean_global_stats = extent_tree_clean_global_stats,
 };

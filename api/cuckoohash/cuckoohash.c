@@ -185,6 +185,10 @@ void cuckoohash_print_global_stats(void) {
         cstats.ncachelines_written, cstats.nwrites);
 }
 
+void cuckoohash_clean_global_stats(void) {
+    memset(&cstats, 0, sizeof(cstats));
+}
+
 idx_fns_t cuckoohash_fns = {
     .im_init               = cuckoohash_initialize,
     .im_init_prealloc      = NULL,
@@ -200,4 +204,5 @@ idx_fns_t cuckoohash_fns = {
     .im_set_stats          = cuckoohash_set_stats,
     .im_print_stats        = cuckoohash_print_stats,
     .im_print_global_stats = cuckoohash_print_global_stats,
+    .im_clean_global_stats = cuckoohash_clean_global_stats
 };
