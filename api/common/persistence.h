@@ -4,5 +4,6 @@
 #include <libpmem.h>
 
 #define nvm_persist_struct(s) pmem_persist((void*)&(s), sizeof(s))
+#define nvm_persist_struct_ptr(p) pmem_persist((void*)(p), sizeof(*p))
 
 #endif

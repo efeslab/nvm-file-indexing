@@ -107,14 +107,24 @@ typedef struct nvm_api_extent_tree_path {
 typedef struct extent_stats {
     STAT_FIELD(read_metadata_blocks);
     STAT_FIELD(read_from_device);
+    uint64_t ncachelines_written;
+    uint64_t nblocks_inserted;
+    uint64_t nwrites;
 } ext_stats_t;
 
 extern ext_stats_t estats;
+extern bool g_do_stats;
 
 static void print_ext_stats(ext_stats_t *s) {
     printf("extent tree stats: \n");
     PFIELD(s, read_metadata_blocks);
     PFIELD(s, read_from_device);
+    printf("\tInserts: %.1f blocks per op (%lu / %lu)\n",
+        (float)estats.nblocks_inserted / (float)estats.nwrites,
+        estats.nblocks_inserted, estats.nwrites);
+    printf("\tInserts: %.1f cachelines per op (%lu / %lu)\n",
+        (float)estats.ncachelines_written / (float)estats.nwrites, 
+        estats.ncachelines_written, estats.nwrites);
 }
 
 #define MAX_DEPTH 10
