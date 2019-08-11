@@ -2646,6 +2646,11 @@ out2:
         //FREE(ext_idx, path);
     }
 
+    if (g_do_stats) {
+        INCR_STAT(&estats, nwrites);
+        ADD_STAT(&estats, nblocks_inserted, allocated);
+    }
+
     return err ? err : allocated;
 }
 
@@ -2723,6 +2728,7 @@ ssize_t extent_tree_remove(idx_struct_t *ext_idx,
 
     int err = ext_truncate(ext_idx, laddr, laddr + size - 1);
     if (err) return err;
+    
     return size;
 }
 
