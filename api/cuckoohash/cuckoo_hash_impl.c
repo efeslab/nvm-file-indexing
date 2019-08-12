@@ -22,7 +22,7 @@
 
 #include "cuckoo_hash_impl.h"
 
-nvm_cuckoo_stats_t cstats;
+nvm_cuckoo_stats_t cstats = {0,}; 
 
 static inline
 void
@@ -246,6 +246,10 @@ insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item)
 
         if (elem->hash1 == elem->hash2 || (elem->hash1 % mod) != h1m) {
             *elem = *item;
+            nvm_persist_struct(*elem);
+            if (hash->do_stats) {
+                INCR_NR_CACHELINE(&cstats, ncachelines_written, sizeof(*elem));
+            }
 
             return true;
         }

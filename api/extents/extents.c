@@ -5,6 +5,9 @@
 #include "ext_util.h"
 #include "extents.h"
 
+ext_stats_t estats = {0,};
+bool g_do_stats = false;
+
 /*
  * used by extent splitting.
  */
@@ -200,7 +203,7 @@ static int read_extent_tree_block(idx_struct_t *ext_idx, char **buf,
     *buf = getaddr(ext_meta, pblk);
     #endif
     if (ext_meta->et_enable_stats) {
-        UPDATE_STAT(ext_meta->et_stats, read_from_device, second_tsc);
+        UPDATE_STAT(&estats, read_from_device, second_tsc);
     }
     #if 0
     if (nbytes != devinfo.di_block_size) {
@@ -216,7 +219,7 @@ static int read_extent_tree_block(idx_struct_t *ext_idx, char **buf,
     }
 
     if (ext_meta->et_enable_stats) {
-        UPDATE_TIMING(ext_meta->et_stats, read_metadata_blocks);
+        UPDATE_TIMING(&estats, read_metadata_blocks);
     }
 
     return 0;
@@ -240,6 +243,10 @@ static void extent_block_csum_set(idx_struct_t *ext_idx, extent_header_t *eh)
     tail = find_ext_tail(eh);
     tail->et_checksum = ext_block_csum(ext_idx, eh);
     nvm_persist_struct(tail->et_checksum);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                          sizeof(tail->et_checksum));
+    }
 
 }
 
@@ -650,6 +657,10 @@ static int ext_insert_index(idx_struct_t *ext_idx,
     len = EXT_LAST_INDEX(curp->p_hdr) - ix + 1;
     if (len > 0) {
         pmem_memmove_persist(ix + 1, ix, len * sizeof(extent_branch_t));
+        
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, len * sizeof(*ix));
+        }
     }
 
     if (unlikely(ix > EXT_MAX_INDEX(curp->p_hdr))) {
@@ -661,6 +672,10 @@ static int ext_insert_index(idx_struct_t *ext_idx,
     idx_store_pblock(ix, ptr);
     le16_add_cpu(&curp->p_hdr->eh_entries, 1);
     nvm_persist_struct(curp->p_hdr->eh_entries);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                          sizeof(curp->p_hdr->eh_entries));
+    }
 
     if (unlikely(ix > EXT_LAST_INDEX(curp->p_hdr))) {
         //ERROR_INODE(inode, "%s\n", "ix > EXT_LAST_INDEX!");
@@ -797,17 +812,29 @@ static int ext_split(idx_struct_t *ext_idx,
         extent_leaf_t *ex;
         ex = EXT_FIRST_EXTENT(neh);
         pmem_memmove_persist(ex, path[depth].p_ext, sizeof(extent_leaf_t) * m);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, m * sizeof(*ex));
+        }
+
         le16_add_cpu(&neh->eh_entries, m);
     }
 
     extent_block_csum_set(ext_idx, neh);
-    nvm_persist_struct(neh);
+    nvm_persist_struct_ptr(neh);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*neh));
+    }
 
     /* correct old leaf */
     if (m) {
         le16_add_cpu(&path[depth].p_hdr->eh_entries, -m);
         err = ext_dirty(ext_idx, path + depth);
         nvm_persist_struct(path[depth].p_hdr->eh_entries);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                              sizeof(path[depth].p_hdr->eh_entries));
+        }
+
         if (err)
             goto cleanup;
     }
@@ -868,17 +895,30 @@ static int ext_split(idx_struct_t *ext_idx,
         //ext_show_move(ext_idx, path, newblock, i);
         if (m) {
             pmem_memmove_persist(++fidx, path[i].p_idx, sizeof(extent_branch_t) * m);
+            if (g_do_stats) {
+                INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                                  sizeof(extent_branch_t) * m);
+            }
+
             le16_add_cpu(&neh->eh_entries, m);
         }
 
         extent_block_csum_set(ext_idx, neh);
-        nvm_persist_struct(neh);
+        nvm_persist_struct_ptr(neh);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*neh));
+        }
 
         /* correct old index */
         if (m) {
             le16_add_cpu(&path[i].p_hdr->eh_entries, -m);
             err = ext_dirty(ext_idx, path + i);
             nvm_persist_struct(path[i].p_hdr->eh_entries);
+            if (g_do_stats) {
+                INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                                sizeof(path[depth].p_hdr->eh_entries));
+            }
+
             if (err) goto cleanup;
         }
 
@@ -960,6 +1000,10 @@ static int ext_grow_indepth(idx_struct_t *ext_idx, unsigned int flags)
     //memmove(bh->b_data, inode->i_data, sizeof(inode->l1.i_data));
     //memmove(bh->b_data, ext_header(ext_idx), sizeof(inode->l1.i_data));
     pmem_memmove_persist(buf, ext_header(ext_idx), ext_meta->et_direct_range.pr_nbytes);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                          ext_meta->et_direct_range.pr_nbytes);
+    }
 
     /* set size of new block */
     neh = ext_header_from_block(buf);
@@ -972,7 +1016,10 @@ static int ext_grow_indepth(idx_struct_t *ext_idx, unsigned int flags)
     }
     neh->eh_magic = cpu_to_le16(EXT_MAGIC);
     extent_block_csum_set(ext_idx, neh);
-    nvm_persist_struct(neh);
+    nvm_persist_struct_ptr(neh);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*neh));
+    }
     #if 0
     ssize_t nwrite = CB(ext_idx, cb_write,
                         newblock, 0, device_block_size(ext_idx), buf);
@@ -1351,6 +1398,11 @@ static int ext_correct_indexes(idx_struct_t *ext_idx, extent_path_t *path)
     path[k].p_idx->ei_block = border;
     err = ext_dirty(ext_idx, path + k);
     nvm_persist_struct(path[k].p_idx->ei_block);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                          sizeof(path[k].p_idx->ei_block));
+    }
+
     if (err)
         return err;
 
@@ -1362,6 +1414,10 @@ static int ext_correct_indexes(idx_struct_t *ext_idx, extent_path_t *path)
         path[k].p_idx->ei_block = border;
         err = ext_dirty(ext_idx, path + k);
         nvm_persist_struct(path[k].p_idx->ei_block);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                              sizeof(path[k].p_idx->ei_block));
+        }
         if (err) break;
     }
 
@@ -1440,16 +1496,26 @@ static int ext_try_to_merge_right(idx_struct_t *ext_idx,
             ext_mark_unwritten(ex);
 
         nvm_persist_struct(ex->ee_len);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(ex->ee_len));
+        }
 
         if (ex + 1 < EXT_LAST_EXTENT(eh)) {
             len = (EXT_LAST_EXTENT(eh) - ex - 1) * sizeof(extent_leaf_t);
             pmem_memmove_persist(ex + 1, ex + 2, len);
+            if (g_do_stats) {
+                INCR_NR_CACHELINE(&estats, ncachelines_written, len);
+            }
         }
 
         le16_add_cpu(&eh->eh_entries, -1);
         merge_done = 1;
 
         nvm_persist_struct(eh->eh_entries);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                              sizeof(eh->eh_entries));
+        }
     }
 
     return merge_done;
@@ -1488,12 +1554,20 @@ static void ext_try_to_merge_up(idx_struct_t *ext_idx, extent_path_t *path)
 
     path[1].p_maxdepth = path[0].p_maxdepth;
     pmem_memcpy_persist(path[0].p_hdr, path[1].p_hdr, s);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, s);
+    }
+
     path[0].p_depth = 0;
     path[0].p_ext = EXT_FIRST_EXTENT(path[0].p_hdr) +
         (path[1].p_ext - EXT_FIRST_EXTENT(path[1].p_hdr));
     path[0].p_hdr->eh_max = cpu_to_le16(max_root);
 
     nvm_persist_struct(path[0].p_hdr->eh_max);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                            sizeof(path[0].p_hdr->eh_max));
+    }
 
     (void)CB(ext_idx, cb_dealloc_metadata, 1, blk);
 }
@@ -1580,6 +1654,10 @@ int ext_insert_extent(idx_struct_t *ext_idx, extent_path_t **ppath,
             
             if (unwritten) ext_mark_unwritten(ex);
             nvm_persist_struct(ex->ee_len);
+            if (g_do_stats) {
+                INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                                  sizeof(ex->ee_len));
+            }
             
             eh = path[depth].p_hdr;
             nearex = ex;
@@ -1599,7 +1677,10 @@ prepend:
 
             if (unwritten) ext_mark_unwritten(ex);
 
-            nvm_persist_struct(ex);
+            nvm_persist_struct_ptr(ex);
+            if (g_do_stats) {
+                INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*ex));
+            }
 
             eh = path[depth].p_hdr;
             nearex = ex;
@@ -1681,12 +1762,19 @@ has_space:
 
         if (len > 0) {
             pmem_memmove_persist(nearex + 1, nearex, len * sizeof(extent_leaf_t));
+            if (g_do_stats) {
+                INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                                    len * sizeof(extent_leaf_t));
+            }
         }
     }
 
     le16_add_cpu(&eh->eh_entries, 1);
     path[depth].p_ext = nearex;
     nvm_persist_struct(eh->eh_entries);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(eh->eh_entries));
+    }
 
     /* nearex points to the location in a extent block.
      * update nearex with newext information */
@@ -1694,7 +1782,10 @@ has_space:
     ext_set_lblock(nearex, ext_lblock(newext));
     ext_store_pblock(nearex, ext_pblock(newext));
     nearex->ee_len = newext->ee_len;
-    nvm_persist_struct(nearex);
+    nvm_persist_struct_ptr(nearex);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*nearex));
+    }
 
 merge:
     /* try to merge extents */
@@ -1770,10 +1861,17 @@ int ext_rm_idx(idx_struct_t *ext_idx, extent_path_t *path, int depth)
         int len = EXT_LAST_INDEX(path->p_hdr) - path->p_idx;
         len *= sizeof(extent_branch_t);
         pmem_memmove_persist(path->p_idx, path->p_idx + 1, len);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, len);
+        }
     }
 
     le16_add_cpu(&path->p_hdr->eh_entries, -1);
     nvm_persist_struct(path->p_hdr->eh_entries);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                            sizeof(path->p_hdr->eh_entries));
+    }
 
     if ((err = ext_dirty(ext_idx, path)))
         return err;
@@ -1796,7 +1894,10 @@ int ext_rm_idx(idx_struct_t *ext_idx, extent_path_t *path, int depth)
 
         path->p_idx->ei_block = (path+1)->p_idx->ei_block;
         err = ext_dirty(ext_idx, path);
-        nvm_persist_struct(path->p_idx);
+        nvm_persist_struct_ptr(path->p_idx);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*path->p_idx));
+        }
         if (err)
             break;
     }
@@ -1891,7 +1992,10 @@ static int ext_rm_leaf(idx_struct_t *ext_idx, extent_path_t *path,
         if (unwritten && num)
             ext_mark_unwritten(ex);
 
-        nvm_persist_struct(ex);
+        nvm_persist_struct_ptr(ex);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*ex));
+        }
         /*
          * If the extent was completely released,
          * we need to remove it from the leaf
@@ -1905,13 +2009,23 @@ static int ext_rm_leaf(idx_struct_t *ext_idx, extent_path_t *path,
                  */
                 pmem_memmove_persist(ex, ex+1, (EXT_LAST_EXTENT(eh) - ex) *
                     sizeof(extent_leaf_t));
-
+                
                 /* Now get rid of the one at the end */
                 pmem_memset_persist(EXT_LAST_EXTENT(eh), 0,
                     sizeof(extent_leaf_t));
+
+                if (g_do_stats) {
+                    INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                                    (EXT_LAST_EXTENT(eh) - ex + 1) *
+                    sizeof(extent_leaf_t) );
+                }
             }
             le16_add_cpu(&eh->eh_entries, -1);
             nvm_persist_struct(eh->eh_entries);
+            if (g_do_stats) {
+                INCR_NR_CACHELINE(&estats, ncachelines_written, 
+                                  sizeof(eh->eh_entries));
+            }
         }
 
         err = ext_dirty(ext_idx, path + depth);
@@ -1999,12 +2113,18 @@ static int split_extent_at(idx_struct_t *ext_idx,
 
     /* case a */
     pmem_memcpy_persist(&orig_ex, ex, sizeof(orig_ex));
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(orig_ex));
+    }
     ex->ee_len = cpu_to_le16(split - ee_block);
 
     if (split_flag & EXT_MARK_UNWRIT1)
         ext_mark_unwritten(ex);
 
-    nvm_persist_struct(ex);
+    nvm_persist_struct_ptr(ex);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*ex));
+    }
 
     /*
      * path may lead to new leaf, not to original leaf any more
@@ -2021,7 +2141,10 @@ static int split_extent_at(idx_struct_t *ext_idx,
     if (split_flag & EXT_MARK_UNWRIT2)
         ext_mark_unwritten(ex2);
 
-    nvm_persist_struct(ex2);
+    nvm_persist_struct_ptr(ex2);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*ex2));
+    }
 
     err = ext_insert_extent(ext_idx, ppath, &newex, flags);
 
@@ -2046,6 +2169,9 @@ static int split_extent_at(idx_struct_t *ext_idx,
         }
 
         nvm_persist_struct(zero_ex);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(zero_ex));
+        }
 
         if (err)
             goto fix_extent_len;
@@ -2053,7 +2179,10 @@ static int split_extent_at(idx_struct_t *ext_idx,
         ex->ee_len = cpu_to_le16(ee_len);
         ext_try_to_merge(ext_idx, path, ex);
         err = ext_dirty(ext_idx, path + path->p_depth);
-        nvm_persist_struct(ex);
+        nvm_persist_struct_ptr(ex);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*ex));
+        }
         if (err)
             goto fix_extent_len;
 
@@ -2068,7 +2197,10 @@ out:
 fix_extent_len:
     ex->ee_len = orig_ex.ee_len;
     ext_dirty(ext_idx, path + path->p_depth);
-    nvm_persist_struct(ex);
+    nvm_persist_struct_ptr(ex);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*ex));
+    }
     return err;
 }
 
@@ -2277,7 +2409,10 @@ int ext_remove_space(idx_struct_t *ext_idx, laddr_t start, laddr_t end)
         ext_header(ext_idx)->eh_max = cpu_to_le16(
                 ext_space_root(ext_idx));
         err = ext_dirty(ext_idx, path);
-        nvm_persist_struct(ext_hdr);
+        nvm_persist_struct_ptr(ext_hdr);
+        if (g_do_stats) {
+            INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*ext_hdr));
+        }
     }
 out:
     if (path) {
@@ -2289,10 +2424,10 @@ out:
 }
 
 static int ext_convert_to_initialized(idx_struct_t *ext_idx,
-                                           extent_path_t **ppath,
-                                           laddr_t split,
-                                           size_t blocks,
-                                           int flags)
+                                    extent_path_t **ppath,
+                                    laddr_t split,
+                                    size_t blocks,
+                                    int flags)
 {
     int depth = ext_tree_depth(ext_idx), err;
     extent_leaf_t *ex = (*ppath)[depth].p_ext;
@@ -2479,6 +2614,9 @@ ssize_t extent_tree_create(idx_struct_t *ext_idx, inum_t inum,
     err = ext_insert_extent(ext_idx, &path, &newex, 0);
                                  //flags & GET_BLOCKS_PRE_IO);
     nvm_persist_struct(newex);
+    if (g_do_stats) {
+        INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(newex));
+    }
 
     if (err) {
         /* free data blocks we just allocated */
@@ -2506,6 +2644,11 @@ out2:
         /* write back tree changes (internal/leaf nodes) */
         ext_drop_refs(ext_idx, path);
         //FREE(ext_idx, path);
+    }
+
+    if (g_do_stats) {
+        INCR_STAT(&estats, nwrites);
+        ADD_STAT(&estats, nblocks_inserted, allocated);
     }
 
     return err ? err : allocated;
@@ -2585,6 +2728,7 @@ ssize_t extent_tree_remove(idx_struct_t *ext_idx,
 
     int err = ext_truncate(ext_idx, laddr, laddr + size - 1);
     if (err) return err;
+    
     return size;
 }
 
@@ -2615,6 +2759,7 @@ int extent_tree_invalidate_caches(idx_struct_t* idx_struct) {
 void extent_tree_set_stats(idx_struct_t *ext_idx, bool enable) {
     EXTMETA(ext_idx, ext_meta);
     ext_meta->et_enable_stats = enable;
+    g_do_stats = enable;
 }
 
 void extent_tree_print_stats(idx_struct_t *ext_idx) {
@@ -2622,19 +2767,29 @@ void extent_tree_print_stats(idx_struct_t *ext_idx) {
     print_ext_stats(ext_meta->et_stats);
 }
 
+void extent_tree_print_global_stats(void) {
+    print_ext_stats(&estats);
+}
+
+void extent_tree_clean_global_stats(void) {
+    memset(&estats, 0, sizeof(estats));
+}
+
 
 idx_fns_t extent_tree_fns = {
-    .im_init           = NULL,
-    .im_init_prealloc  = extent_tree_init,
-    .im_lookup         = extent_tree_lookup,
-    .im_create         = extent_tree_create,
-    .im_remove         = extent_tree_remove,
+    .im_init               = NULL,
+    .im_init_prealloc      = extent_tree_init,
+    .im_lookup             = extent_tree_lookup,
+    .im_create             = extent_tree_create,
+    .im_remove             = extent_tree_remove,
 
-    .im_set_caching    = extent_tree_set_caching,
-    .im_persist        = extent_tree_persist_updates,
-    .im_invalidate     = extent_tree_invalidate_caches,
-    .im_clear_metadata = extent_tree_clear_metadata_cache,
+    .im_set_caching        = extent_tree_set_caching,
+    .im_persist            = extent_tree_persist_updates,
+    .im_invalidate         = extent_tree_invalidate_caches,
+    .im_clear_metadata     = extent_tree_clear_metadata_cache,
 
-    .im_set_stats      = extent_tree_set_stats,
-    .im_print_stats    = extent_tree_print_stats
+    .im_set_stats          = extent_tree_set_stats,
+    .im_print_stats        = extent_tree_print_stats,
+    .im_print_global_stats = extent_tree_print_global_stats,
+    .im_clean_global_stats = extent_tree_clean_global_stats,
 };
