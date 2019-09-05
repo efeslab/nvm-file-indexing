@@ -21,6 +21,7 @@
 #include <assert.h>
 
 #include "cuckoo_hash_impl.h"
+#include "common/hash_functions.h"
 
 nvm_cuckoo_stats_t cstats = {0,}; 
 
@@ -37,9 +38,12 @@ compute_hash(paddr_t key, uint32_t *h1, uint32_t *h2)
     *h2 = 0x6d7839d0;
     // TODO: might be inefficient
     hashlittle2(&key, sizeof(key), h1, h2);
-#else
+#elif 1
+    *h1 = mix(key);
+    *h2 = mix(~key);
+#else 
     *h1 = (uint32_t)key;
-    *h2 = ~*h1;
+    *h2 = (uint32_t)~key;
 #endif
     if (*h1 == *h2) {
         *h2 = ~*h2;
@@ -56,7 +60,7 @@ cuckoo_hash_init(nvm_cuckoo_idx_t **ht, paddr_t meta_block,
 
     // Read metadata to see if it exists or not.
     ssize_t err = CB(idx_spec, cb_read, meta_block, 0, 
-                                        sizeof(hash->meta), (char*)&(hash->meta));
+                     sizeof(hash->meta), (char*)&(hash->meta));
     if (err != sizeof(hash->meta)) return err;
 
     if (hash->meta.magic != CUCKOO_MAGIC) {
@@ -80,6 +84,7 @@ cuckoo_hash_init(nvm_cuckoo_idx_t **ht, paddr_t meta_block,
         ssize_t werr = CB(idx_spec, cb_write, meta_block, 0, 
                           sizeof(hash->meta), (char*)&(hash->meta));
         if (werr != sizeof(hash->meta)) return err;
+
     }
 
     // Always have to retrieve the pointer.
@@ -120,16 +125,14 @@ lookup(const struct cuckoo_hash *hash, paddr_t key, uint32_t h1, uint32_t h2)
 
     elem = bin_at(hash, (h1 % mod));
 
-    if (elem->hash2 == h2 && elem->hash1 == h1
-        && elem->hash_item.key == key)
-    {
+    //if (elem->hash2 == h2 && elem->hash1 == h1
+    if (elem->hash_item.key == key) {
         return elem;
     }
 
     elem = bin_at(hash, (h2 % mod));
-    if (elem->hash2 == h1 && elem->hash1 == h2
-        && elem->hash_item.key == key)
-    {
+    //if (elem->hash2 == h1 && elem->hash1 == h2
+    if (elem->hash_item.key == key) {
         return elem;
     }
 
@@ -141,10 +144,13 @@ int
 cuckoo_hash_lookup(const struct cuckoo_hash *hash,
                    paddr_t key, paddr_t *value, uint32_t *size)
 {
+    DECLARE_TIMING();
     *value = *size = 0;
 
     uint32_t h1, h2;
+    if (hash->do_stats) START_TIMING();
     compute_hash(key, &h1, &h2);
+    if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
 
     cuckoo_elem_t *elem = lookup(hash, key, h1, h2);
     if (!elem) return -ENOENT;
@@ -158,7 +164,10 @@ int
 cuckoo_hash_update(const struct cuckoo_hash *hash, paddr_t key, uint32_t size)
 {
     uint32_t h1, h2;
+    DECLARE_TIMING();
+    if (hash->do_stats) START_TIMING();
     compute_hash(key, &h1, &h2);
+    if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
 
     cuckoo_elem_t *elem = lookup(hash, key, h1, h2);
     if (!elem) return -ENOENT;
@@ -176,7 +185,10 @@ cuckoo_hash_remove(struct cuckoo_hash *hash, paddr_t key, paddr_t *value,
                    uint32_t *index, uint32_t *range)
 {
     uint32_t h1, h2;
+    DECLARE_TIMING();
+    if (hash->do_stats) START_TIMING();
     compute_hash(key, &h1, &h2);
+    if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
 
     cuckoo_elem_t *elem = lookup(hash, key, h1, h2);
     if (!elem) return -ENOENT;
@@ -280,7 +292,10 @@ cuckoo_hash_insert(struct cuckoo_hash *hash, paddr_t key, paddr_t value,
                    uint32_t index, uint32_t range)
 {
     uint32_t h1, h2;
+    DECLARE_TIMING();
+    if (hash->do_stats) START_TIMING();
     compute_hash(key, &h1, &h2);
+    if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
 
     struct cuckoo_hash_elem *elem = lookup(hash, key, h1, h2);
     if (elem) {

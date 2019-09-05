@@ -3,7 +3,8 @@
 
 int cuckoohash_initialize(const idx_spec_t *idx_spec,
                          idx_struct_t *idx_struct,
-                         paddr_t *location) {
+                         paddr_t *location) 
+{
 
     if_then_panic(!idx_spec, "idx_spec cannot be null!");
     if_then_panic(!idx_struct, "idx_struct cannot be null!");
@@ -52,7 +53,7 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
     }
 
     for (size_t blkno = 0; blkno < nalloc; ++blkno) {
-        hash_key_t k = MAKEKEY(inum, laddr + blkno);
+        hash_key_t k = MAKECUCKOOKEY(inum, laddr + blkno);
         // Range: how many more logical blocks are contiguous after this one?
         uint32_t range = (uint32_t)(nalloc - blkno);
         // Index: how many more logical blocks are contiguous before this one?
@@ -82,7 +83,7 @@ ssize_t cuckoohash_lookup(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t max, paddr_t* paddr) {
     CUCKOOHASH(idx_struct, ht);
 
-    hash_key_t k = MAKEKEY(inum, laddr);
+    hash_key_t k = MAKECUCKOOKEY(inum, laddr);
     uint32_t size;
     int err = cuckoo_hash_lookup(ht, k, paddr, &size);
     if (err) return err;
@@ -108,7 +109,7 @@ ssize_t cuckoohash_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     size_t new_size;
     laddr_t range_start;
     for (laddr_t lblk = laddr; lblk < laddr + size; ++lblk) {
-        hash_key_t k = MAKEKEY(inum, lblk);
+        hash_key_t k = MAKECUCKOOKEY(inum, lblk);
         paddr_t removed;
         uint32_t index, range;
         int err = cuckoo_hash_remove(ht, k, &removed, &index, &range);
@@ -135,7 +136,7 @@ ssize_t cuckoohash_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
     if (new_size > 0) {
         for (laddr_t lblk = range_start; lblk < smallest_lblk; ++lblk) {
-            hash_key_t k = MAKEKEY(inum, lblk);
+            hash_key_t k = MAKECUCKOOKEY(inum, lblk);
             size_t new_range = new_size - lblk;
             if_then_panic(new_range == 0, "Cannot insert with size 0!");
             int uerr = cuckoo_hash_update(ht, k, new_range);
@@ -183,6 +184,7 @@ void cuckoohash_print_global_stats(void) {
     printf("\tInserts: %.1f cachelines per op (%lu / %lu)\n",
         (float)cstats.ncachelines_written / (float)cstats.nwrites, 
         cstats.ncachelines_written, cstats.nwrites);
+    PFIELD(&cstats, compute_hash);
 }
 
 void cuckoohash_clean_global_stats(void) {

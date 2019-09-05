@@ -40,6 +40,10 @@ int hashtable_set_locking(idx_struct_t *idx_struct, bool enable);
 int hashtable_persist_updates(idx_struct_t *idx_struct);
 int hashtable_invalidate_caches(idx_struct_t *idx_struct);
 
+void hashtable_set_stats(idx_struct_t* idx_struct, bool enable);
+
+void hashtable_print_global_stats();
+
 #ifdef __cplusplus
 }
 #endif

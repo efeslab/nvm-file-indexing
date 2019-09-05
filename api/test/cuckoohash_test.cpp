@@ -33,7 +33,7 @@ TEST_F(CuckooHashFixture, InsertSingle) {
     size_t npages = 1;
 
     ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
-    ASSERT_EQ(npages, ret);
+    ASSERT_EQ(npages, ret) << strerror(-ret);
     ASSERT_GT(pblk, 0);
 }
 

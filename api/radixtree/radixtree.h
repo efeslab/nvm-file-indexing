@@ -52,6 +52,22 @@ typedef struct ondevice_radixtree_metadata {
 
 _Static_assert(sizeof(ondev_radix_meta_t) <= 64, "On-device metadata > 64!");
 
+typedef struct radixtree_stats {
+    uint64_t depth_total;
+    uint64_t depth_nr;
+} radixtree_stats_t;
+
+extern radixtree_stats_t rstats;
+extern bool g_radix_do_stats;
+
+static void print_radixtree_stats(radixtree_stats_t *s) {
+    printf("Radixtree stats:\n");
+    printf("\tAverage depth: %.1f\n", 
+           (double)s->depth_total / (double)s->depth_nr);
+}
+
+#define print_global_radixtree_stats() print_radixtree_stats(&rstats)
+
 typedef struct radixtree_metadata {
     bool cached;
     paddr_range_t metadata_loc;
@@ -89,6 +105,13 @@ typedef struct radixtree_metadata {
     mem_man_fns_t  *idx_mem_man;
 
 } radixtree_meta_t;
+
+static void inc_stats(radixtree_meta_t *radix, radixtree_stats_t *s) {
+    ADD_STAT(s, depth_total, radix->max_depth);
+    INCR_STAT(s, depth_nr);
+}
+
+#define inc_global_stats(radix) inc_stats(radix, &rstats)
 
 #define get_contents(r, pblk) (paddr_t*)(r->dev_addr + (r->blksz * pblk))
 #define rmeta(r) (&((r)->metadata_loc))

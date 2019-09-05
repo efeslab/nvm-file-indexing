@@ -10,7 +10,8 @@ INSTANTIATE_TEST_CASE_P(AllStructures,
                                           &hash_fns, 
                                           &cuckoohash_fns,
                                           &levelhash_fns,
-                                          &radixtree_fns));
+                                          &radixtree_fns,
+                                          &cuckoohash_fns));
 
 TEST_P(GenericTestFixture, InitNoError) {
     ASSERT_EQ(0, init_err);

@@ -63,6 +63,8 @@ typedef struct level_hash_stats {
     STAT_FIELD(misc_callbacks);
     size_t nchecked;
     size_t nreads;
+    size_t nchecked_create;
+    size_t nwrites;
 } level_stats_t;
 
 static void print_level_stats(level_stats_t *s) {
@@ -73,8 +75,10 @@ static void print_level_stats(level_stats_t *s) {
     PFIELD(s, per_read);
     PFIELD(s, per_loop);
     PFIELD(s, read_entries);
-    printf("\t Ratio: %lu / %lu (%lf)\n", s->nchecked, s->nreads, 
+    printf("\tRead Ratio: %lu / %lu (%lf) \n", s->nchecked, s->nreads, 
             (double)s->nchecked / (double)s->nreads);
+    printf("\tWrite Ratio: %lu / %lu (%lf) \n", s->nchecked_create, s->nwrites, 
+            (double)s->nchecked_create / (double)s->nwrites);
 }
 
 #define METADATA_CACHING

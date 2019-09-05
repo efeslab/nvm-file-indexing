@@ -9,6 +9,9 @@ _Static_assert(PRESENT_BIT != 0llu, "Too much shift!");
 
 #define MKADDR(i, l) ( ((paddr_t) i) << 32 | ((paddr_t)l) )
 
+radixtree_stats_t rstats;
+bool g_radix_do_stats;
+
 /*******************************************************************************
  * Section: IO interface for radix trees.
  ******************************************************************************/
@@ -697,15 +700,37 @@ void radixtree_clear_metadata_cache(idx_struct_t *idx_struct) {
     if_then_panic(merr < 0, "could not reread metadata!");
 }
 
-idx_fns_t radixtree_fns = {
-    .im_init           = NULL,
-    .im_init_prealloc  = radixtree_init,
-    .im_lookup         = radixtree_lookup,
-    .im_create         = radixtree_create,
-    .im_remove         = radixtree_remove,
+void radixtree_set_stats(idx_struct_t *idx_struct, bool enable) {
+    g_radix_do_stats = enable;
+}
 
-    .im_set_caching    = radixtree_set_caching,
-    .im_persist        = radixtree_persist,
-    .im_invalidate     = radixtree_invalidate, 
-    .im_clear_metadata = radixtree_clear_metadata_cache,
+void radixtree_print_stats(idx_struct_t *idx_struct) {
+    print_global_radixtree_stats();
+}
+
+void radixtree_print_global_stats(void) {
+    print_global_radixtree_stats();
+}
+
+void radixtree_clean_global_stats(void) {
+    memset(&rstats, 0, sizeof(rstats));
+}
+
+
+idx_fns_t radixtree_fns = {
+    .im_init               = NULL,
+    .im_init_prealloc      = radixtree_init,
+    .im_lookup             = radixtree_lookup,
+    .im_create             = radixtree_create,
+    .im_remove             = radixtree_remove,
+
+    .im_set_caching        = radixtree_set_caching,
+    .im_persist            = radixtree_persist,
+    .im_invalidate         = radixtree_invalidate, 
+    .im_clear_metadata     = radixtree_clear_metadata_cache,
+
+    .im_set_stats          = radixtree_set_stats,
+    .im_print_stats        = radixtree_print_stats,
+    .im_print_global_stats = radixtree_print_global_stats,
+    .im_clean_global_stats = radixtree_clean_global_stats,
 };

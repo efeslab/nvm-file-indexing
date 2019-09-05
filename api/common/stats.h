@@ -61,9 +61,9 @@ static inline unsigned long long _asm_rdtscp(void)
 
 #define DECLARE_TIMING() uint64_t _start_tsc
 #define START_TIMING() _start_tsc = _asm_rdtscp()
-#define UPDATE_TIMING(s, f) \
+#define UPDATE_TIMING(s, f) do { \
     (void)__sync_add_and_fetch(&((s)->f ## _tsc), _asm_rdtscp() - _start_tsc);\
-    (void)__sync_add_and_fetch(&((s)->f ## _nr), 1)
+    (void)__sync_add_and_fetch(&((s)->f ## _nr), 1); } while (0)
 
 #define UPDATE_STAT(s, f, v) \
     (void)__sync_add_and_fetch(&((s)->f ## _tsc), _asm_rdtscp() - v);\

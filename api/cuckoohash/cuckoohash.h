@@ -12,7 +12,8 @@
 extern "C" {
 #endif
 
-#define MAKEKEY(inum, key) (((uint64_t)inum << 32) | key)
+// iangneal: ensure the key is never 0
+#define MAKECUCKOOKEY(inum, key) (((uint64_t)(inum + 1) << 32) | key)
 
 typedef paddr_t hash_key_t;
 

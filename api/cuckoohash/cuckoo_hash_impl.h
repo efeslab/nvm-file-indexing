@@ -68,6 +68,7 @@ typedef struct cuckoo_hash_stats {
     uint64_t ncachelines_written;
     uint64_t nblocks_inserted;
     uint64_t nwrites;
+    STAT_FIELD(compute_hash);
 } nvm_cuckoo_stats_t;
 
 extern nvm_cuckoo_stats_t cstats;
@@ -101,9 +102,8 @@ cuckoo_hash_destroy(const struct cuckoo_hash *hash);
 */
 static inline
 size_t
-cuckoo_hash_count(struct cuckoo_hash *hash)
-{
-  return 0;
+cuckoo_hash_count(struct cuckoo_hash *hash) {
+    return 0;
 }
 
 

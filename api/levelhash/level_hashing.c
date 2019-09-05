@@ -997,12 +997,15 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value,
 
     uint64_t i, j;
     int empty_location;
+    if (level->enable_stats) INCR_STAT(&level_stats, nwrites);
 
     for(i = 0; i < 2; i ++){
         for(j = 0; j < ASSOC_NUM; j ++){        
             /*  The new item is inserted into the less-loaded bucket between 
                 the two hash locations in each level           
             */      
+            if (level->enable_stats) INCR_STAT(&level_stats, nchecked_create);
+
             int f_err = ensure_bucket_uptodate(level, i, f_idx);
             if (f_err) return 1;
             if (level->buckets[i][f_idx].token[j] == 0)
@@ -1021,6 +1024,8 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value,
                 level->meta_cache_state = 1;
                 return 0;
             }
+
+            if (level->enable_stats) INCR_STAT(&level_stats, nchecked_create);
             int s_err = ensure_bucket_uptodate(level, i, s_idx);
             if (s_err) return 1;
             if (level->buckets[i][s_idx].token[j] == 0) 
