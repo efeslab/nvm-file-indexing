@@ -13,8 +13,14 @@ idx_fns_t levelhash_fns = {
     .im_clear_metadata     = levelhash_clear_metadata,
 
     .im_set_stats          = levelhash_set_stats,
-    .im_print_global_stats = levelhash_print_global_stats
+    .im_print_global_stats = levelhash_print_global_stats,
+    .im_add_global_to_json = levelhash_add_global_to_json,
 };
+
+void levelhash_add_global_to_json(json_object *root) {
+   js_add_int64(root, "compute_tsc", level_stats.compute_hash_tsc); 
+   js_add_int64(root, "compute_nr", level_stats.compute_hash_nr); 
+}
 
 int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents, 
                    idx_struct_t* level_idx) {

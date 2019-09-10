@@ -2649,6 +2649,8 @@ out2:
     if (g_do_stats) {
         INCR_STAT(&estats, nwrites);
         ADD_STAT(&estats, nblocks_inserted, allocated);
+        ADD_STAT(&estats, depth_total, depth);
+        INCR_STAT(&estats, depth_nr);
     }
 
     return err ? err : allocated;
@@ -2718,6 +2720,11 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
     }
     #endif
 
+    if (g_do_stats) {
+        ADD_STAT(&estats, depth_total, depth);
+        INCR_STAT(&estats, depth_nr);
+    }
+
     return ret;
 }
 
@@ -2775,6 +2782,10 @@ void extent_tree_clean_global_stats(void) {
     memset(&estats, 0, sizeof(estats));
 }
 
+void extent_tree_add_global_to_json(json_object *root) {
+   js_add_int64(root, "compute_tsc", 0); 
+   js_add_int64(root, "compute_nr", 0); 
+}
 
 idx_fns_t extent_tree_fns = {
     .im_init               = NULL,
@@ -2792,4 +2803,5 @@ idx_fns_t extent_tree_fns = {
     .im_print_stats        = extent_tree_print_stats,
     .im_print_global_stats = extent_tree_print_global_stats,
     .im_clean_global_stats = extent_tree_clean_global_stats,
+    .im_add_global_to_json = extent_tree_add_global_to_json,
 };

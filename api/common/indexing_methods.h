@@ -2,6 +2,7 @@
 #define __NVMIDX_COMMON_INDEXING_METHODS_H__
 
 #include <stdbool.h>
+#include <json-c/json.h>
 #include "types.h"
 
 /*******************************************************************************
@@ -72,6 +73,7 @@ typedef void (*set_stats_t)(idx_struct_t*, bool);
 typedef void (*print_stats_t)(idx_struct_t*);
 typedef void (*print_global_stats_t)(void);
 typedef void (*clean_global_stats_t)(void);
+typedef void (*add_global_to_json_t)(json_object *);
 
 
 /*******************************************************************************
@@ -95,6 +97,7 @@ typedef struct indexing_functions {
     print_stats_t             im_print_stats;
     print_global_stats_t      im_print_global_stats;
     clean_global_stats_t      im_clean_global_stats;
+    add_global_to_json_t      im_add_global_to_json;
 } idx_fns_t;
 
 #endif  // __INDEXING_METHODS_H__

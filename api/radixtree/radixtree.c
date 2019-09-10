@@ -429,6 +429,8 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
     if (!*paddr) return -ENOENT;
 
+    inc_global_stats(radix);
+
     return ret;
 }
 
@@ -568,11 +570,13 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
             radix->rewrite_meta = true;
             
         } else if (is_full(radix)) {
+            inc_global_stats(radix);
             return ninserted ? ninserted : -ENOSPC;
         }
     }
     
     if_then_panic(write_metadata(radix), "Could not update metadata!");
+    inc_global_stats(radix);
     return nalloc;
 }
 
@@ -678,6 +682,7 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
     if_then_panic(write_metadata(radix), "Could not update metadata!");
 
+    inc_global_stats(radix);
     return ret;
 }
 
@@ -716,6 +721,10 @@ void radixtree_clean_global_stats(void) {
     memset(&rstats, 0, sizeof(rstats));
 }
 
+void radixtree_add_global_to_json(json_object *root) {
+   js_add_int64(root, "compute_tsc", 0); 
+   js_add_int64(root, "compute_nr", 0); 
+}
 
 idx_fns_t radixtree_fns = {
     .im_init               = NULL,
@@ -733,4 +742,5 @@ idx_fns_t radixtree_fns = {
     .im_print_stats        = radixtree_print_stats,
     .im_print_global_stats = radixtree_print_global_stats,
     .im_clean_global_stats = radixtree_clean_global_stats,
+    .im_add_global_to_json = radixtree_add_global_to_json,
 };

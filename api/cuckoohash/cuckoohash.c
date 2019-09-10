@@ -44,6 +44,7 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t size, paddr_t *paddr) {
     CUCKOOHASH(idx_struct, ht);
 
+    size = size > UINT8_MAX ? UINT8_MAX : size;
     ssize_t nalloc = CB(idx_struct, cb_alloc_data, size, paddr);
 
     if (nalloc < 0) {
@@ -191,6 +192,11 @@ void cuckoohash_clean_global_stats(void) {
     memset(&cstats, 0, sizeof(cstats));
 }
 
+void cuckoohash_add_global_to_json(json_object *root) {
+   js_add_int64(root, "compute_tsc", cstats.compute_hash_tsc); 
+   js_add_int64(root, "compute_nr", cstats.compute_hash_nr); 
+}
+
 idx_fns_t cuckoohash_fns = {
     .im_init               = cuckoohash_initialize,
     .im_init_prealloc      = NULL,
@@ -206,5 +212,6 @@ idx_fns_t cuckoohash_fns = {
     .im_set_stats          = cuckoohash_set_stats,
     .im_print_stats        = cuckoohash_print_stats,
     .im_print_global_stats = cuckoohash_print_global_stats,
-    .im_clean_global_stats = cuckoohash_clean_global_stats
+    .im_clean_global_stats = cuckoohash_clean_global_stats,
+    .im_add_global_to_json = cuckoohash_add_global_to_json,
 };

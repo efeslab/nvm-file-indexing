@@ -107,11 +107,12 @@ typedef struct radixtree_metadata {
 } radixtree_meta_t;
 
 static void inc_stats(radixtree_meta_t *radix, radixtree_stats_t *s) {
-    ADD_STAT(s, depth_total, radix->max_depth);
+    ADD_STAT(s, depth_total, radix->nlevels + 1);
     INCR_STAT(s, depth_nr);
 }
 
-#define inc_global_stats(radix) inc_stats(radix, &rstats)
+#define inc_global_stats(radix) \
+    if (g_radix_do_stats) inc_stats(radix, &rstats)
 
 #define get_contents(r, pblk) (paddr_t*)(r->dev_addr + (r->blksz * pblk))
 #define rmeta(r) (&((r)->metadata_loc))

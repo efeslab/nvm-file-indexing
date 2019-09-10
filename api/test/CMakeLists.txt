@@ -24,4 +24,4 @@ add_executable(TestSuite
                $<TARGET_OBJECTS:LevelHashing>
                $<TARGET_OBJECTS:RadixTree>
                )
-target_link_libraries(TestSuite gtest pmem)
+target_link_libraries(TestSuite gtest pmem json-c)

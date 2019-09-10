@@ -28,4 +28,4 @@ add_library(NVMIndexingAPI SHARED
             $<TARGET_OBJECTS:LevelHashing>
             $<TARGET_OBJECTS:RadixTree>
             )
-target_link_libraries(NVMIndexingAPI m pmem)
+target_link_libraries(NVMIndexingAPI m pmem json-c)

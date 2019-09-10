@@ -32,16 +32,21 @@ extern "C" {
 
 
 typedef struct cuckoo_hash_item {
+    // 8
     paddr_t key;
-    paddr_t value;
-    uint32_t index;
-    uint32_t range;
+    // 2
+    uint8_t index;
+    uint8_t range;
+    // 6
+    uint16_t value_hi;
+    uint32_t value_lo;
 } cuckoo_item_t;
 
 typedef struct cuckoo_hash_elem {
     cuckoo_item_t hash_item;
-    uint32_t hash1;
-    uint32_t hash2;
+    // 8
+    //uint32_t hash1;
+    //uint32_t hash2;
 } cuckoo_elem_t;
 
 #define sz sizeof(cuckoo_elem_t)
@@ -62,6 +67,7 @@ typedef struct cuckoo_hash {
     nvm_cuckoo_metadata_t meta;
     cuckoo_elem_t *table;
     bool do_stats;
+    bool compact_idx;
 } nvm_cuckoo_idx_t;
 
 typedef struct cuckoo_hash_stats {

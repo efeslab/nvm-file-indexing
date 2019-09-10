@@ -53,6 +53,13 @@ int hashtable_initialize(const idx_spec_t *idx_spec,
                             devinfo.di_block_size, 1, *location, idx_spec);
     if_then_panic(ht == NULL, "could not allocate hash table");
 
+    const char* compact_str = getenv("IDX_COMPACT");
+    if (compact_str && !strcmp(compact_str, "1")) {
+        ht->compact = true;
+    } else {
+        ht->compact = false;
+    }
+
     idx_struct->idx_metadata = (void*)ht;
 
     return 0;
@@ -221,19 +228,25 @@ void hashtable_print_global_stats(void) {
     if (g_idx) hashtable_print_stats(g_idx);
 }
 
+void hashtable_add_global_to_json(json_object *root) {
+   js_add_int64(root, "compute_tsc", 0); 
+   js_add_int64(root, "compute_nr", 0); 
+}
+
 idx_fns_t hash_fns = {
-    .im_init          = hashtable_initialize,
-    .im_init_prealloc = NULL,
-    .im_lookup        = hashtable_lookup,
-    .im_create        = hashtable_create,
-    .im_remove        = hashtable_remove,
+    .im_init               = hashtable_initialize,
+    .im_init_prealloc      = NULL,
+    .im_lookup             = hashtable_lookup,
+    .im_create             = hashtable_create,
+    .im_remove             = hashtable_remove,
 
-    .im_set_caching   = hashtable_set_caching,
-    .im_set_locking   = hashtable_set_locking,
-    .im_persist       = hashtable_persist_updates,
-    .im_invalidate    = hashtable_invalidate_caches,
+    .im_set_caching        = hashtable_set_caching,
+    .im_set_locking        = hashtable_set_locking,
+    .im_persist            = hashtable_persist_updates,
+    .im_invalidate         = hashtable_invalidate_caches,
 
-    .im_set_stats     = hashtable_set_stats,
-    .im_print_stats   = hashtable_print_stats,
+    .im_set_stats          = hashtable_set_stats,
+    .im_print_stats        = hashtable_print_stats,
     .im_print_global_stats = hashtable_print_global_stats,
+    .im_add_global_to_json = hashtable_add_global_to_json,
 };

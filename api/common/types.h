@@ -58,6 +58,9 @@ typedef struct device_info {
 
 typedef int (*get_dev_info_fn_t)(device_info_t*);
 
+// For the undo log.
+typedef int (*log_change_fn_t)(inum_t, void*, size_t);
+
 typedef struct callback_functions {
     writeback_fn_t      cb_write;
     read_fn_t           cb_read;
@@ -67,6 +70,7 @@ typedef struct callback_functions {
     dealloc_metadata_t  cb_dealloc_metadata;
     dealloc_data_t      cb_dealloc_data;
     get_dev_info_fn_t   cb_get_dev_info;
+    log_change_fn_t     cb_log_change;
 } callback_fns_t;
 
 #endif //__NVMIDX_COMMON_TYPES_H__

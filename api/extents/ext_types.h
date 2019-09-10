@@ -110,6 +110,8 @@ typedef struct extent_stats {
     uint64_t ncachelines_written;
     uint64_t nblocks_inserted;
     uint64_t nwrites;
+    uint64_t depth_total;
+    uint64_t depth_nr;
 } ext_stats_t;
 
 extern ext_stats_t estats;
@@ -125,6 +127,8 @@ static void print_ext_stats(ext_stats_t *s) {
     printf("\tInserts: %.1f cachelines per op (%lu / %lu)\n",
         (float)estats.ncachelines_written / (float)estats.nwrites, 
         estats.ncachelines_written, estats.nwrites);
+    printf("\tAverage depth: %.1f\n",
+        (float)estats.depth_total / (float)estats.depth_nr);
 }
 
 #define MAX_DEPTH 10

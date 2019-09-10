@@ -34,6 +34,7 @@ void levelhash_clear_metadata(idx_struct_t*);
 
 void levelhash_set_stats(idx_struct_t* level_idx, bool enable);
 void levelhash_print_global_stats(void);
+void levelhash_add_global_to_json(json_object *root);
 
 /*
  * Convenience macros.
