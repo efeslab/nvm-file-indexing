@@ -194,7 +194,7 @@ static inline int read_ext_direct_data(const idx_struct_t *ext_idx)
 
         memset(ext_meta->prev_path, 0, sizeof(*ext_meta->prev_path) * MAX_DEPTH);
         memset(ext_meta->path, 0, sizeof(*ext_meta->path) * MAX_DEPTH);
-    } else if (!ext_meta->et_direct_data || ext_meta->reread_meta) {
+    } else if (!ext_meta->et_direct_data) {
         int err = CB(ext_idx, cb_get_addr, ext_meta->et_direct_range.pr_start,
                                     ext_meta->et_direct_range.pr_blk_offset,
                                     (char**)&(ext_meta->et_direct_data));
@@ -345,7 +345,7 @@ static inline void idx_store_pblock(extent_branch_t *ix,
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
 #define in_range(b, first, len) \
-    ((b) >= (first) && (b) <= (first) + (len) - 1)
+    ((len) > 0 && (b) >= (first) && (b) <= (first) + (len) - 1)
 
 #define ext_dirty(ext_idx, path)  \
     __ext_dirty(__func__, __LINE__, (ext_idx), (path))

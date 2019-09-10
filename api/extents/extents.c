@@ -191,7 +191,10 @@ static int read_extent_tree_block(idx_struct_t *ext_idx, char **buf,
     int err = CB(ext_idx, cb_get_dev_info, &devinfo);
     if (err) return err;
 
-    if_then_panic(depth >= MAX_DEPTH, "not enough buffers!");
+    if (depth >= MAX_DEPTH) {
+        fprintf(stderr, "depth (%d) >= MAX_DEPTH (%d)!\n", depth, MAX_DEPTH);
+        panic("not enough buffers!");
+    }
 
     uint64_t second_tsc = _asm_rdtscp();
     #if 0
@@ -2522,8 +2525,8 @@ ssize_t extent_tree_create(idx_struct_t *ext_idx, inum_t inum,
     if (NULL == ext_idx) return -EINVAL;
     size = size > UINT16_MAX ? UINT16_MAX : size;
 
-    //int read_ret = read_ext_direct_data(ext_idx);
-    //if (read_ret) return read_ret;
+    int read_ret = read_ext_direct_data(ext_idx);
+    if (read_ret) return read_ret;
 
     /* find extent for this block */
     path = ext_meta->path;
@@ -2668,8 +2671,8 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
     *paddr = 0;
     ret = 0;
 
-    //int read_ret = read_ext_direct_data(ext_idx);
-    //if (read_ret) return read_ret;
+    int read_ret = read_ext_direct_data(ext_idx);
+    if (read_ret) return read_ret;
 
     EXTMETA(ext_idx, ext_meta);
 
@@ -2730,8 +2733,8 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
 
 ssize_t extent_tree_remove(idx_struct_t *ext_idx,
                            inum_t inum, laddr_t laddr, size_t size) {
-    //int read_ret = read_ext_direct_data(ext_idx);
-    //if (read_ret) return read_ret;
+    int read_ret = read_ext_direct_data(ext_idx);
+    if (read_ret) return read_ret;
 
     int err = ext_truncate(ext_idx, laddr, laddr + size - 1);
     if (err) return err;
