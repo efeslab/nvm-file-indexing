@@ -46,8 +46,9 @@ typedef struct radixtree_path {
 #define RADIX_NDIRECT 7
 
 typedef struct ondevice_radixtree_metadata {
-    uint32_t nentries;  
-    uint32_t nlevels;
+    volatile uint32_t nentries;  
+    volatile uint16_t nlevels;
+    volatile uint16_t is_locked;
 } ondev_radix_meta_t;
 
 _Static_assert(sizeof(ondev_radix_meta_t) <= 64, "On-device metadata > 64!");
@@ -72,16 +73,13 @@ typedef struct radixtree_metadata {
     bool cached;
     paddr_range_t metadata_loc;
 
-    paddr_t top_page;
-    uint8_t nlevels;
-    uint32_t nentries;
-
     // -- CACHING
     // ---- Metadata
     bool reread_meta;
     bool use_direct;
     bool rewrite_meta;
     paddr_t *direct_entries;
+    ondev_radix_meta_t *ondev;
     // ---- General
     radix_node_t *cached_tree;
 
@@ -107,7 +105,7 @@ typedef struct radixtree_metadata {
 } radixtree_meta_t;
 
 static void inc_stats(radixtree_meta_t *radix, radixtree_stats_t *s) {
-    ADD_STAT(s, depth_total, radix->nlevels + 1);
+    ADD_STAT(s, depth_total, radix->ondev->nlevels + 1);
     INCR_STAT(s, depth_nr);
 }
 
@@ -116,8 +114,12 @@ static void inc_stats(radixtree_meta_t *radix, radixtree_stats_t *s) {
 
 #define get_contents(r, pblk) (paddr_t*)(r->dev_addr + (r->blksz * pblk))
 #define rmeta(r) (&((r)->metadata_loc))
+#define get_ondev(r) (ondev_radix_meta_t*)(r->dev_addr + (r->blksz * rmeta(r)->pr_start) \
+                                + rmeta(r)->pr_blk_offset)
 #define get_direct(r) (paddr_t*)(r->dev_addr + (r->blksz * rmeta(r)->pr_start) \
                                 + rmeta(r)->pr_blk_offset + sizeof(ondev_radix_meta_t))
+#define top_page(r) (r->direct_entries[0])
+#define use_direct(r) (r->ondev->nlevels == 0)
 
 int radixtree_init(const idx_spec_t *idx_spec,
                    const paddr_range_t *metadata_location,

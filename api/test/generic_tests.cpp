@@ -54,7 +54,8 @@ TEST_P(GenericTestFixture, InsertPersistCheckEach) {
             ASSERT_LE(1, r) << "\"" << strerror(-r) << "\" on lblk " << l 
                                             << " after insertion of " << lblk;
             ASSERT_LE(ret, npages - l);
-            ASSERT_TRUE(mapping[l] == p);
+            ASSERT_TRUE(mapping[l] == p) << l << " != " << p << ", is " 
+                << mapping[l] << " [lblk=" << lblk << "]";
         }
     }
 
@@ -100,7 +101,7 @@ TEST_P(GenericTestFixture, InsertPersistCheckEnd) {
                        &idx_other, inum, l, npages - l, &p);
 
         ASSERT_LE(1, r) << strerror(-r) << " on lblk " << l;
-        ASSERT_TRUE(mapping[l] == p);
+        ASSERT_TRUE(mapping[l] == p) << l << " != " << p;
     }
 
     device.deallocate();
@@ -149,7 +150,7 @@ TEST_P(GenericTestFixture, InsertPersistThenRemoveAll) {
         ssize_t ret = FN(&idx_other, im_lookup,
                          &idx_other, inum, lblk, 1, &pblk);
 
-        ASSERT_LE(ret, 0);
+        ASSERT_LE(ret, 0) << "lblk == " << lblk;
         ASSERT_EQ(0, pblk);
     }
 

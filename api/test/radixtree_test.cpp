@@ -234,7 +234,7 @@ TEST_F(RadixTreeFixture, LookupGrow) {
     ASSERT_GT(pblk, 0);
 
     GET_RADIX(&radixtree);
-    ASSERT_EQ(radix->nlevels, 2);
+    ASSERT_EQ(radix->ondev->nlevels, 2);
 
     paddr_t check_paddr;
     ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk, 
@@ -254,8 +254,8 @@ TEST_F(RadixTreeFixture, GrowAndShrink) {
     ASSERT_GT(pblk, 0);
 
     GET_RADIX(&radixtree);
-    ASSERT_EQ(radix->nlevels, 2);
-    ASSERT_EQ(radix->nentries, npages);
+    ASSERT_EQ(radix->ondev->nlevels, 2);
+    ASSERT_EQ(radix->ondev->nentries, npages);
 
     paddr_t check_paddr;
     ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk, 
@@ -266,8 +266,8 @@ TEST_F(RadixTreeFixture, GrowAndShrink) {
     check_size = radixtree_remove(&radixtree, inum, lblk + (npages / 2), 
                                   npages / 2);
     ASSERT_EQ(npages / 2, check_size);
-    ASSERT_EQ(radix->nlevels, 1);
-    ASSERT_EQ(radix->nentries, npages / 2);
+    ASSERT_EQ(radix->ondev->nlevels, 1);
+    ASSERT_EQ(radix->ondev->nentries, npages / 2);
 
     check_size = radixtree_lookup(&radixtree, inum, lblk, npages, &check_paddr);
     ASSERT_EQ(npages / 2, check_size);
@@ -285,7 +285,8 @@ TEST_F(RadixTreeFixture, LookupGrowMulti) {
     ASSERT_GT(pblk, 0);
 
     GET_RADIX(&radixtree);
-    ASSERT_EQ(radix->nlevels, 3);
+    ASSERT_EQ(radix->ondev->nlevels, 3);
+
 
     paddr_t check_paddr;
     ssize_t check_size = radixtree_lookup(&radixtree, inum, lblk, 

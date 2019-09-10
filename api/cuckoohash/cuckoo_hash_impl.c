@@ -377,7 +377,8 @@ cuckoo_hash_insert(struct cuckoo_hash *hash, paddr_t key, paddr_t value,
     }
 
     assert(new_elem.hash_item.key == key);
-    assert(new_elem.hash_item.value == value);
+    assert(new_elem.hash_item.value_hi == (uint16_t)(value >> 32));
+    assert(new_elem.hash_item.value_lo == (uint32_t)(value));
     assert(new_elem.hash_item.index == index);
     assert(new_elem.hash_item.range == range);
     //assert(new_elem.hash1 == h1);
