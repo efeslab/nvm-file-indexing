@@ -31,9 +31,7 @@ typedef struct entry {                    // A slot storing a key-value item
 
 #define LH_MAX_SIZE UINT8_MAX
 
-#define MAGIC 0xcafebabe
 typedef struct on_device_level_hash {  //
-    uint32_t init_magic;               // So we know if stuff is initialized.
     paddr_t  dev_levels[2];            // API: Device location for the blocks.
     uint32_t dev_sizes[2];
     uint32_t level_item_num[2];        // The numbers of items stored in the top and bottom levels respectively
@@ -41,7 +39,6 @@ typedef struct on_device_level_hash {  //
     uint32_t level_size;               // level_size = log2(addr_capacity)
     uint64_t f_seed;
     uint64_t s_seed;                   // Two randomized seeds for hash functions
-    size_t   block_size;               // size of block on underlying device.
 } dev_level_hash_t;
 _Static_assert(sizeof(dev_level_hash_t) <= 64, "level bucket is too big!");
 #pragma pack(pop)
@@ -99,8 +96,10 @@ typedef struct level_hash {            // A Level hash table
     uint8_t level_expand_time;         // Indicate whether the Level hash table was expanded, ">1 or =1": Yes, "0": No;
     uint8_t resize_state;              // Indicate the resizing state of the level hash table, ‘0’ means the hash table is not during resizing; 
                                        // ‘1’ means the hash table is being expanded; ‘2’ means the hash table is being shrunk.
-    uint64_t f_seed;
-    uint64_t s_seed;                   // Two randomized seeds for hash functions
+
+    // NVM direct access
+    char *dev_ptr;
+    dev_level_hash_t *ondev;
 
     /* API shenanigans */
     const idx_spec_t *idx_spec;        // Callbacks for memory, persistence
@@ -111,6 +110,10 @@ typedef struct level_hash {            // A Level hash table
     // stats struct
     bool enable_stats;
 } level_hash_t;
+
+#define level_block(l, w) ((l)->ondev->dev_levels[w])
+#define level_offset(l, w) (level_block(l, w) * (l)->block_size)
+#define bucket(l, w) ((level_bucket_t*)((l)->dev_ptr + level_offset(l, w)))
 
 int read_metadata(const idx_spec_t *idx_spec, 
                   const paddr_range_t *loc, 

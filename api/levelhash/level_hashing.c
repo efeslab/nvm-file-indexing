@@ -170,18 +170,22 @@ void generate_seeds(level_hash_t *level)
     srand(time(NULL));
     do
     {
-        level->f_seed = (((uint64_t) rand() <<  0) & 0x000000000000FFFFull) | 
+        level->ondev->f_seed = (((uint64_t) rand() <<  0) & 0x000000000000FFFFull) | 
                         (((uint64_t) rand() << 16) & 0x00000000FFFF0000ull) | 
                         (((uint64_t) rand() << 32) & 0x0000FFFF00000000ull) |
                         (((uint64_t) rand() << 48) & 0xFFFF000000000000ull);
-        level->s_seed = (((uint64_t) rand() <<  0) & 0x000000000000FFFFull) | 
+        level->ondev->s_seed = (((uint64_t) rand() <<  0) & 0x000000000000FFFFull) | 
                         (((uint64_t) rand() << 16) & 0x00000000FFFF0000ull) | 
                         (((uint64_t) rand() << 32) & 0x0000FFFF00000000ull) |
                         (((uint64_t) rand() << 48) & 0xFFFF000000000000ull);
-    } while (level->f_seed == level->s_seed);
+    } while (level->ondev->f_seed == level->ondev->s_seed);
+
+    nvm_persist_struct_ptr(level->ondev);
 }
 
-int read_metadata(const idx_spec_t *idx_spec, 
+
+static inline 
+int get_ondev_ptr(const idx_spec_t *idx_spec, 
                   const paddr_range_t *loc, 
                   dev_level_hash_t **dhash) {
     if_then_panic(loc->pr_nbytes < sizeof(**dhash), 
@@ -194,103 +198,7 @@ int read_metadata(const idx_spec_t *idx_spec,
     return (int)ret;
 }
 
-int reread_metadata(level_hash_t *level) {
-    dev_level_hash_t *dhash;
-    DECLARE_TIMING();
 
-    #ifndef METADATA_CACHING
-    level->reread_meta = true;
-    #endif
-
-    if (!level->reread_meta) return 0;
-
-    if (level->enable_stats) {
-        START_TIMING();
-    }
-
-    if (!level->do_cache || level->meta_cache_state < 0) {
-        int ret = read_metadata(level->idx_spec, &(level->range), &dhash);
-        if (ret) return -EIO;
-
-        if (dhash->init_magic != MAGIC) return -EINVAL;
-
-        bool resized = false;
-        if (level->level_size != dhash->level_size) {
-            resized = true;
-        }
-
-        if (!resized) goto out;
-
-        for (int i = 0; i < 2; ++i) {
-            level->level_item_num[i] = dhash->level_item_num[i];
-            level->dev_levels[i]     = dhash->dev_levels[i];
-            level->dev_sizes[i]      = dhash->dev_sizes[i];
-        }
-
-        level->level_size = dhash->level_size;
-        level->addr_capacity = pow(2, dhash->level_size);
-        level->total_capacity = pow(2, dhash->level_size) + 
-                                pow(2, dhash->level_size - 1);
-        level->f_seed = dhash->f_seed;
-        level->s_seed = dhash->s_seed;
-        level->block_size = dhash->block_size;
-
-        if (level->do_cache) {
-            for (int i = 0; i < 2; ++i) {
-                size_t new_size = pow(2, level->level_size - i);
-                FREE(level->idx_spec, level->buckets[i]);
-                FREE(level->idx_spec, level->cache_state[i]);
-                size_t bucket_bytes = new_size * sizeof(level_bucket_t);
-                size_t cache_state_bytes = new_size * sizeof(int8_t);
-
-                level->buckets[i] = ZALLOC(level->idx_spec, bucket_bytes);
-                level->cache_state[i] = ZALLOC(level->idx_spec, cache_state_bytes);
-
-                if (!level->buckets[i] || !level->cache_state[i]) return -ENOMEM;
-
-                memset(level->cache_state[i], -1, new_size*sizeof(int8_t));
-            }
-        } else {
-            for (int i = 0; i < 2; ++i) {
-                get_buckets(level, i);
-            }
-        }
-
-        level->meta_cache_state = 0;
-    }
-out:
-    if (level->enable_stats) {
-        UPDATE_TIMING(&level_stats, read_metadata);
-    }
-
-    level->reread_meta = false;
-
-    return 0;
-}
-
-int write_metadata(level_hash_t *level) {
-    paddr_range_t *loc = &(level->range);
-    if_then_panic(loc->pr_nbytes < sizeof(dev_level_hash_t), 
-                  "region is too small!");
-
-    dev_level_hash_t dhash = {
-        .init_magic     = MAGIC,
-        .dev_levels     = { level->dev_levels[0], level->dev_levels[1] },
-        .dev_sizes      = { level->dev_sizes[0], level->dev_sizes[1] },
-        .level_item_num = { level->level_item_num[0], level->level_item_num[1]},
-        .level_size     = level->level_size,
-        .f_seed         = level->f_seed,
-        .s_seed         = level->s_seed,
-        .block_size     = level->block_size
-    };
-
-    ssize_t ret = CB(level->idx_spec, cb_write,
-                     loc->pr_start, loc->pr_blk_offset, sizeof(dhash),
-                     (const char*)&dhash);
-
-    if (ret != sizeof(dhash)) return -EIO;
-    return 0;
-}
 
 /*
 Function: level_init() 
@@ -299,31 +207,29 @@ Function: level_init()
 level_hash_t *level_init(const idx_spec_t *idx_spec, 
                          const paddr_range_t *loc,
                          uint64_t level_size) {
-    //level_hash_t *level = alignedmalloc(sizeof(level_hash_t));
     level_hash_t *level = ZALLOC(idx_spec, sizeof(level_hash_t));
     if (!level) {
         printf("The level hash table initialization fails:1\n");
         exit(1);
     }
 
-    dev_level_hash_t *dhash;
-    int ret = read_metadata(idx_spec, loc, &dhash);
-    bool already_exists = dhash->init_magic == MAGIC;
+    int ret = get_ondev_ptr(idx_spec, loc, &level->ondev);
 
-    if (already_exists) {
-        level_size = dhash->level_size;
+    if (ret) {
+        printf("The level hash table initialization fails:2\n");
+        exit(1);
     }
 
-    level->level_size = level_size;
-    level->addr_capacity = pow(2, level_size);
-    level->total_capacity = pow(2, level_size) + pow(2, level_size - 1);
+    bool already_exists = !!level->ondev->dev_levels[0] && 
+                          !!level->ondev->dev_levels[1];
+
+    ssize_t sret = CB(idx_spec, cb_get_addr, 0, 0, (char**)&(level->dev_ptr));
+    if_then_panic(sret, "init failed: 3");
+
 
     level->range = *loc;
     
-    if (already_exists) {
-        level->f_seed = dhash->f_seed;
-        level->s_seed = dhash->s_seed;
-    } else {
+    if (!already_exists) {
         generate_seeds(level);
     }
 
@@ -333,41 +239,15 @@ level_hash_t *level_init(const idx_spec_t *idx_spec,
     size_t top_size_bytes = top_size * sizeof(level_bucket_t);
     size_t bot_size = pow(2, level_size - 1);
     size_t bot_size_bytes = bot_size * sizeof(level_bucket_t);
-    if (level->do_cache) {
-        level->buckets[0] = ZALLOC(idx_spec, top_size_bytes);
-        level->buckets[1] = ZALLOC(idx_spec, bot_size_bytes);
-        if (!level->buckets[0] || !level->buckets[1])
-        {
-            printf("The level hash table initialization fails:2\n");
-            exit(1);
-        }
-    }
-
-    if (already_exists) {
-        level->level_item_num[0] = dhash->level_item_num[0];
-        level->level_item_num[1] = dhash->level_item_num[1];
-    } else {
-        level->level_item_num[0] = 0;
-        level->level_item_num[1] = 0;
-    }
 
     level->level_expand_time = 0;
     level->resize_state = 0;
-    
 
     /* API Init */
     level->idx_spec = idx_spec;
     level->enable_stats = false;
     //level->stats = ZALLOC(idx_spec, sizeof(*level->stats));
     memset(&level_stats, 0, sizeof(level_stats));
-
-    if (level->do_cache) {
-        level->cache_state[0] = ZALLOC(idx_spec, top_size*sizeof(int8_t));
-        level->cache_state[1] = ZALLOC(idx_spec, bot_size*sizeof(int8_t));
-
-        memset(level->cache_state[0], -1, top_size*sizeof(int8_t));
-        memset(level->cache_state[1], -1, bot_size*sizeof(int8_t));
-    }
 
     device_info_t di;
     int err = CB(idx_spec, cb_get_dev_info, &di);
@@ -378,44 +258,33 @@ level_hash_t *level_init(const idx_spec_t *idx_spec,
 
     level->block_size = di.di_block_size;
 
-    size_t top_blocks = top_size_bytes / level->block_size; 
+    size_t top_blocks = top_size_bytes / level->block_size;
     if (top_size_bytes % level->block_size != 0) top_blocks++;
     size_t bot_blocks = bot_size_bytes / level->block_size;
     if (bot_size_bytes % level->block_size != 0) bot_blocks++;
 
-    level->dev_sizes[0] = top_blocks;
-    level->dev_sizes[1] = bot_blocks;
-
     if (!already_exists) {
+        level->ondev->level_size = level_size;
+
         paddr_t top_block_start;
         ssize_t top_blocks_alloced = CB(idx_spec, cb_alloc_metadata,
                                         top_blocks, &top_block_start);
         if_then_panic(top_blocks_alloced != top_blocks, "could not alloc!");
-        level->dev_levels[0] = top_block_start;
+        level->ondev->dev_levels[0] = top_block_start;
 
         paddr_t bot_block_start;
         ssize_t bot_blocks_alloced = CB(idx_spec, cb_alloc_metadata,
                                         bot_blocks, &bot_block_start);
         if_then_panic(bot_blocks_alloced != bot_blocks, "could not alloc!");
-        level->dev_levels[1] = bot_block_start;
-    } else {
-        for (int i = 0; i < 2; ++i) {
-            level->dev_levels[i] = dhash->dev_levels[i];
-            if (!level->do_cache) {
-                get_buckets(level, i);
-            }
-        }
+        level->ondev->dev_levels[1] = bot_block_start;
+
+        nvm_persist_struct(level->ondev);
     }
 
-    /*
-    printf("Level hashing: ASSOC_NUM %d, KEY_LEN %d, VALUE_LEN %d \n", ASSOC_NUM, KEY_LEN, VALUE_LEN);
-    printf("The number of top-level buckets: %ld\n", level->addr_capacity);
-    printf("The number of all buckets: %ld\n", level->total_capacity);
-    printf("The number of all entries: %ld\n", level->total_capacity*ASSOC_NUM);
-    printf("The level hash table initialization succeeds!\n");
-    */
-    if (!already_exists && write_metadata(level)) return NULL;
-    level->meta_cache_state = 0;
+    level->addr_capacity = pow(2, level->ondev->level_size);
+    level->total_capacity = pow(2, level->ondev->level_size) 
+                            + pow(2, level->ondev->level_size - 1);
+
     return level;
 }
 
@@ -432,10 +301,8 @@ void level_expand(level_hash_t *level)
         exit(1);
     }
 
-    //if_then_panic(true, "Have yet to implement this for the API!");
-
     level->resize_state = 1;
-    level->addr_capacity = pow(2, level->level_size + 1);
+    level->addr_capacity = pow(2, level->ondev->level_size + 1);
     size_t new_buckets_bytes = level->addr_capacity * sizeof(level_bucket_t);
     size_t new_buckets_blocks = new_buckets_bytes / level->block_size;
     if(new_buckets_bytes % level->block_size != 0) new_buckets_blocks++;
@@ -462,38 +329,21 @@ void level_expand(level_hash_t *level)
     level_bucket_t *newBuckets;
     int8_t *new_cache_state;
 
-    if (!level->do_cache) {
-        (void)CB(level->idx_spec, cb_get_addr, new_buckets_paddr, 0, (char**)&newBuckets);
-        new_cache_state = NULL;
-        memset(newBuckets, 0, new_buckets_bytes);
-    } else {
-        newBuckets = ZALLOC(level->idx_spec, new_buckets_bytes);
-        new_cache_state = ZALLOC(level->idx_spec, level->addr_capacity*sizeof(int8_t));
-
-        if (!newBuckets || !new_cache_state) {
-            printf("The expanding fails: 2\n");
-            exit(1);
-        }
-
-        // Ensure the new blocks are zeroed out.
-        ssize_t nzeroed = CB(level->idx_spec, cb_write,
-                             new_buckets_paddr, 0, new_buckets_bytes, 
-                             (char*)newBuckets); 
-        if_then_panic(nzeroed != new_buckets_bytes, "could not zero out metadata!");
-    }
+    (void)CB(level->idx_spec, cb_get_addr, new_buckets_paddr, 0, (char**)&newBuckets);
+    pmem_memset_persist(newBuckets, 0, new_buckets_bytes);
 
     uint64_t new_level_item_num = 0;
     
     uint64_t old_idx;
-    for (old_idx = 0; old_idx < pow(2, level->level_size - 1); old_idx ++) {
+    for (old_idx = 0; old_idx < pow(2, level->ondev->level_size - 1); old_idx ++) {
         uint64_t i, j;
         for(i = 0; i < ASSOC_NUM; i ++){
-            if (level->buckets[1][old_idx].token[i] == 1)
+            if (bucket(level, 1)[old_idx].token[i] == 1)
             {
-                laddr_t  key   = level->buckets[1][old_idx].slot[i].e_key;
-                paddr_t  value = level->buckets[1][old_idx].slot[i].e_val;
-                size_t   size  = level->buckets[1][old_idx].slot[i].e_size;
-                size_t   idx   = level->buckets[1][old_idx].slot[i].e_idx;
+                laddr_t  key   = bucket(level, 1)[old_idx].slot[i].e_key;
+                paddr_t  value = bucket(level, 1)[old_idx].slot[i].e_val;
+                size_t   size  = bucket(level, 1)[old_idx].slot[i].e_size;
+                size_t   idx   = bucket(level, 1)[old_idx].slot[i].e_idx;
                 uint64_t f_idx = F_IDX(F_HASH(level, key), level->addr_capacity);
                 uint64_t s_idx = S_IDX(S_HASH(level, key), level->addr_capacity);
 
@@ -502,10 +352,7 @@ void level_expand(level_hash_t *level)
                     /*  The rehashed item is inserted into the less-loaded bucket between 
                         the two hash locations in the new level
                     */
-                    if (newBuckets[f_idx].token[j] == 0)
-                    {
-                        //memcpy(newBuckets[f_idx].slot[j].key, key, KEY_LEN);
-                        //memcpy(newBuckets[f_idx].slot[j].value, value, VALUE_LEN);
+                    if (newBuckets[f_idx].token[j] == 0) {
                         newBuckets[f_idx].slot[j].e_key  = key;
                         newBuckets[f_idx].slot[j].e_val  = value;
                         newBuckets[f_idx].slot[j].e_size = size;
@@ -513,15 +360,11 @@ void level_expand(level_hash_t *level)
                         newBuckets[f_idx].token[j] = 1;
                         insertSuccess = 1;
                         new_level_item_num ++;
-                        int f_err = mark_new_bucket_dirty(level, newBuckets,
-                                    new_cache_state, new_buckets_paddr, f_idx);
-                        if_then_panic(f_err, "couldn't write!");
+
+                        nvm_persist_struct(newBuckets[f_idx]);
                         break;
                     }
-                    if (newBuckets[s_idx].token[j] == 0)
-                    {
-                        //memcpy(newBuckets[s_idx].slot[j].key, key, KEY_LEN);
-                        //memcpy(newBuckets[s_idx].slot[j].value, value, VALUE_LEN);
+                    if (newBuckets[s_idx].token[j] == 0) {
                         newBuckets[s_idx].slot[j].e_key  = key;
                         newBuckets[s_idx].slot[j].e_val  = value;
                         newBuckets[s_idx].slot[j].e_size = size;
@@ -529,22 +372,21 @@ void level_expand(level_hash_t *level)
                         newBuckets[s_idx].token[j] = 1;
                         insertSuccess = 1;
                         new_level_item_num ++;
-                        int s_err = mark_new_bucket_dirty(level, newBuckets,
-                                    new_cache_state, new_buckets_paddr, s_idx);
-                        if_then_panic(s_err, "couldn't write!");
+
+                        nvm_persist_struct(newBuckets[s_idx]);
                         break;
                     }
                 }
 
                 if(!insertSuccess){
                     printf("The expanding fails: 3\n");
-                    printf("\tWas expanding to level size %lu\n",
-                            level->level_size + 1);
+                    printf("\tWas expanding to level size %u\n",
+                            level->ondev->level_size + 1);
                     exit(1);                    
                 }
                
                 /*
-                level->buckets[1][old_idx].token[i] = 0;
+                bucket(level, 1)[old_idx].token[i] = 0;
                 int oerr = mark_bucket_dirty(level, 1, old_idx);
                 if_then_panic(oerr, "couldn't write!");
                 */
@@ -552,8 +394,8 @@ void level_expand(level_hash_t *level)
         }
     }
 
-    level->level_size ++;
-    level->total_capacity = pow(2, level->level_size) + pow(2, level->level_size - 1);
+    level->ondev->level_size ++;
+    level->total_capacity = pow(2, level->ondev->level_size) + pow(2, level->ondev->level_size - 1);
 
     if (level->do_cache) {
         FREE(level->idx_spec, level->buckets[1]);
@@ -563,27 +405,19 @@ void level_expand(level_hash_t *level)
                        level->dev_sizes[1], level->dev_levels[1]); 
     if_then_panic(freed != level->dev_sizes[1], "could not free metadata!");
 
-    level->buckets[1] = level->buckets[0];
-    level->buckets[0] = newBuckets;
-    pmem_persist((void*)newBuckets, new_buckets_bytes);
-    newBuckets = NULL;
+    level->ondev->dev_levels[1] = level->ondev->dev_levels[0];
+    level->ondev->dev_levels[0] = new_buckets_paddr;
 
-    level->dev_levels[1] = level->dev_levels[0];
-    level->dev_levels[0] = new_buckets_paddr;
-
-    level->dev_sizes[1] = level->dev_sizes[0];
-    level->dev_sizes[0] = new_buckets_blocks;
-
-    level->cache_state[1] = level->cache_state[0];
-    level->cache_state[0] = new_cache_state;
+    level->ondev->dev_sizes[1] = level->ondev->dev_sizes[0];
+    level->ondev->dev_sizes[0] = new_buckets_blocks;
     
-    level->level_item_num[1] = level->level_item_num[0];
-    level->level_item_num[0] = new_level_item_num;
+    level->ondev->level_item_num[1] = level->ondev->level_item_num[0];
+    level->ondev->level_item_num[0] = new_level_item_num;
 
     level->level_expand_time++;
     level->resize_state = 0;
 
-    level->meta_cache_state = 1;
+    nvm_persist_struct_ptr(level->ondev);
 }
 
 /*
@@ -596,15 +430,17 @@ void level_shrink(level_hash_t *level)
 {
     if_then_panic(!level, "level hash table cannot be null!");
 
+    #define SHRINK_THRESHOLD 0.2
     // The shrinking is performed only when the hash table has very few items.
-    if(level->level_item_num[0] + level->level_item_num[1] > level->total_capacity*ASSOC_NUM*0.4 || 
-       level->total_capacity*ASSOC_NUM*0.4 == 0){
+    if(level->ondev->level_item_num[0] + level->ondev->level_item_num[1] 
+            > level->total_capacity*ASSOC_NUM*SHRINK_THRESHOLD || 
+       level->total_capacity*ASSOC_NUM*SHRINK_THRESHOLD == 0){
         return;
     }
 
-    if ((level->level_size - 1) <= 2) return;
+    if ((level->ondev->level_size - 1) <= 2) return;
 
-    size_t new_size = pow(2, level->level_size - 1);
+    size_t new_size = pow(2, level->ondev->level_size - 1);
     size_t new_buckets_bytes = new_size * sizeof(level_bucket_t);
     size_t new_buckets_blocks = new_buckets_bytes / level->block_size;
     if(new_buckets_bytes % level->block_size != 0) new_buckets_blocks++;
@@ -622,54 +458,32 @@ void level_shrink(level_hash_t *level)
     }
 
     level->resize_state = 2;
-    level->level_size--;
+    level->ondev->level_size--;
 
-    level_bucket_t *newBuckets;
-    int8_t *new_cache_state;
+    level_bucket_t *newBuckets = ((level_bucket_t*)(level->dev_ptr 
+                + (new_buckets_paddr * level->block_size)));
 
-    if (level->do_cache) {
-        newBuckets = ZALLOC(level->idx_spec, new_size*sizeof(level_bucket_t));
-        new_cache_state = ZALLOC(level->idx_spec, level->addr_capacity*sizeof(int8_t));
+    level_bucket_t *interimBuckets = bucket(level, 0);
 
-        if_then_panic(!newBuckets || !new_cache_state, "could not alloc for shrink!");
+    level->ondev->level_item_num[0] = level->ondev->level_item_num[1];
+    level->ondev->level_item_num[1] = 0;
 
-        // Ensure the new blocks are zeroed out.
-        ssize_t nzeroed = CB(level->idx_spec, cb_write,
-                             new_buckets_paddr, 0, new_buckets_bytes, 
-                             (char*)newBuckets); 
-        if_then_panic(nzeroed != new_buckets_bytes, "could not zero out metadata!");
-    } else {
-        (void)CB(level->idx_spec, cb_get_addr, new_buckets_paddr, 0, (char**)&newBuckets);
-        new_cache_state = NULL;
-        //memset(newBuckets, 0, new_size*sizeof(level_bucket_t));
-    }
+    level->addr_capacity = pow(2, level->ondev->level_size);
+    level->total_capacity = pow(2, level->ondev->level_size) +
+                            pow(2, level->ondev->level_size - 1);
 
-    level_bucket_t *interimBuckets = level->buckets[0];
-    level->buckets[0] = level->buckets[1];
-    level->buckets[1] = newBuckets;
+    size_t interimDevSize = level->ondev->dev_sizes[0];
+    level->ondev->dev_sizes[0] = level->ondev->dev_sizes[1];
+    level->ondev->dev_sizes[1] = new_buckets_blocks;
 
-    pmem_persist((void*)newBuckets, new_buckets_bytes);
+    paddr_t interimDevLoc = level->ondev->dev_levels[0];
+    level->ondev->dev_levels[0] = level->ondev->dev_levels[1];
+    level->ondev->dev_levels[1] = new_buckets_paddr;
 
-    level->level_item_num[0] = level->level_item_num[1];
-    level->level_item_num[1] = 0;
-
-    level->addr_capacity = pow(2, level->level_size);
-    level->total_capacity = pow(2, level->level_size) + pow(2, level->level_size - 1);
-
-    size_t interimDevSize = level->dev_sizes[0];
-    level->dev_sizes[0] = level->dev_sizes[1];
-    level->dev_sizes[1] = new_buckets_blocks;
-
-    paddr_t interimDevLoc = level->dev_levels[0];
-    level->dev_levels[0] = level->dev_levels[1];
-    level->dev_levels[1] = new_buckets_paddr;
-
-    int8_t *interimCacheState = level->cache_state[0];
-    level->cache_state[0] = level->cache_state[1];
-    level->cache_state[1] = new_cache_state;
+    nvm_persist_struct_ptr(level->ondev);
 
     uint64_t old_idx, i;
-    for (old_idx = 0; old_idx < pow(2, level->level_size+1); old_idx ++) {
+    for (old_idx = 0; old_idx < pow(2, level->ondev->level_size+1); old_idx ++) {
         for(i = 0; i < ASSOC_NUM; i ++){
             if (interimBuckets[old_idx].token[i] == 1)
             {
@@ -683,22 +497,17 @@ void level_shrink(level_hash_t *level)
                 }
 
                 interimBuckets[old_idx].token[i] = 0;
+
+                nvm_persist_struct(interimBuckets[old_idx]);
             }
         }
     } 
-
-    if (level->do_cache) {
-        FREE(level->idx_spec, interimBuckets);
-        FREE(level->idx_spec, interimCacheState);
-    }
 
     ssize_t nfreed = CB(level->idx_spec, cb_dealloc_metadata,
                         interimDevSize, interimDevLoc);
     if_then_panic(nfreed != interimDevSize, "could not dealloc!");
     level->level_expand_time = 0;
     level->resize_state = 0;
-
-    level->meta_cache_state = 1;
 }
 
 /*
@@ -712,6 +521,10 @@ size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
     uint64_t s_hash = S_HASH(level, key);
 
     *value = 0;
+
+    level->addr_capacity = pow(2, level->ondev->level_size);
+    level->total_capacity = pow(2, level->ondev->level_size) 
+                            + pow(2, level->ondev->level_size - 1);
 
     uint64_t i, j, f_idx, s_idx;
     if (level->enable_stats) INCR_STAT(&level_stats, nreads);
@@ -733,13 +546,12 @@ size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
                     INCR_STAT(&level_stats, nchecked);
                 }
 
-                if (level->buckets[i][f_idx].token[j] == 1 &&
-                    //strcmp(level->buckets[i][f_idx].slot[j].key, key) == 0)
-                    level->buckets[i][f_idx].slot[j].e_key == key)
+                if (bucket(level, i)[f_idx].token[j] == 1 &&
+                    bucket(level, i)[f_idx].slot[j].e_key == key)
                 {
-                    *value = level->buckets[i][f_idx].slot[j].e_val;
+                    *value = bucket(level, i)[f_idx].slot[j].e_val;
                     if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
-                    return level->buckets[i][f_idx].slot[j].e_size;
+                    return bucket(level, i)[f_idx].slot[j].e_size;
                 }
 
                 if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
@@ -757,13 +569,12 @@ size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
                     INCR_STAT(&level_stats, nchecked);
                 }
 
-                if (level->buckets[i][s_idx].token[j] == 1 &&
-                    //strcmp(level->buckets[i][s_idx].slot[j].key, key) == 0)
-                    level->buckets[i][s_idx].slot[j].e_key == key) 
+                if (bucket(level, i)[s_idx].token[j] == 1 &&
+                    bucket(level, i)[s_idx].slot[j].e_key == key) 
                 {
-                    *value = level->buckets[i][s_idx].slot[j].e_val;
+                    *value = bucket(level, i)[s_idx].slot[j].e_val;
                     if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
-                    return level->buckets[i][s_idx].slot[j].e_size;
+                    return bucket(level, i)[s_idx].slot[j].e_size;
                 }
 
                 if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
@@ -786,13 +597,12 @@ size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
                     INCR_STAT(&level_stats, nchecked);
                 }
 
-                if (level->buckets[i-1][f_idx].token[j] == 1 &&
-                    //strcmp(level->buckets[i-1][f_idx].slot[j].key, key) == 0)
-                    level->buckets[i-1][f_idx].slot[j].e_key == key)
+                if (bucket(level, i-1)[f_idx].token[j] == 1 &&
+                    bucket(level, i-1)[f_idx].slot[j].e_key == key)
                 {
-                    *value = level->buckets[i-1][f_idx].slot[j].e_val;
+                    *value = bucket(level, i-1)[f_idx].slot[j].e_val;
                     if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
-                    return level->buckets[i-1][f_idx].slot[j].e_size;
+                    return bucket(level, i-1)[f_idx].slot[j].e_size;
                 }
 
                 if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
@@ -807,13 +617,12 @@ size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
                     INCR_STAT(&level_stats, nchecked);
                 }
 
-                if (level->buckets[i-1][s_idx].token[j] == 1 &&
-                    //strcmp(level->buckets[i-1][s_idx].slot[j].key, key) == 0)
-                    level->buckets[i-1][s_idx].slot[j].e_key == key)
+                if (bucket(level, i-1)[s_idx].token[j] == 1 &&
+                    bucket(level, i-1)[s_idx].slot[j].e_key == key)
                 {
-                    *value = level->buckets[i-1][s_idx].slot[j].e_val;
+                    *value = bucket(level, i-1)[s_idx].slot[j].e_val;
                     if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
-                    return level->buckets[i-1][s_idx].slot[j].e_size;
+                    return bucket(level, i-1)[s_idx].slot[j].e_size;
                 }
 
                 if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
@@ -833,6 +642,10 @@ Function: level_static_query()
 */
 size_t level_static_query(level_hash_t *level, laddr_t key, paddr_t *value)
 {
+    level->addr_capacity = pow(2, level->ondev->level_size);
+    level->total_capacity = pow(2, level->ondev->level_size) 
+                            + pow(2, level->ondev->level_size - 1);
+
     uint64_t f_hash = F_HASH(level, key);
     uint64_t s_hash = S_HASH(level, key);
     uint64_t f_idx = F_IDX(f_hash, level->addr_capacity);
@@ -847,11 +660,11 @@ size_t level_static_query(level_hash_t *level, laddr_t key, paddr_t *value)
         if (f_err) return 0;
         for(j = 0; j < ASSOC_NUM; j ++){
             if (level->enable_stats) INCR_STAT(&level_stats, nchecked);
-            if (level->buckets[i][f_idx].token[j] == 1 &&
-                level->buckets[i][f_idx].slot[j].e_key == key)
+            if (bucket(level, i)[f_idx].token[j] == 1 &&
+                bucket(level, i)[f_idx].slot[j].e_key == key)
             {
-                *value = level->buckets[i][f_idx].slot[j].e_val;
-                return level->buckets[i][f_idx].slot[j].e_size;
+                *value = bucket(level, i)[f_idx].slot[j].e_val;
+                return bucket(level, i)[f_idx].slot[j].e_size;
             }
         }
 
@@ -859,11 +672,11 @@ size_t level_static_query(level_hash_t *level, laddr_t key, paddr_t *value)
         if (s_err) return 0;
         for (j = 0; j < ASSOC_NUM; j++) {
             if (level->enable_stats) INCR_STAT(&level_stats, nchecked);
-            if (level->buckets[i][s_idx].token[j] == 1 &&
-                level->buckets[i][s_idx].slot[j].e_key == key)
+            if (bucket(level, i)[s_idx].token[j] == 1 &&
+                bucket(level, i)[s_idx].slot[j].e_key == key)
             {
-                *value = level->buckets[i][s_idx].slot[j].e_val;
-                return level->buckets[i][s_idx].slot[j].e_size;
+                *value = bucket(level, i)[s_idx].slot[j].e_val;
+                return bucket(level, i)[s_idx].slot[j].e_size;
             }
         }
         f_idx = F_IDX(f_hash, level->addr_capacity / 2);
@@ -890,37 +703,32 @@ uint8_t level_delete(level_hash_t *level, laddr_t key,
     uint64_t i, j;
     for(i = 0; i < 2; i ++){
         for(j = 0; j < ASSOC_NUM; j ++){
-            if (level->buckets[i][f_idx].token[j] == 1 && 
-                //strcmp(level->buckets[i][f_idx].slot[j].key, key) == 0)
-                level->buckets[i][f_idx].slot[j].e_key ==  key)
+            if (bucket(level, i)[f_idx].token[j] == 1 && 
+                bucket(level, i)[f_idx].slot[j].e_key ==  key)
             {
-                *old_val  = level->buckets[i][f_idx].slot[j].e_val;
-                *old_idx  = level->buckets[i][f_idx].slot[j].e_idx;
-                *old_size = level->buckets[i][f_idx].slot[j].e_size;
-                level->buckets[i][f_idx].token[j] = 0;
-                nvm_persist_struct(level->buckets[i][f_idx].token[j]);
-                level->level_item_num[i] --;
+                *old_val  = bucket(level, i)[f_idx].slot[j].e_val;
+                *old_idx  = bucket(level, i)[f_idx].slot[j].e_idx;
+                *old_size = bucket(level, i)[f_idx].slot[j].e_size;
+                bucket(level, i)[f_idx].token[j] = 0;
+                level->ondev->level_item_num[i] --;
 
-                // int f_err = mark_bucket_dirty(level, i, f_idx);
-                // if (f_err) return 1;
-                level->meta_cache_state = 1;
+                nvm_persist_struct(bucket(level, i)[f_idx].token[j]);
+                nvm_persist_struct_ptr(level->ondev);
                 return 0;
             }
         }
         for(j = 0; j < ASSOC_NUM; j ++){
-            if (level->buckets[i][s_idx].token[j] == 1 &&
-                //strcmp(level->buckets[i][s_idx].slot[j].key, key) == 0)
-                level->buckets[i][s_idx].slot[j].e_key == key)
+            if (bucket(level, i)[s_idx].token[j] == 1 &&
+                bucket(level, i)[s_idx].slot[j].e_key == key)
             {
-                *old_val  = level->buckets[i][s_idx].slot[j].e_val;
-                *old_idx  = level->buckets[i][s_idx].slot[j].e_idx;
-                *old_size = level->buckets[i][s_idx].slot[j].e_size;
-                level->buckets[i][s_idx].token[j] = 0;
-                nvm_persist_struct(level->buckets[i][s_idx].token[j]);
-                level->level_item_num[i] --;
-                // int s_err = mark_bucket_dirty(level, i, s_idx);
-                // if (s_err) return 1;
-                level->meta_cache_state = 1;
+                *old_val  = bucket(level, i)[s_idx].slot[j].e_val;
+                *old_idx  = bucket(level, i)[s_idx].slot[j].e_idx;
+                *old_size = bucket(level, i)[s_idx].slot[j].e_size;
+                bucket(level, i)[s_idx].token[j] = 0;
+                level->ondev->level_item_num[i] --;
+
+                nvm_persist_struct(bucket(level, i)[s_idx].token[j]);
+                nvm_persist_struct_ptr(level->ondev);
                 return 0;
             }
         }
@@ -949,33 +757,26 @@ uint8_t level_update(level_hash_t *level, laddr_t key,
         int f_err = ensure_bucket_uptodate(level, i, f_idx);
         if (f_err) return 1;
         for(j = 0; j < ASSOC_NUM; j ++){
-            if (level->buckets[i][f_idx].token[j] == 1 &&
-                //strcmp(level->buckets[i][f_idx].slot[j].key, key) == 0)
-                level->buckets[i][f_idx].slot[j].e_key == key)
+            if (bucket(level, i)[f_idx].token[j] == 1 &&
+                bucket(level, i)[f_idx].slot[j].e_key == key)
             {
-                //memcpy(level->buckets[i][f_idx].slot[j].e_val, new_value, VALUE_LEN);
-                level->buckets[i][f_idx].slot[j].e_size = new_size;
-                level->buckets[i][f_idx].slot[j].e_idx  = new_idx;
-                nvm_persist_struct(level->buckets[i][f_idx].slot[j]);
-                // int f_err = mark_bucket_dirty(level, i, f_idx);
-                // if (f_err) return 1;
+                bucket(level, i)[f_idx].slot[j].e_size = new_size;
+                bucket(level, i)[f_idx].slot[j].e_idx  = new_idx;
+                nvm_persist_struct(bucket(level, i)[f_idx].slot[j]);
+
                 return 0;
             }
         }
         int s_err = ensure_bucket_uptodate(level, i, s_idx);
         if (s_err) return 1;
         for(j = 0; j < ASSOC_NUM; j ++){
-            if (level->buckets[i][s_idx].token[j] == 1 &&
-                //strcmp(level->buckets[i][s_idx].slot[j].key, key) == 0)
-                level->buckets[i][s_idx].slot[j].e_key == key)
+            if (bucket(level, i)[s_idx].token[j] == 1 &&
+                bucket(level, i)[s_idx].slot[j].e_key == key)
             {
-                //memcpy(level->buckets[i][s_idx].slot[j].e_val, new_value, VALUE_LEN);
-                level->buckets[i][s_idx].slot[j].e_size = new_size;
-                level->buckets[i][s_idx].slot[j].e_idx  = new_idx;
-                nvm_persist_struct(level->buckets[i][s_idx].slot[j]);
+                bucket(level, i)[s_idx].slot[j].e_size = new_size;
+                bucket(level, i)[s_idx].slot[j].e_idx  = new_idx;
+                nvm_persist_struct(bucket(level, i)[s_idx].slot[j]);
 
-                // int s_err = mark_bucket_dirty(level, i, s_idx);
-                // if (s_err) return 1;
                 return 0;
             }
         }
@@ -1011,40 +812,35 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value,
 
             int f_err = ensure_bucket_uptodate(level, i, f_idx);
             if (f_err) return 1;
-            if (level->buckets[i][f_idx].token[j] == 0)
-            {
-                //memcpv(level->buckets[i][f_idx].slot[j].key, key, KEY_LEN);
-                //memcpy(level->buckets[i][f_idx].slot[j].value, value, VALUE_LEN);
-                level->buckets[i][f_idx].slot[j].e_key  = key;
-                level->buckets[i][f_idx].slot[j].e_val  = value;
-                level->buckets[i][f_idx].slot[j].e_size = size;
-                level->buckets[i][f_idx].slot[j].e_idx  = idx;
-                level->buckets[i][f_idx].token[j] = 1;
-                level->level_item_num[i] ++;
-                nvm_persist_struct(level->buckets[i][f_idx]);
-                // int f_err = mark_bucket_dirty(level, i, f_idx);
-                // if (f_err) return 1;
-                level->meta_cache_state = 1;
+            if (bucket(level, i)[f_idx].token[j] == 0) {
+                bucket(level, i)[f_idx].slot[j].e_key  = key;
+                bucket(level, i)[f_idx].slot[j].e_val  = value;
+                bucket(level, i)[f_idx].slot[j].e_size = size;
+                bucket(level, i)[f_idx].slot[j].e_idx  = idx;
+                bucket(level, i)[f_idx].token[j] = 1;
+                level->ondev->level_item_num[i] ++;
+                
+                nvm_persist_struct(bucket(level, i)[f_idx]);
+                nvm_persist_struct_ptr(level->ondev);
+
                 return 0;
             }
 
             if (level->enable_stats) INCR_STAT(&level_stats, nchecked_create);
             int s_err = ensure_bucket_uptodate(level, i, s_idx);
             if (s_err) return 1;
-            if (level->buckets[i][s_idx].token[j] == 0) 
-            {
-                //memcpy(level->buckets[i][s_idx].slot[j].key, key, KEY_LEN);
-                //memcpy(level->buckets[i][s_idx].slot[j].value, value, VALUE_LEN);
-                level->buckets[i][s_idx].slot[j].e_key  = key;
-                level->buckets[i][s_idx].slot[j].e_val  = value;
-                level->buckets[i][s_idx].slot[j].e_size = size;
-                level->buckets[i][s_idx].slot[j].e_idx  = idx;
-                level->buckets[i][s_idx].token[j] = 1;
-                level->level_item_num[i] ++;
-                nvm_persist_struct(level->buckets[i][s_idx]);
-                // int s_err = mark_bucket_dirty(level, i, s_idx);
-                // if (s_err) return 1;
-                level->meta_cache_state = 1;
+            if (bucket(level, i)[s_idx].token[j] == 0) {
+
+                bucket(level, i)[s_idx].slot[j].e_key  = key;
+                bucket(level, i)[s_idx].slot[j].e_val  = value;
+                bucket(level, i)[s_idx].slot[j].e_size = size;
+                bucket(level, i)[s_idx].slot[j].e_idx  = idx;
+                bucket(level, i)[s_idx].token[j] = 1;
+                level->ondev->level_item_num[i] ++;
+                
+                nvm_persist_struct(bucket(level, i)[s_idx]);
+                nvm_persist_struct_ptr(level->ondev);
+
                 return 0;
             }
         }
@@ -1070,36 +866,32 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value,
     
     if(level->level_expand_time > 0){
         empty_location = b2t_movement(level, f_idx);
-        if(empty_location != -1){
-            //memcpy(level->buckets[1][f_idx].slot[empty_location].key, key, KEY_LEN);
-            //memcpy(level->buckets[1][f_idx].slot[empty_location].value, value, VALUE_LEN);
-            level->buckets[1][f_idx].slot[empty_location].e_key  = key;
-            level->buckets[1][f_idx].slot[empty_location].e_val  = value;
-            level->buckets[1][f_idx].slot[empty_location].e_size = size;
-            level->buckets[1][f_idx].slot[empty_location].e_idx  = idx;
-            level->buckets[1][f_idx].token[empty_location] = 1;
-            level->level_item_num[1] ++;
-            nvm_persist_struct(level->buckets[1][f_idx]);
-            // int f_err = mark_bucket_dirty(level, 1, f_idx);
-            // if (f_err) return 1;
-            level->meta_cache_state = 1;
+        if (empty_location != -1) {
+            bucket(level, 1)[f_idx].slot[empty_location].e_key  = key;
+            bucket(level, 1)[f_idx].slot[empty_location].e_val  = value;
+            bucket(level, 1)[f_idx].slot[empty_location].e_size = size;
+            bucket(level, 1)[f_idx].slot[empty_location].e_idx  = idx;
+            bucket(level, 1)[f_idx].token[empty_location] = 1;
+            level->ondev->level_item_num[1] ++;
+
+            nvm_persist_struct(bucket(level, 1)[f_idx]);
+            nvm_persist_struct_ptr(level->ondev);
+
             return 0;
         }
 
         empty_location = b2t_movement(level, s_idx);
-        if(empty_location != -1){
-            //memcpy(level->buckets[1][s_idx].slot[empty_location].key, key, KEY_LEN);
-            //memcpy(level->buckets[1][s_idx].slot[empty_location].value, value, VALUE_LEN);
-            level->buckets[1][s_idx].slot[empty_location].e_key  = key;
-            level->buckets[1][s_idx].slot[empty_location].e_val  = value;
-            level->buckets[1][s_idx].slot[empty_location].e_size = size;
-            level->buckets[1][s_idx].slot[empty_location].e_idx  = idx;
-            level->buckets[1][s_idx].token[empty_location] = 1;
-            level->level_item_num[1] ++;
-            nvm_persist_struct(level->buckets[1][s_idx]);
-            // int s_err = mark_bucket_dirty(level, 1, s_idx);
-            // if (s_err) return 1;
-            level->meta_cache_state = 1;
+        if (empty_location != -1) {
+            bucket(level, 1)[s_idx].slot[empty_location].e_key  = key;
+            bucket(level, 1)[s_idx].slot[empty_location].e_val  = value;
+            bucket(level, 1)[s_idx].slot[empty_location].e_size = size;
+            bucket(level, 1)[s_idx].slot[empty_location].e_idx  = idx;
+            bucket(level, 1)[s_idx].token[empty_location] = 1;
+            level->ondev->level_item_num[1] ++;
+
+            nvm_persist_struct(bucket(level, 1)[s_idx]);
+            nvm_persist_struct_ptr(level->ondev);
+
             return 0;
         }
     }
@@ -1117,10 +909,10 @@ uint8_t try_movement(level_hash_t *level, uint64_t idx, uint64_t level_num,
     uint64_t i, j, jdx;
 
     for(i = 0; i < ASSOC_NUM; i ++){
-        laddr_t  m_key   = level->buckets[level_num][idx].slot[i].e_key;
-        paddr_t  m_value = level->buckets[level_num][idx].slot[i].e_val;
-        size_t   m_size  = level->buckets[level_num][idx].slot[i].e_size;
-        size_t   m_idx   = level->buckets[level_num][idx].slot[i].e_idx;
+        laddr_t  m_key   = bucket(level, level_num)[idx].slot[i].e_key;
+        paddr_t  m_value = bucket(level, level_num)[idx].slot[i].e_val;
+        size_t   m_size  = bucket(level, level_num)[idx].slot[i].e_size;
+        size_t   m_idx   = bucket(level, level_num)[idx].slot[i].e_idx;
         uint64_t f_hash = F_HASH(level, m_key);
         uint64_t s_hash = S_HASH(level, m_key);
         uint64_t f_idx = F_IDX(f_hash, level->addr_capacity/(1+level_num));
@@ -1132,36 +924,27 @@ uint8_t try_movement(level_hash_t *level, uint64_t idx, uint64_t level_num,
             jdx = f_idx;
         }
 
-        for(j = 0; j < ASSOC_NUM; j ++){
-            if (level->buckets[level_num][jdx].token[j] == 0)
-            {
-                //memcpy(level->buckets[level_num][jdx].slot[j].key, m_key, KEY_LEN);
-                //memcpy(level->buckets[level_num][jdx].slot[j].value, m_value, VALUE_LEN);
-                level->buckets[level_num][jdx].slot[j].e_key  = m_key;
-                level->buckets[level_num][jdx].slot[j].e_val  = m_value;
-                level->buckets[level_num][jdx].slot[j].e_size = m_size;
-                level->buckets[level_num][jdx].slot[j].e_idx  = m_idx;
-                level->buckets[level_num][jdx].token[j] = 1;
-                level->buckets[level_num][idx].token[i] = 0;
+        for(j = 0; j < ASSOC_NUM; j ++) {
+            if (bucket(level, level_num)[jdx].token[j] == 0) {
+                bucket(level, level_num)[jdx].slot[j].e_key  = m_key;
+                bucket(level, level_num)[jdx].slot[j].e_val  = m_value;
+                bucket(level, level_num)[jdx].slot[j].e_size = m_size;
+                bucket(level, level_num)[jdx].slot[j].e_idx  = m_idx;
+                bucket(level, level_num)[jdx].token[j] = 1;
+                bucket(level, level_num)[idx].token[i] = 0;
                 // The movement is finished and then the new item is inserted
 
-                //memcpy(level->buckets[level_num][idx].slot[i].key, key, KEY_LEN);
-                //memcpy(level->buckets[level_num][idx].slot[i].value, value, VALUE_LEN);
-                level->buckets[level_num][idx].slot[i].e_key  = key;
-                level->buckets[level_num][idx].slot[i].e_val  = value;
-                level->buckets[level_num][idx].slot[i].e_size = size;
-                level->buckets[level_num][idx].slot[i].e_idx  = p_idx;
-                level->buckets[level_num][idx].token[i] = 1;
-                level->level_item_num[level_num] ++;
+                bucket(level, level_num)[idx].slot[i].e_key  = key;
+                bucket(level, level_num)[idx].slot[i].e_val  = value;
+                bucket(level, level_num)[idx].slot[i].e_size = size;
+                bucket(level, level_num)[idx].slot[i].e_idx  = p_idx;
+                bucket(level, level_num)[idx].token[i] = 1;
+                level->ondev->level_item_num[level_num] ++;
 
-                nvm_persist_struct(level->buckets[level_num][idx]);
-                nvm_persist_struct(level->buckets[level_num][jdx]);
+                nvm_persist_struct(bucket(level, level_num)[idx]);
+                nvm_persist_struct(bucket(level, level_num)[jdx]);
+                nvm_persist_struct_ptr(level->ondev);
                 
-                // int i_err = mark_bucket_dirty(level, level_num, idx);
-                // int j_err = mark_bucket_dirty(level, level_num, jdx);
-                // if (i_err || j_err) return 1;
-
-                level->meta_cache_state = 1;
                 return 0;
             }
         }       
@@ -1184,58 +967,45 @@ int b2t_movement(level_hash_t *level, uint64_t idx)
     
     uint64_t i, j;
     for(i = 0; i < ASSOC_NUM; i ++){
-        key   = level->buckets[1][idx].slot[i].e_key;
-        value = level->buckets[1][idx].slot[i].e_val;
-        size  = level->buckets[1][idx].slot[i].e_size;
-        p_idx = level->buckets[1][idx].slot[i].e_idx;
+        key   = bucket(level, 1)[idx].slot[i].e_key;
+        value = bucket(level, 1)[idx].slot[i].e_val;
+        size  = bucket(level, 1)[idx].slot[i].e_size;
+        p_idx = bucket(level, 1)[idx].slot[i].e_idx;
         f_hash = F_HASH(level, key);
         s_hash = S_HASH(level, key);  
         f_idx = F_IDX(f_hash, level->addr_capacity);
         s_idx = S_IDX(s_hash, level->addr_capacity);
     
-        for(j = 0; j < ASSOC_NUM; j ++){
-            if (level->buckets[0][f_idx].token[j] == 0)
-            {
-                //memcpy(level->buckets[0][f_idx].slot[j].key, key, KEY_LEN);
-                //memcpy(level->buckets[0][f_idx].slot[j].value, value, VALUE_LEN);
-                level->buckets[0][f_idx].slot[j].e_key  = key;
-                level->buckets[0][f_idx].slot[j].e_val  = value;
-                level->buckets[0][f_idx].slot[j].e_size = size;
-                level->buckets[0][f_idx].slot[j].e_idx  = p_idx;
-                level->buckets[0][f_idx].token[j] = 1;
-                level->buckets[1][idx].token[i] = 0;
-                level->level_item_num[0] ++;
-                level->level_item_num[1] --;
+        for(j = 0; j < ASSOC_NUM; j ++) {
+            if (bucket(level, 0)[f_idx].token[j] == 0) {
+                bucket(level, 0)[f_idx].slot[j].e_key  = key;
+                bucket(level, 0)[f_idx].slot[j].e_val  = value;
+                bucket(level, 0)[f_idx].slot[j].e_size = size;
+                bucket(level, 0)[f_idx].slot[j].e_idx  = p_idx;
+                bucket(level, 0)[f_idx].token[j] = 1;
+                bucket(level, 1)[idx].token[i] = 0;
+                level->ondev->level_item_num[0] ++;
+                level->ondev->level_item_num[1] --;
 
-                nvm_persist_struct(level->buckets[0][f_idx]);
-                nvm_persist_struct(level->buckets[1][idx]);
+                nvm_persist_struct(bucket(level, 0)[f_idx]);
+                nvm_persist_struct(bucket(level, 1)[idx]);
+                nvm_persist_struct_ptr(level->ondev);
 
-                // int t_err = mark_bucket_dirty(level, 0, f_idx);
-                // int b_err = mark_bucket_dirty(level, 1, idx);
-                // if (t_err || b_err) return -1;
-                level->meta_cache_state = 1;
                 return i;
-            }
-            else if (level->buckets[0][s_idx].token[j] == 0)
-            {
-                //memcpy(level->buckets[0][s_idx].slot[j].key, key, KEY_LEN);
-                //memcpy(level->buckets[0][s_idx].slot[j].value, value, VALUE_LEN);
-                level->buckets[0][s_idx].slot[j].e_key  = key;
-                level->buckets[0][s_idx].slot[j].e_val  = value;
-                level->buckets[0][s_idx].slot[j].e_size = size;
-                level->buckets[0][s_idx].slot[j].e_idx  = p_idx;
-                level->buckets[0][s_idx].token[j] = 1;
-                level->buckets[1][idx].token[i] = 0;
-                level->level_item_num[0] ++;
-                level->level_item_num[1] --;
+            } else if (bucket(level, 0)[s_idx].token[j] == 0) {
+                bucket(level, 0)[s_idx].slot[j].e_key  = key;
+                bucket(level, 0)[s_idx].slot[j].e_val  = value;
+                bucket(level, 0)[s_idx].slot[j].e_size = size;
+                bucket(level, 0)[s_idx].slot[j].e_idx  = p_idx;
+                bucket(level, 0)[s_idx].token[j] = 1;
+                bucket(level, 1)[idx].token[i] = 0;
+                level->ondev->level_item_num[0] ++;
+                level->ondev->level_item_num[1] --;
 
-                nvm_persist_struct(level->buckets[0][s_idx]);
-                nvm_persist_struct(level->buckets[1][idx]);
+                nvm_persist_struct(bucket(level, 0)[s_idx]);
+                nvm_persist_struct(bucket(level, 1)[idx]);
+                nvm_persist_struct_ptr(level->ondev);
 
-                // int t_err = mark_bucket_dirty(level, 0, s_idx);
-                // int b_err = mark_bucket_dirty(level, 1, idx);
-                // if (t_err || b_err) return -1;
-                level->meta_cache_state = 1;
                 return i;
             }
         }
@@ -1250,42 +1020,13 @@ Function: level_destroy()
 */
 void level_destroy(level_hash_t *level)
 {
-    FREE(level->idx_spec, level->buckets[0]);
-    FREE(level->idx_spec, level->buckets[1]);
-    level = NULL;
+    panic("should never be here!");
 }
 
 int level_persist(level_hash_t *level) {
-    if (level->do_cache) {
-        for (int l = 0; l < 2; ++l) {
-            size_t num_buckets = pow(2, level->level_size - l);
-            for (uint64_t b = 0; b < num_buckets; ++b) {
-                int err = persist_dirty_bucket(level, l, b);
-                if (err) return err;
-            }
-        }
-    }
-
-    if (level->meta_cache_state > 0) {
-        int err = write_metadata(level);
-        if (err) return err;
-        level->meta_cache_state = 0;
-    }
-
     return 0;
 }
 
 int level_cache_invalidate(level_hash_t *level) {
-    if (level->do_cache) {
-        for (int l = 0; l < 2; ++l) {
-            size_t num_buckets = pow(2, level->level_size - l);
-            for (uint64_t b = 0; b < num_buckets; ++b) {
-                level->cache_state[l][b] = -1;
-            }
-        }
-    }
-
-    level->meta_cache_state = -1;
-
     return 0;
 }
