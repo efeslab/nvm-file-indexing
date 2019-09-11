@@ -32,6 +32,7 @@ typedef struct radix_node {
 // For path memoization.
 typedef struct radixtree_path {
     paddr_t page;
+    int max_level;
     paddr_t *contents;
     laddr_t last_idx;
     paddr_t last_ent;
