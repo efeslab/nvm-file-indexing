@@ -18,6 +18,11 @@ bool operator== (const idx_struct_t& lhs, const idx_struct_t& rhs) {
            *lm == *rm;
 }
 
+INSTANTIATE_TEST_CASE_P(CacheState, 
+                        ExtentTreeFixture,
+                        ::testing::Values(false, true));
+
+
 /*******************************************************************************
  * Section: Hashtable correctness tests.
  *
@@ -27,7 +32,7 @@ bool operator== (const idx_struct_t& lhs, const idx_struct_t& rhs) {
  * HashTable initialization tests.
  */
 
-TEST_F(ExtentTreeFixture, InitNew) {
+TEST_P(ExtentTreeFixture, InitNew) {
     ASSERT_NE(nullptr, ext_idx.idx_metadata);
     ASSERT_EQ(0, init_err);
 
@@ -35,14 +40,14 @@ TEST_F(ExtentTreeFixture, InitNew) {
     ASSERT_NE(nullptr, ext_meta->et_direct_data);
 }
 
-TEST_F(ExtentTreeFixture, InitExists) {
+TEST_P(ExtentTreeFixture, InitExists) {
     idx_struct_t ext_copy = ext_idx;
     int err = extent_tree_init(&idx_spec, &inode_space, &ext_copy);
     ASSERT_NE(0, err);
     ASSERT_EQ(ext_idx, ext_copy);
 }
 
-TEST_F(ExtentTreeFixture, InsertSingle) {
+TEST_P(ExtentTreeFixture, InsertSingle) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
@@ -53,7 +58,7 @@ TEST_F(ExtentTreeFixture, InsertSingle) {
     ASSERT_GT(pblk, 0);
 }
 
-TEST_F(ExtentTreeFixture, InsertPersist) {
+TEST_P(ExtentTreeFixture, InsertPersist) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
@@ -69,7 +74,7 @@ TEST_F(ExtentTreeFixture, InsertPersist) {
     ASSERT_EQ(ext_idx, new_ext);
 }
 
-TEST_F(ExtentTreeFixture, InsertMulti) {
+TEST_P(ExtentTreeFixture, InsertMulti) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
@@ -80,7 +85,7 @@ TEST_F(ExtentTreeFixture, InsertMulti) {
     ASSERT_GT(pblk, 0);
 }
 
-TEST_F(ExtentTreeFixture, InsertFragmented) {
+TEST_P(ExtentTreeFixture, InsertFragmented) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk1 = 0;
@@ -100,7 +105,7 @@ TEST_F(ExtentTreeFixture, InsertFragmented) {
     ASSERT_NE(pblk1, pblk2);
 }
 
-TEST_F(ExtentTreeFixture, InsertDeep) {
+TEST_P(ExtentTreeFixture, InsertDeep) {
     inum_t inum   = 0;
     size_t npages = 1000;
 
@@ -117,7 +122,7 @@ TEST_F(ExtentTreeFixture, InsertDeep) {
     }
 }
 
-TEST_F(ExtentTreeFixture, InsertDeepPersist) {
+TEST_P(ExtentTreeFixture, InsertDeepPersist) {
     inum_t inum   = 0;
     size_t npages = 1000;
 
@@ -143,7 +148,7 @@ TEST_F(ExtentTreeFixture, InsertDeepPersist) {
     }
 }
 
-TEST_F(ExtentTreeFixture, InsertDeepPersistStats) {
+TEST_P(ExtentTreeFixture, InsertDeepPersistStats) {
     inum_t inum   = 0;
     size_t npages = 1000;
 
@@ -171,7 +176,7 @@ TEST_F(ExtentTreeFixture, InsertDeepPersistStats) {
     extent_tree_print_stats(&new_ext);
 }
 
-TEST_F(ExtentTreeFixture, InsertRepeat) {
+TEST_P(ExtentTreeFixture, InsertRepeat) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
@@ -190,7 +195,7 @@ TEST_F(ExtentTreeFixture, InsertRepeat) {
         "Error: new blocks mistakenly allocated for existing logical block.";
 }
 
-TEST_F(ExtentTreeFixture, LookupSingle) {
+TEST_P(ExtentTreeFixture, LookupSingle) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
@@ -206,7 +211,7 @@ TEST_F(ExtentTreeFixture, LookupSingle) {
     ASSERT_EQ(npages, check_size);
 }
 
-TEST_F(ExtentTreeFixture, LookupMulti) {
+TEST_P(ExtentTreeFixture, LookupMulti) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
@@ -224,7 +229,7 @@ TEST_F(ExtentTreeFixture, LookupMulti) {
     }
 }
 
-TEST_F(ExtentTreeFixture, RemoveSingle) {
+TEST_P(ExtentTreeFixture, RemoveSingle) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
@@ -244,7 +249,7 @@ TEST_F(ExtentTreeFixture, RemoveSingle) {
     ASSERT_LE(check_size, 0);
 }
 
-TEST_F(ExtentTreeFixture, RemoveSingleReinsert) {
+TEST_P(ExtentTreeFixture, RemoveSingleReinsert) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
@@ -268,7 +273,7 @@ TEST_F(ExtentTreeFixture, RemoveSingleReinsert) {
     ASSERT_GT(pblk, 0);
 }
 
-TEST_F(ExtentTreeFixture, EraseMulti) {
+TEST_P(ExtentTreeFixture, EraseMulti) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
@@ -288,7 +293,7 @@ TEST_F(ExtentTreeFixture, EraseMulti) {
     ASSERT_LE(check_size, 0);
 }
 
-TEST_F(ExtentTreeFixture, EraseDeep) {
+TEST_P(ExtentTreeFixture, EraseDeep) {
     inum_t inum   = 0;
     size_t npages = 1000;
 
@@ -307,7 +312,8 @@ TEST_F(ExtentTreeFixture, EraseDeep) {
     ssize_t check_size = extent_tree_remove(&ext_idx, inum, 0, npages);
     ASSERT_EQ(npages, check_size);
 }
-TEST_F(ExtentTreeFixture, EraseDeallocate) {
+
+TEST_P(ExtentTreeFixture, EraseDeallocate) {
     inum_t inum   = 0;
     laddr_t lblk  = 0;
     paddr_t pblk  = 0;
