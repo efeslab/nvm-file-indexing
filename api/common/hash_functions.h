@@ -42,16 +42,31 @@ static inline laddr_t mix(paddr_t c)
 {
     paddr_t a = 0xff51afd7ed558ccdL;
     paddr_t b = 0xc4ceb9fe1a85ec53L;
-	a=a-b;  a=a-c;  a=a^(c >> 13);
-	b=b-c;  b=b-a;  b=b^(a << 8);
-	c=c-a;  c=c-b;  c=c^(b >> 13);
-	a=a-b;  a=a-c;  a=a^(c >> 12);
-	b=b-c;  b=b-a;  b=b^(a << 16);
-	c=c-a;  c=c-b;  c=c^(b >> 5);
-	a=a-b;  a=a-c;  a=a^(c >> 3);
-	b=b-c;  b=b-a;  b=b^(a << 10);
-	c=c-a;  c=c-b;  c=c^(b >> 15);
-	return (laddr_t)c;
+    a=a-b;  a=a-c;  a=a^(c >> 13);
+    b=b-c;  b=b-a;  b=b^(a << 8);
+    c=c-a;  c=c-b;  c=c^(b >> 13);
+    a=a-b;  a=a-c;  a=a^(c >> 12);
+    b=b-c;  b=b-a;  b=b^(a << 16);
+    c=c-a;  c=c-b;  c=c^(b >> 5);
+    a=a-b;  a=a-c;  a=a^(c >> 3);
+    b=b-c;  b=b-a;  b=b^(a << 10);
+    c=c-a;  c=c-b;  c=c^(b >> 15);
+    return (laddr_t)c;
+}
+
+static inline laddr_t mix_seed(paddr_t c, paddr_t a)
+{
+    paddr_t b = 0xc4ceb9fe1a85ec53L;
+    a=a-b;  a=a-c;  a=a^(c >> 13);
+    b=b-c;  b=b-a;  b=b^(a << 8);
+    c=c-a;  c=c-b;  c=c^(b >> 13);
+    a=a-b;  a=a-c;  a=a^(c >> 12);
+    b=b-c;  b=b-a;  b=b^(a << 16);
+    c=c-a;  c=c-b;  c=c^(b >> 5);
+    a=a-b;  a=a-c;  a=a^(c >> 3);
+    b=b-c;  b=b-a;  b=b^(a << 10);
+    c=c-a;  c=c-b;  c=c^(b >> 15);
+    return (laddr_t)c;
 }
 
 static inline laddr_t nvm_idx_direct_hash (paddr_t v) {

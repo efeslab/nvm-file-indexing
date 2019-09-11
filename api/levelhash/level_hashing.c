@@ -1,4 +1,5 @@
 #include "level_hashing.h"
+#include "common/hash_functions.h"
 
 level_stats_t level_stats = {0, };
 
@@ -10,7 +11,8 @@ uint64_t F_HASH(level_hash_t *level, laddr_t key) {
     DECLARE_TIMING();
     if (level->enable_stats) START_TIMING();
     //uint64_t h = (hash((void *)&key, sizeof(key), level->f_seed));
-    uint64_t h = ((uint64_t)key) ^ level->f_seed;
+    //uint64_t h = ((uint64_t)key) ^ level->f_seed;
+    uint64_t h = mix_seed((paddr_t)key, level->ondev->f_seed);
     if (level->enable_stats) UPDATE_TIMING(&level_stats, compute_hash);
     return h;
 }
@@ -23,7 +25,8 @@ uint64_t S_HASH(level_hash_t *level, laddr_t key) {
     DECLARE_TIMING();
     if (level->enable_stats) START_TIMING();
     //uint64_t h = (hash((void *)&key, sizeof(key), level->s_seed));
-    uint64_t h = ((uint64_t)key) ^ level->s_seed;
+    //uint64_t h = ((uint64_t)key) ^ level->s_seed;
+    uint64_t h = mix_seed((paddr_t)key, level->ondev->s_seed);
     if (level->enable_stats) UPDATE_TIMING(&level_stats, compute_hash);
     return h;
 }
