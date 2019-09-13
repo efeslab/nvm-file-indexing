@@ -29,8 +29,8 @@ static inline
 void
 compute_hash(paddr_t key, uint32_t *h1, uint32_t *h2, bool compact_idx)
 {
-    static paddr_t last_key = 0;
-    static uint32_t last_h1, last_h2; 
+    static __thread paddr_t last_key = 0;
+    static __thread uint32_t last_h1, last_h2; 
 #if 0
     extern void hashlittle2(const void *key, size_t length,
                             uint32_t *pc, uint32_t *pb);

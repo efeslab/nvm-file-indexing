@@ -20,6 +20,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <immintrin.h>
 
 #include "common/common.h"
 

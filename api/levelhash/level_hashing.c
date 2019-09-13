@@ -338,12 +338,12 @@ void level_expand(level_hash_t *level)
     for (old_idx = 0; old_idx < pow(2, level->ondev->level_size - 1); old_idx ++) {
         uint64_t i, j;
         for(i = 0; i < ASSOC_NUM; i ++){
-            if (bucket(level, 1)[old_idx].token[i] == 1)
+            if (level_bucket(level, 1)[old_idx].token[i] == 1)
             {
-                laddr_t  key   = bucket(level, 1)[old_idx].slot[i].e_key;
-                paddr_t  value = bucket(level, 1)[old_idx].slot[i].e_val;
-                size_t   size  = bucket(level, 1)[old_idx].slot[i].e_size;
-                size_t   idx   = bucket(level, 1)[old_idx].slot[i].e_idx;
+                laddr_t  key   = level_bucket(level, 1)[old_idx].slot[i].e_key;
+                paddr_t  value = level_bucket(level, 1)[old_idx].slot[i].e_val;
+                size_t   size  = level_bucket(level, 1)[old_idx].slot[i].e_size;
+                size_t   idx   = level_bucket(level, 1)[old_idx].slot[i].e_idx;
                 uint64_t f_idx = F_IDX(F_HASH(level, key), level->addr_capacity);
                 uint64_t s_idx = S_IDX(S_HASH(level, key), level->addr_capacity);
 
@@ -386,7 +386,7 @@ void level_expand(level_hash_t *level)
                 }
                
                 /*
-                bucket(level, 1)[old_idx].token[i] = 0;
+                level_bucket(level, 1)[old_idx].token[i] = 0;
                 int oerr = mark_bucket_dirty(level, 1, old_idx);
                 if_then_panic(oerr, "couldn't write!");
                 */
@@ -463,7 +463,7 @@ void level_shrink(level_hash_t *level)
     level_bucket_t *newBuckets = ((level_bucket_t*)(level->dev_ptr 
                 + (new_buckets_paddr * level->block_size)));
 
-    level_bucket_t *interimBuckets = bucket(level, 0);
+    level_bucket_t *interimBuckets = level_bucket(level, 0);
 
     level->ondev->level_item_num[0] = level->ondev->level_item_num[1];
     level->ondev->level_item_num[1] = 0;
@@ -546,12 +546,12 @@ size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
                     INCR_STAT(&level_stats, nchecked);
                 }
 
-                if (bucket(level, i)[f_idx].token[j] == 1 &&
-                    bucket(level, i)[f_idx].slot[j].e_key == key)
+                if (level_bucket(level, i)[f_idx].token[j] == 1 &&
+                    level_bucket(level, i)[f_idx].slot[j].e_key == key)
                 {
-                    *value = bucket(level, i)[f_idx].slot[j].e_val;
+                    *value = level_bucket(level, i)[f_idx].slot[j].e_val;
                     if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
-                    return bucket(level, i)[f_idx].slot[j].e_size;
+                    return level_bucket(level, i)[f_idx].slot[j].e_size;
                 }
 
                 if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
@@ -569,12 +569,12 @@ size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
                     INCR_STAT(&level_stats, nchecked);
                 }
 
-                if (bucket(level, i)[s_idx].token[j] == 1 &&
-                    bucket(level, i)[s_idx].slot[j].e_key == key) 
+                if (level_bucket(level, i)[s_idx].token[j] == 1 &&
+                    level_bucket(level, i)[s_idx].slot[j].e_key == key) 
                 {
-                    *value = bucket(level, i)[s_idx].slot[j].e_val;
+                    *value = level_bucket(level, i)[s_idx].slot[j].e_val;
                     if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
-                    return bucket(level, i)[s_idx].slot[j].e_size;
+                    return level_bucket(level, i)[s_idx].slot[j].e_size;
                 }
 
                 if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
@@ -597,12 +597,12 @@ size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
                     INCR_STAT(&level_stats, nchecked);
                 }
 
-                if (bucket(level, i-1)[f_idx].token[j] == 1 &&
-                    bucket(level, i-1)[f_idx].slot[j].e_key == key)
+                if (level_bucket(level, i-1)[f_idx].token[j] == 1 &&
+                    level_bucket(level, i-1)[f_idx].slot[j].e_key == key)
                 {
-                    *value = bucket(level, i-1)[f_idx].slot[j].e_val;
+                    *value = level_bucket(level, i-1)[f_idx].slot[j].e_val;
                     if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
-                    return bucket(level, i-1)[f_idx].slot[j].e_size;
+                    return level_bucket(level, i-1)[f_idx].slot[j].e_size;
                 }
 
                 if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
@@ -617,12 +617,12 @@ size_t level_dynamic_query(level_hash_t *level, laddr_t key, paddr_t *value)
                     INCR_STAT(&level_stats, nchecked);
                 }
 
-                if (bucket(level, i-1)[s_idx].token[j] == 1 &&
-                    bucket(level, i-1)[s_idx].slot[j].e_key == key)
+                if (level_bucket(level, i-1)[s_idx].token[j] == 1 &&
+                    level_bucket(level, i-1)[s_idx].slot[j].e_key == key)
                 {
-                    *value = bucket(level, i-1)[s_idx].slot[j].e_val;
+                    *value = level_bucket(level, i-1)[s_idx].slot[j].e_val;
                     if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
-                    return bucket(level, i-1)[s_idx].slot[j].e_size;
+                    return level_bucket(level, i-1)[s_idx].slot[j].e_size;
                 }
 
                 if (level->enable_stats) UPDATE_TIMING(&level_stats, per_read);
@@ -660,11 +660,11 @@ size_t level_static_query(level_hash_t *level, laddr_t key, paddr_t *value)
         if (f_err) return 0;
         for(j = 0; j < ASSOC_NUM; j ++){
             if (level->enable_stats) INCR_STAT(&level_stats, nchecked);
-            if (bucket(level, i)[f_idx].token[j] == 1 &&
-                bucket(level, i)[f_idx].slot[j].e_key == key)
+            if (level_bucket(level, i)[f_idx].token[j] == 1 &&
+                level_bucket(level, i)[f_idx].slot[j].e_key == key)
             {
-                *value = bucket(level, i)[f_idx].slot[j].e_val;
-                return bucket(level, i)[f_idx].slot[j].e_size;
+                *value = level_bucket(level, i)[f_idx].slot[j].e_val;
+                return level_bucket(level, i)[f_idx].slot[j].e_size;
             }
         }
 
@@ -672,11 +672,11 @@ size_t level_static_query(level_hash_t *level, laddr_t key, paddr_t *value)
         if (s_err) return 0;
         for (j = 0; j < ASSOC_NUM; j++) {
             if (level->enable_stats) INCR_STAT(&level_stats, nchecked);
-            if (bucket(level, i)[s_idx].token[j] == 1 &&
-                bucket(level, i)[s_idx].slot[j].e_key == key)
+            if (level_bucket(level, i)[s_idx].token[j] == 1 &&
+                level_bucket(level, i)[s_idx].slot[j].e_key == key)
             {
-                *value = bucket(level, i)[s_idx].slot[j].e_val;
-                return bucket(level, i)[s_idx].slot[j].e_size;
+                *value = level_bucket(level, i)[s_idx].slot[j].e_val;
+                return level_bucket(level, i)[s_idx].slot[j].e_size;
             }
         }
         f_idx = F_IDX(f_hash, level->addr_capacity / 2);
@@ -703,31 +703,31 @@ uint8_t level_delete(level_hash_t *level, laddr_t key,
     uint64_t i, j;
     for(i = 0; i < 2; i ++){
         for(j = 0; j < ASSOC_NUM; j ++){
-            if (bucket(level, i)[f_idx].token[j] == 1 && 
-                bucket(level, i)[f_idx].slot[j].e_key ==  key)
+            if (level_bucket(level, i)[f_idx].token[j] == 1 && 
+                level_bucket(level, i)[f_idx].slot[j].e_key ==  key)
             {
-                *old_val  = bucket(level, i)[f_idx].slot[j].e_val;
-                *old_idx  = bucket(level, i)[f_idx].slot[j].e_idx;
-                *old_size = bucket(level, i)[f_idx].slot[j].e_size;
-                bucket(level, i)[f_idx].token[j] = 0;
+                *old_val  = level_bucket(level, i)[f_idx].slot[j].e_val;
+                *old_idx  = level_bucket(level, i)[f_idx].slot[j].e_idx;
+                *old_size = level_bucket(level, i)[f_idx].slot[j].e_size;
+                level_bucket(level, i)[f_idx].token[j] = 0;
                 level->ondev->level_item_num[i] --;
 
-                nvm_persist_struct(bucket(level, i)[f_idx].token[j]);
+                nvm_persist_struct(level_bucket(level, i)[f_idx].token[j]);
                 nvm_persist_struct_ptr(level->ondev);
                 return 0;
             }
         }
         for(j = 0; j < ASSOC_NUM; j ++){
-            if (bucket(level, i)[s_idx].token[j] == 1 &&
-                bucket(level, i)[s_idx].slot[j].e_key == key)
+            if (level_bucket(level, i)[s_idx].token[j] == 1 &&
+                level_bucket(level, i)[s_idx].slot[j].e_key == key)
             {
-                *old_val  = bucket(level, i)[s_idx].slot[j].e_val;
-                *old_idx  = bucket(level, i)[s_idx].slot[j].e_idx;
-                *old_size = bucket(level, i)[s_idx].slot[j].e_size;
-                bucket(level, i)[s_idx].token[j] = 0;
+                *old_val  = level_bucket(level, i)[s_idx].slot[j].e_val;
+                *old_idx  = level_bucket(level, i)[s_idx].slot[j].e_idx;
+                *old_size = level_bucket(level, i)[s_idx].slot[j].e_size;
+                level_bucket(level, i)[s_idx].token[j] = 0;
                 level->ondev->level_item_num[i] --;
 
-                nvm_persist_struct(bucket(level, i)[s_idx].token[j]);
+                nvm_persist_struct(level_bucket(level, i)[s_idx].token[j]);
                 nvm_persist_struct_ptr(level->ondev);
                 return 0;
             }
@@ -757,12 +757,12 @@ uint8_t level_update(level_hash_t *level, laddr_t key,
         int f_err = ensure_bucket_uptodate(level, i, f_idx);
         if (f_err) return 1;
         for(j = 0; j < ASSOC_NUM; j ++){
-            if (bucket(level, i)[f_idx].token[j] == 1 &&
-                bucket(level, i)[f_idx].slot[j].e_key == key)
+            if (level_bucket(level, i)[f_idx].token[j] == 1 &&
+                level_bucket(level, i)[f_idx].slot[j].e_key == key)
             {
-                bucket(level, i)[f_idx].slot[j].e_size = new_size;
-                bucket(level, i)[f_idx].slot[j].e_idx  = new_idx;
-                nvm_persist_struct(bucket(level, i)[f_idx].slot[j]);
+                level_bucket(level, i)[f_idx].slot[j].e_size = new_size;
+                level_bucket(level, i)[f_idx].slot[j].e_idx  = new_idx;
+                nvm_persist_struct(level_bucket(level, i)[f_idx].slot[j]);
 
                 return 0;
             }
@@ -770,12 +770,12 @@ uint8_t level_update(level_hash_t *level, laddr_t key,
         int s_err = ensure_bucket_uptodate(level, i, s_idx);
         if (s_err) return 1;
         for(j = 0; j < ASSOC_NUM; j ++){
-            if (bucket(level, i)[s_idx].token[j] == 1 &&
-                bucket(level, i)[s_idx].slot[j].e_key == key)
+            if (level_bucket(level, i)[s_idx].token[j] == 1 &&
+                level_bucket(level, i)[s_idx].slot[j].e_key == key)
             {
-                bucket(level, i)[s_idx].slot[j].e_size = new_size;
-                bucket(level, i)[s_idx].slot[j].e_idx  = new_idx;
-                nvm_persist_struct(bucket(level, i)[s_idx].slot[j]);
+                level_bucket(level, i)[s_idx].slot[j].e_size = new_size;
+                level_bucket(level, i)[s_idx].slot[j].e_idx  = new_idx;
+                nvm_persist_struct(level_bucket(level, i)[s_idx].slot[j]);
 
                 return 0;
             }
@@ -812,15 +812,15 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value,
 
             int f_err = ensure_bucket_uptodate(level, i, f_idx);
             if (f_err) return 1;
-            if (bucket(level, i)[f_idx].token[j] == 0) {
-                bucket(level, i)[f_idx].slot[j].e_key  = key;
-                bucket(level, i)[f_idx].slot[j].e_val  = value;
-                bucket(level, i)[f_idx].slot[j].e_size = size;
-                bucket(level, i)[f_idx].slot[j].e_idx  = idx;
-                bucket(level, i)[f_idx].token[j] = 1;
+            if (level_bucket(level, i)[f_idx].token[j] == 0) {
+                level_bucket(level, i)[f_idx].slot[j].e_key  = key;
+                level_bucket(level, i)[f_idx].slot[j].e_val  = value;
+                level_bucket(level, i)[f_idx].slot[j].e_size = size;
+                level_bucket(level, i)[f_idx].slot[j].e_idx  = idx;
+                level_bucket(level, i)[f_idx].token[j] = 1;
                 level->ondev->level_item_num[i] ++;
                 
-                nvm_persist_struct(bucket(level, i)[f_idx]);
+                nvm_persist_struct(level_bucket(level, i)[f_idx]);
                 nvm_persist_struct_ptr(level->ondev);
 
                 return 0;
@@ -829,16 +829,16 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value,
             if (level->enable_stats) INCR_STAT(&level_stats, nchecked_create);
             int s_err = ensure_bucket_uptodate(level, i, s_idx);
             if (s_err) return 1;
-            if (bucket(level, i)[s_idx].token[j] == 0) {
+            if (level_bucket(level, i)[s_idx].token[j] == 0) {
 
-                bucket(level, i)[s_idx].slot[j].e_key  = key;
-                bucket(level, i)[s_idx].slot[j].e_val  = value;
-                bucket(level, i)[s_idx].slot[j].e_size = size;
-                bucket(level, i)[s_idx].slot[j].e_idx  = idx;
-                bucket(level, i)[s_idx].token[j] = 1;
+                level_bucket(level, i)[s_idx].slot[j].e_key  = key;
+                level_bucket(level, i)[s_idx].slot[j].e_val  = value;
+                level_bucket(level, i)[s_idx].slot[j].e_size = size;
+                level_bucket(level, i)[s_idx].slot[j].e_idx  = idx;
+                level_bucket(level, i)[s_idx].token[j] = 1;
                 level->ondev->level_item_num[i] ++;
                 
-                nvm_persist_struct(bucket(level, i)[s_idx]);
+                nvm_persist_struct(level_bucket(level, i)[s_idx]);
                 nvm_persist_struct_ptr(level->ondev);
 
                 return 0;
@@ -867,14 +867,14 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value,
     if(level->level_expand_time > 0){
         empty_location = b2t_movement(level, f_idx);
         if (empty_location != -1) {
-            bucket(level, 1)[f_idx].slot[empty_location].e_key  = key;
-            bucket(level, 1)[f_idx].slot[empty_location].e_val  = value;
-            bucket(level, 1)[f_idx].slot[empty_location].e_size = size;
-            bucket(level, 1)[f_idx].slot[empty_location].e_idx  = idx;
-            bucket(level, 1)[f_idx].token[empty_location] = 1;
+            level_bucket(level, 1)[f_idx].slot[empty_location].e_key  = key;
+            level_bucket(level, 1)[f_idx].slot[empty_location].e_val  = value;
+            level_bucket(level, 1)[f_idx].slot[empty_location].e_size = size;
+            level_bucket(level, 1)[f_idx].slot[empty_location].e_idx  = idx;
+            level_bucket(level, 1)[f_idx].token[empty_location] = 1;
             level->ondev->level_item_num[1] ++;
 
-            nvm_persist_struct(bucket(level, 1)[f_idx]);
+            nvm_persist_struct(level_bucket(level, 1)[f_idx]);
             nvm_persist_struct_ptr(level->ondev);
 
             return 0;
@@ -882,14 +882,14 @@ uint8_t level_insert(level_hash_t *level, laddr_t key, paddr_t value,
 
         empty_location = b2t_movement(level, s_idx);
         if (empty_location != -1) {
-            bucket(level, 1)[s_idx].slot[empty_location].e_key  = key;
-            bucket(level, 1)[s_idx].slot[empty_location].e_val  = value;
-            bucket(level, 1)[s_idx].slot[empty_location].e_size = size;
-            bucket(level, 1)[s_idx].slot[empty_location].e_idx  = idx;
-            bucket(level, 1)[s_idx].token[empty_location] = 1;
+            level_bucket(level, 1)[s_idx].slot[empty_location].e_key  = key;
+            level_bucket(level, 1)[s_idx].slot[empty_location].e_val  = value;
+            level_bucket(level, 1)[s_idx].slot[empty_location].e_size = size;
+            level_bucket(level, 1)[s_idx].slot[empty_location].e_idx  = idx;
+            level_bucket(level, 1)[s_idx].token[empty_location] = 1;
             level->ondev->level_item_num[1] ++;
 
-            nvm_persist_struct(bucket(level, 1)[s_idx]);
+            nvm_persist_struct(level_bucket(level, 1)[s_idx]);
             nvm_persist_struct_ptr(level->ondev);
 
             return 0;
@@ -909,10 +909,10 @@ uint8_t try_movement(level_hash_t *level, uint64_t idx, uint64_t level_num,
     uint64_t i, j, jdx;
 
     for(i = 0; i < ASSOC_NUM; i ++){
-        laddr_t  m_key   = bucket(level, level_num)[idx].slot[i].e_key;
-        paddr_t  m_value = bucket(level, level_num)[idx].slot[i].e_val;
-        size_t   m_size  = bucket(level, level_num)[idx].slot[i].e_size;
-        size_t   m_idx   = bucket(level, level_num)[idx].slot[i].e_idx;
+        laddr_t  m_key   = level_bucket(level, level_num)[idx].slot[i].e_key;
+        paddr_t  m_value = level_bucket(level, level_num)[idx].slot[i].e_val;
+        size_t   m_size  = level_bucket(level, level_num)[idx].slot[i].e_size;
+        size_t   m_idx   = level_bucket(level, level_num)[idx].slot[i].e_idx;
         uint64_t f_hash = F_HASH(level, m_key);
         uint64_t s_hash = S_HASH(level, m_key);
         uint64_t f_idx = F_IDX(f_hash, level->addr_capacity/(1+level_num));
@@ -925,24 +925,24 @@ uint8_t try_movement(level_hash_t *level, uint64_t idx, uint64_t level_num,
         }
 
         for(j = 0; j < ASSOC_NUM; j ++) {
-            if (bucket(level, level_num)[jdx].token[j] == 0) {
-                bucket(level, level_num)[jdx].slot[j].e_key  = m_key;
-                bucket(level, level_num)[jdx].slot[j].e_val  = m_value;
-                bucket(level, level_num)[jdx].slot[j].e_size = m_size;
-                bucket(level, level_num)[jdx].slot[j].e_idx  = m_idx;
-                bucket(level, level_num)[jdx].token[j] = 1;
-                bucket(level, level_num)[idx].token[i] = 0;
+            if (level_bucket(level, level_num)[jdx].token[j] == 0) {
+                level_bucket(level, level_num)[jdx].slot[j].e_key  = m_key;
+                level_bucket(level, level_num)[jdx].slot[j].e_val  = m_value;
+                level_bucket(level, level_num)[jdx].slot[j].e_size = m_size;
+                level_bucket(level, level_num)[jdx].slot[j].e_idx  = m_idx;
+                level_bucket(level, level_num)[jdx].token[j] = 1;
+                level_bucket(level, level_num)[idx].token[i] = 0;
                 // The movement is finished and then the new item is inserted
 
-                bucket(level, level_num)[idx].slot[i].e_key  = key;
-                bucket(level, level_num)[idx].slot[i].e_val  = value;
-                bucket(level, level_num)[idx].slot[i].e_size = size;
-                bucket(level, level_num)[idx].slot[i].e_idx  = p_idx;
-                bucket(level, level_num)[idx].token[i] = 1;
+                level_bucket(level, level_num)[idx].slot[i].e_key  = key;
+                level_bucket(level, level_num)[idx].slot[i].e_val  = value;
+                level_bucket(level, level_num)[idx].slot[i].e_size = size;
+                level_bucket(level, level_num)[idx].slot[i].e_idx  = p_idx;
+                level_bucket(level, level_num)[idx].token[i] = 1;
                 level->ondev->level_item_num[level_num] ++;
 
-                nvm_persist_struct(bucket(level, level_num)[idx]);
-                nvm_persist_struct(bucket(level, level_num)[jdx]);
+                nvm_persist_struct(level_bucket(level, level_num)[idx]);
+                nvm_persist_struct(level_bucket(level, level_num)[jdx]);
                 nvm_persist_struct_ptr(level->ondev);
                 
                 return 0;
@@ -967,43 +967,43 @@ int b2t_movement(level_hash_t *level, uint64_t idx)
     
     uint64_t i, j;
     for(i = 0; i < ASSOC_NUM; i ++){
-        key   = bucket(level, 1)[idx].slot[i].e_key;
-        value = bucket(level, 1)[idx].slot[i].e_val;
-        size  = bucket(level, 1)[idx].slot[i].e_size;
-        p_idx = bucket(level, 1)[idx].slot[i].e_idx;
+        key   = level_bucket(level, 1)[idx].slot[i].e_key;
+        value = level_bucket(level, 1)[idx].slot[i].e_val;
+        size  = level_bucket(level, 1)[idx].slot[i].e_size;
+        p_idx = level_bucket(level, 1)[idx].slot[i].e_idx;
         f_hash = F_HASH(level, key);
         s_hash = S_HASH(level, key);  
         f_idx = F_IDX(f_hash, level->addr_capacity);
         s_idx = S_IDX(s_hash, level->addr_capacity);
     
         for(j = 0; j < ASSOC_NUM; j ++) {
-            if (bucket(level, 0)[f_idx].token[j] == 0) {
-                bucket(level, 0)[f_idx].slot[j].e_key  = key;
-                bucket(level, 0)[f_idx].slot[j].e_val  = value;
-                bucket(level, 0)[f_idx].slot[j].e_size = size;
-                bucket(level, 0)[f_idx].slot[j].e_idx  = p_idx;
-                bucket(level, 0)[f_idx].token[j] = 1;
-                bucket(level, 1)[idx].token[i] = 0;
+            if (level_bucket(level, 0)[f_idx].token[j] == 0) {
+                level_bucket(level, 0)[f_idx].slot[j].e_key  = key;
+                level_bucket(level, 0)[f_idx].slot[j].e_val  = value;
+                level_bucket(level, 0)[f_idx].slot[j].e_size = size;
+                level_bucket(level, 0)[f_idx].slot[j].e_idx  = p_idx;
+                level_bucket(level, 0)[f_idx].token[j] = 1;
+                level_bucket(level, 1)[idx].token[i] = 0;
                 level->ondev->level_item_num[0] ++;
                 level->ondev->level_item_num[1] --;
 
-                nvm_persist_struct(bucket(level, 0)[f_idx]);
-                nvm_persist_struct(bucket(level, 1)[idx]);
+                nvm_persist_struct(level_bucket(level, 0)[f_idx]);
+                nvm_persist_struct(level_bucket(level, 1)[idx]);
                 nvm_persist_struct_ptr(level->ondev);
 
                 return i;
-            } else if (bucket(level, 0)[s_idx].token[j] == 0) {
-                bucket(level, 0)[s_idx].slot[j].e_key  = key;
-                bucket(level, 0)[s_idx].slot[j].e_val  = value;
-                bucket(level, 0)[s_idx].slot[j].e_size = size;
-                bucket(level, 0)[s_idx].slot[j].e_idx  = p_idx;
-                bucket(level, 0)[s_idx].token[j] = 1;
-                bucket(level, 1)[idx].token[i] = 0;
+            } else if (level_bucket(level, 0)[s_idx].token[j] == 0) {
+                level_bucket(level, 0)[s_idx].slot[j].e_key  = key;
+                level_bucket(level, 0)[s_idx].slot[j].e_val  = value;
+                level_bucket(level, 0)[s_idx].slot[j].e_size = size;
+                level_bucket(level, 0)[s_idx].slot[j].e_idx  = p_idx;
+                level_bucket(level, 0)[s_idx].token[j] = 1;
+                level_bucket(level, 1)[idx].token[i] = 0;
                 level->ondev->level_item_num[0] ++;
                 level->ondev->level_item_num[1] --;
 
-                nvm_persist_struct(bucket(level, 0)[s_idx]);
-                nvm_persist_struct(bucket(level, 1)[idx]);
+                nvm_persist_struct(level_bucket(level, 0)[s_idx]);
+                nvm_persist_struct(level_bucket(level, 1)[idx]);
                 nvm_persist_struct_ptr(level->ondev);
 
                 return i;

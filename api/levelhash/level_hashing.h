@@ -113,7 +113,7 @@ typedef struct level_hash {            // A Level hash table
 
 #define level_block(l, w) ((l)->ondev->dev_levels[w])
 #define level_offset(l, w) (level_block(l, w) * (l)->block_size)
-#define bucket(l, w) ((level_bucket_t*)((l)->dev_ptr + level_offset(l, w)))
+#define level_bucket(l, w) ((level_bucket_t*)((l)->dev_ptr + level_offset(l, w)))
 
 int read_metadata(const idx_spec_t *idx_spec, 
                   const paddr_range_t *loc, 

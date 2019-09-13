@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include "common/common.h"
+#include <pthread.h>
 
 /*******************************************************************************
  * Section: Regular extent tree data types.
