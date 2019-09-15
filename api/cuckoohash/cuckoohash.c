@@ -80,6 +80,20 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
 /*
  * Returns 0 if found, or -errno otherwise.
  */
+ssize_t cuckoohash_lookup_parallel(idx_struct_t *idx_struct, inum_t inum,
+                         laddr_t laddr, size_t max, paddr_t* paddr) {
+    CUCKOOHASH(idx_struct, ht);
+
+    hash_key_t k = MAKECUCKOOKEY(inum, laddr);
+    int err = cuckoo_hash_lookup_parallel(ht, k, paddr, 8);
+    if (err) return err;
+
+    return -ENOENT;
+}
+
+/*
+ * Returns 0 if found, or -errno otherwise.
+ */
 ssize_t cuckoohash_lookup(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t max, paddr_t* paddr) {
     CUCKOOHASH(idx_struct, ht);
@@ -201,6 +215,7 @@ idx_fns_t cuckoohash_fns = {
     .im_init               = cuckoohash_initialize,
     .im_init_prealloc      = NULL,
     .im_lookup             = cuckoohash_lookup,
+    .im_lookup_parallel    = cuckoohash_lookup_parallel,
     .im_create             = cuckoohash_create,
     .im_remove             = cuckoohash_remove,
 

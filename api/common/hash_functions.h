@@ -2,6 +2,8 @@
 #define __NVM_IDX_HASH_FUNCTIONS_H__
 
 #include <stdint.h>
+#include <emmintrin.h>
+#include <immintrin.h>
 
 #include "common/common.h"
 #include "xxhash.h"
@@ -82,4 +84,69 @@ static inline laddr_t nvm_xxhash(paddr_t v) {
     return (laddr_t)XXH32(&v, sizeof(v), seed);
 }
 
+// SIMD stuff
+
+typedef union {__m512i vec; uint64_t arr[8];} u512i_64_t;
+typedef union {__m256i vec; uint32_t arr[8];} u256i_32_t;
+
+static
+void print_vec64(u512i_64_t *a)
+{
+    for (int i = 0; i < 8; ++i) {
+        printf("[%d] %lu\n", i, a->arr[i]);
+    }
+}
+
+static
+void print_vec32(u256i_32_t *a)
+{
+    for (int i = 0; i < 8; ++i) {
+        printf("[%d] %u\n", i, a->arr[i]);
+    }
+}
+
+static inline
+void mod_simd32(uint32_t mod, u256i_32_t *vals, u256i_32_t *ret) {
+  for(int i = 0; i < 8; ++i) {
+    ret->arr[i] = vals->arr[i] % mod;
+  }
+}
+
+static void
+mixHash_simd64_helper(__m512i *first, __m512i *second, __m512i *third, int right, uint32_t shiftCount) {
+  *first = _mm512_sub_epi64(*first, *second); //first = first - second
+  *first = _mm512_sub_epi64(*first, *third); //first = first - third
+  __m512i bsTemp;
+  if(right) {
+    bsTemp = _mm512_srli_epi64(*third, shiftCount); //>>
+  }
+  else {
+    bsTemp = _mm512_slli_epi64(*third, shiftCount); //<<
+  }
+  *first = _mm512_xor_epi64(*first, bsTemp); //first = first XOR (third (<< || >>) shiftcount)
+}
+
+
+static void mixHash_simd64(uint32_t mod, u512i_64_t *keys, u256i_32_t *node_indices) {
+  int RIGHT = 1;
+  int LEFT = 0;
+
+  __m512i a = _mm512_set1_epi64(0xff51afd7ed558ccdL);
+  __m512i b = _mm512_set1_epi64(0xc4ceb9fe1a85ec53L);
+  __m512i *c = &keys->vec;
+
+  mixHash_simd64_helper(&a, &b, c, RIGHT, 13);
+  mixHash_simd64_helper(&b, c, &a, LEFT, 8);
+  mixHash_simd64_helper(c, &a, &b, RIGHT, 13);
+  mixHash_simd64_helper(&a, &b, c, RIGHT, 12);
+  mixHash_simd64_helper(&b, c, &a, LEFT, 16);
+  mixHash_simd64_helper(c, &a, &b, RIGHT, 5);
+  mixHash_simd64_helper(&a, &b, c, RIGHT, 3);
+  mixHash_simd64_helper(&b, c, &a, LEFT, 10);
+  mixHash_simd64_helper(c, &a, &b, RIGHT, 15);
+
+  u256i_32_t hash_values;
+  hash_values.vec = _mm512_cvtepi64_epi32(*c); // direct hash with truncation to 32-bit
+  mod_simd32(mod, &hash_values, node_indices);
+}
 #endif  //__HASH_FUNCTIONS_H__

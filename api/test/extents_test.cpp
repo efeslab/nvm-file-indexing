@@ -1,5 +1,6 @@
 #include "extents_test.hpp"
 
+#include <map>
 #include <iostream>
 using namespace std;
 
@@ -126,6 +127,39 @@ TEST_P(ExtentTreeFixture, InsertDeepPersist) {
     inum_t inum   = 0;
     size_t npages = 1000;
 
+    map<laddr_t, paddr_t> mapping;
+    paddr_t prev_blk = -1;
+    for(size_t i = 0; i < npages; ++i) {
+        laddr_t lblk = (laddr_t)i;
+        paddr_t pblk;
+        ssize_t ret = extent_tree_create(&ext_idx, inum, lblk, 1, &pblk);
+        ASSERT_EQ(1, ret);
+        ASSERT_NE(prev_blk, pblk);
+        mapping[lblk] = pblk;
+
+        prev_blk = pblk;
+        device.allocate(1);
+    }
+
+    idx_struct_t new_ext = {};
+    int err = extent_tree_init(&idx_spec, &inode_space, &new_ext);
+    for(size_t i = 0; i < npages; ++i) {
+        laddr_t lblk = (laddr_t)i;
+        paddr_t pblk;
+        ssize_t ret = extent_tree_lookup(&new_ext, inum, lblk, 1, &pblk);
+        ASSERT_EQ(1, ret);
+        ASSERT_EQ(mapping[lblk], pblk);
+    }
+}
+
+TEST_P(ExtentTreeFixture, InsertDeeperPersist) {
+    inum_t inum   = 0;
+    size_t npages = 100000;
+
+    idx_struct_t new_ext = {};
+    int err = extent_tree_init(&idx_spec, &inode_space, &new_ext);
+    ASSERT_EQ(0, err);
+
     paddr_t prev_blk = -1;
     for(size_t i = 0; i < npages; ++i) {
         laddr_t lblk = (laddr_t)i;
@@ -138,8 +172,9 @@ TEST_P(ExtentTreeFixture, InsertDeepPersist) {
         device.allocate(1);
     }
 
-    idx_struct_t new_ext = {};
-    int err = extent_tree_init(&idx_spec, &inode_space, &new_ext);
+    //Should caching be enabled.
+    extent_tree_invalidate_caches(&new_ext);
+
     for(size_t i = 0; i < npages; ++i) {
         laddr_t lblk = (laddr_t)i;
         paddr_t pblk;

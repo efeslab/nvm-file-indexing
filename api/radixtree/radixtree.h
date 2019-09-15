@@ -50,6 +50,7 @@ typedef struct ondevice_radixtree_metadata {
     volatile uint32_t nentries;  
     volatile uint16_t nlevels;
     volatile uint16_t is_locked;
+    pmlock_t rwlock;
 } ondev_radix_meta_t;
 
 _Static_assert(sizeof(ondev_radix_meta_t) <= 64, "On-device metadata > 64!");

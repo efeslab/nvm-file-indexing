@@ -10,6 +10,7 @@ extern "C" {
 #include "kerncompat.h"
 #include "stats.h"
 #include "persistence.h"
+#include "pmlock.h"
 
 #ifdef __cplusplus
 }

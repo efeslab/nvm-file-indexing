@@ -441,6 +441,8 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
     if (!radix->ondev->nentries) return 0;
 
+    pmlock_rd_lock(&radix->ondev->rwlock);
+
     bool unused;
     ssize_t ret = index_and_find(radix, top_page(radix), radix->ondev->nlevels, 
                         max_ents, laddr, paddr, &unused);
@@ -452,13 +454,21 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
         ret = index_and_find(radix, top_page(radix), radix->ondev->nlevels, 
                             max_ents, laddr, paddr, &unused);
-        if (!*paddr) return -ENOENT;
+        if (!*paddr) {
+            pmlock_rd_unlock(&radix->ondev->rwlock);
+            return -ENOENT;
+        }
     }
 #else
-    if (!*paddr) return -ENOENT;
+    if (!*paddr) {
+        pmlock_rd_unlock(&radix->ondev->rwlock);
+        return -ENOENT;
+    }
 #endif
 
     inc_global_stats(radix);
+
+    pmlock_rd_unlock(&radix->ondev->rwlock);
 
     return ret;
 }
@@ -557,6 +567,8 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     if (nalloc == 0) return -ENOMEM;
     if (nalloc < 0) return nalloc;
 
+    pmlock_wr_lock(&radix->ondev->rwlock);
+
     ssize_t ninserted = 0;
     while (ninserted < nalloc) {
         laddr_t new_laddr = laddr + ninserted;
@@ -565,7 +577,11 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         int ret = index_and_insert(radix, top_page(radix), radix->ondev->nlevels, 
                                     nalloc - ninserted, new_laddr, new_paddr);
 
-        if (ret < 0) return ret;
+        if (ret < 0) {
+            pmlock_wr_unlock(&radix->ondev->rwlock);
+
+            return ret;
+        }
         if (!ret) break;
 
         ninserted += ret;
@@ -584,14 +600,20 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
                 for (laddr_t i = 0; i < RADIX_NDIRECT; ++i) {
                     int err = insert_dev_entry(radix, new_top, i, 
                                                 radix->direct_entries[i]);
-                    if (err) return err;
+                    if (err) {
+                        pmlock_wr_unlock(&radix->ondev->rwlock);
+                        return err;
+                    }
                 }
 
                 pmem_memset_persist(radix->direct_entries, 0, 
                         sizeof(*radix->direct_entries) * RADIX_NDIRECT);
             } else {
                 int err = insert_dev_entry(radix, new_top, 0, old_top);
-                if (err) return err;
+                if (err) {
+                    pmlock_wr_unlock(&radix->ondev->rwlock);
+                    return err;
+                }
             }
 
             // Instead of using a separate field, we encode this here for later
@@ -604,12 +626,14 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
             
         } else if (is_full(radix)) {
             inc_global_stats(radix);
+            pmlock_wr_unlock(&radix->ondev->rwlock);
             return ninserted ? ninserted : -ENOSPC;
         }
     }
     
     //if_then_panic(write_metadata(radix), "Could not update metadata!");
     inc_global_stats(radix);
+    pmlock_wr_unlock(&radix->ondev->rwlock);
     return nalloc;
 }
 
@@ -692,10 +716,15 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         panic("Bad arguments to remove");
     }
 
+    pmlock_wr_lock(&radix->ondev->rwlock);
+
     ssize_t ret = index_and_remove(radix, top_page(radix), radix->ondev->nlevels, 
                                    npages, laddr);
 
-    if (ret <= 0) return ret;
+    if (ret <= 0) {
+        pmlock_wr_unlock(&radix->ondev->rwlock);
+        return ret;
+    }
 
     radix->ondev->nentries -= ret;
     nvm_persist_struct_ptr(radix->ondev);
@@ -707,7 +736,10 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
             top_page(radix) = 0;
         } else {
             int err = lookup_dev_entry(radix, top_page(radix), 0, &(top_page(radix)));
-            if (err) return err;
+            if (err) {
+                pmlock_wr_unlock(&radix->ondev->rwlock);
+                return err;
+            }
         }
 
         ssize_t dealloc_ret = CB(radix, cb_dealloc_data, 1, old_top);
@@ -720,6 +752,7 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     //if_then_panic(write_metadata(radix), "Could not update metadata!");
 
     inc_global_stats(radix);
+    pmlock_wr_unlock(&radix->ondev->rwlock);
     return ret;
 }
 

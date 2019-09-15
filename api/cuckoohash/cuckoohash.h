@@ -33,6 +33,8 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
 
 ssize_t cuckoohash_lookup(idx_struct_t *idx_struct, inum_t inum,
                           laddr_t laddr, size_t max, paddr_t* paddr);
+ssize_t cuckoohash_lookup_parallel(idx_struct_t *idx_struct, inum_t inum,
+                         laddr_t laddr, size_t max, paddr_t* paddr);
 
 ssize_t cuckoohash_remove(idx_struct_t *idx_struct,
                           inum_t inum, laddr_t laddr, size_t size);

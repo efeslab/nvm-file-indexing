@@ -23,6 +23,7 @@
 #include <immintrin.h>
 
 #include "common/common.h"
+#include "common/hash_functions.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,10 +45,18 @@ typedef struct cuckoo_hash_item {
 } cuckoo_item_t;
 
 typedef struct cuckoo_hash_elem {
-    cuckoo_item_t hash_item;
+    //cuckoo_item_t hash_item;
     // 8
     //uint32_t hash1;
     //uint32_t hash2;
+    // 8
+    paddr_t key;
+    // 2
+    uint8_t index;
+    uint8_t range;
+    // 6
+    uint16_t value_hi;
+    uint32_t value_lo;
 } cuckoo_elem_t;
 
 #define sz sizeof(cuckoo_elem_t)
@@ -62,10 +71,11 @@ typedef struct cuckoo_meta {
     uint32_t magic;
     paddr_t elem_start_blk;
     size_t max_size;
+    pmlock_t rwlock;
 } nvm_cuckoo_metadata_t;
 
 typedef struct cuckoo_hash {
-    nvm_cuckoo_metadata_t meta;
+    nvm_cuckoo_metadata_t *meta;
     cuckoo_elem_t *table;
     bool do_stats;
     bool compact_idx;
@@ -143,6 +153,9 @@ int
 cuckoo_hash_lookup(const struct cuckoo_hash *hash,
                    paddr_t key, paddr_t *value, uint32_t *size);
 
+int
+cuckoo_hash_lookup_parallel(const struct cuckoo_hash *hash,
+                            paddr_t key, paddr_t *values, size_t nr);
 /*
   cuckoo_hash_lookup(hash, key, key_len):
 
