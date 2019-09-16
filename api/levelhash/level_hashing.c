@@ -265,6 +265,8 @@ level_hash_t *level_init(const idx_spec_t *idx_spec,
 
     if (!already_exists) {
         level->ondev->level_size = level_size;
+        level->ondev->dev_sizes[0] = top_blocks;
+        level->ondev->dev_sizes[1] = bot_blocks;
 
         paddr_t top_block_start;
         ssize_t top_blocks_alloced = CB(idx_spec, cb_alloc_metadata,
@@ -401,9 +403,10 @@ void level_expand(level_hash_t *level)
         FREE(level->idx_spec, level->buckets[1]);
         FREE(level->idx_spec, level->cache_state[1]);
     }
+
     ssize_t freed = CB(level->idx_spec, cb_dealloc_metadata,
-                       level->dev_sizes[1], level->dev_levels[1]); 
-    if_then_panic(freed != level->dev_sizes[1], "could not free metadata!");
+                       level->ondev->dev_sizes[1], level->ondev->dev_levels[1]); 
+    if_then_panic(freed != level->ondev->dev_sizes[1], "could not free metadata!");
 
     level->ondev->dev_levels[1] = level->ondev->dev_levels[0];
     level->ondev->dev_levels[0] = new_buckets_paddr;
