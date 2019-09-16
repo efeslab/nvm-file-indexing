@@ -90,6 +90,8 @@ cuckoo_hash_init(nvm_cuckoo_idx_t **ht, paddr_t meta_block,
         nvm_persist_struct_ptr(hash->meta);
     }
 
+    pmem_memset_persist(&hash->meta->rwlock, 0, sizeof(hash->meta->rwlock));
+
     // See if we do compact mode:
     const char* compact_str = getenv("IDX_COMPACT");
     if (compact_str && !strcmp(compact_str, "1")) {
@@ -157,8 +159,8 @@ compute_hash_simd64(const struct cuckoo_hash *hash,
                     u256i_32_t *h1s, u256i_32_t *h2s) 
 {
     uint32_t mod = hash->meta->max_size;
-    mixHash_simd64(mod, keys1, h1s);
-    mixHash_simd64(mod, keys2, h2s);
+    nvm_mixHash_simd64(mod, keys1, h1s);
+    nvm_mixHash_simd64(mod, keys2, h2s);
 }
 
 
@@ -467,7 +469,7 @@ bool
 insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item)
 {
     DECLARE_TIMING();
-    size_t max_depth = 16;//(size_t) hash->meta.max_size;
+    size_t max_depth = 32;//(size_t) hash->meta.max_size;
 
     uint32_t mod = (uint32_t) hash->meta->max_size;
 
