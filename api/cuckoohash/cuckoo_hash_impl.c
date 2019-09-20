@@ -388,7 +388,6 @@ cuckoo_hash_remove(struct cuckoo_hash *hash, paddr_t key, paddr_t *value,
         _xend();
         tsx_success++;
     } else {
-        printf("%d\n", tsx_success);
         tsx_success = 0;
         pmlock_wr_lock(&hash->meta->rwlock);
         elem = lookup(hash, key, h1, h2);

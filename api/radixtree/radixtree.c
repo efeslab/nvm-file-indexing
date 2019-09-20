@@ -16,58 +16,6 @@ bool g_radix_do_stats;
  * Section: IO interface for radix trees.
  ******************************************************************************/
 
-static paddr_t block_number(radixtree_meta_t *radix, size_t entry_idx) {
-    size_t entry_idx_bytes = entry_idx * radix->ent_size;
-    return (paddr_t)(entry_idx_bytes / radix->blksz);
-}
-
-static paddr_t block_offset(radixtree_meta_t *radix, size_t entry_idx) {
-    size_t entry_idx_bytes = entry_idx * radix->ent_size;
-    return (paddr_t)(entry_idx_bytes % radix->blksz);
-}
-
-static int read_page(radixtree_meta_t *radix, paddr_t page, paddr_t *cache_page) 
-{
-    ssize_t ret = CB(radix, cb_read,
-                     page, 0, radix->node_nbytes, (char*)cache_page);
-
-    if (ret != radix->node_nbytes) return -EIO;
-    return 0;
-}
-
-static int read_entry(radixtree_meta_t *radix, 
-                      paddr_t page, size_t idx, paddr_t *cache_page) 
-{
-    paddr_t paddr = page + block_number(radix, idx);
-    off_t  offset = block_offset(radix, idx);
-    paddr_t *entp = cache_page + idx;
-    ssize_t   ret = CB(radix, cb_read,
-                       paddr, offset, radix->ent_size, (char*)entp);
-
-    if (ret != radix->ent_size) return -EIO;
-    return 0;
-}
-
-static int write_page(radixtree_meta_t *radix, paddr_t page, paddr_t *cache_page) {
-    ssize_t ret = CB(radix, cb_write,
-                     page, 0, radix->node_nbytes, (char*)cache_page);
-
-    if (ret != radix->node_nbytes) return -EIO;
-    return 0;
-}
-
-static int write_entry(radixtree_meta_t *radix, 
-                      paddr_t page, size_t idx, paddr_t *cache_page) {
-    paddr_t paddr = page + block_number(radix, idx);
-    off_t  offset = block_offset(radix, idx);
-    paddr_t *entp = cache_page + idx;
-    ssize_t   ret = CB(radix, cb_write,
-                       paddr, offset, radix->ent_size, (char*)entp);
-
-    if (ret != radix->ent_size) return -EIO;
-    return 0;
-}
-
 static inline int get_page(radixtree_meta_t *radix, paddr_t page, paddr_t **page_ptr) {
     ssize_t err = CB(radix, cb_get_addr,
                      page, 0, (char**)page_ptr);
@@ -135,9 +83,6 @@ static int write_metadata(radixtree_meta_t *radix) {
 /*******************************************************************************
  * Section: Radix tree setup.
  ******************************************************************************/
-
-static int create_radix_node(radixtree_meta_t *radix, paddr_t page, 
-                             int depth, radix_node_t *node);
 
 static inline paddr_t index_dev_node(radixtree_meta_t *radix, int level, 
                               paddr_t node, size_t idx) 
@@ -327,6 +272,7 @@ int radixtree_init(const idx_spec_t *idx_spec,
     radix->direct_entries = get_direct(radix);
 
     memset(radix->prev_path, 0, sizeof(radix->prev_path));
+    memset(&radix->ondev->rwlock, 0, sizeof(radix->ondev->rwlock));
 
     // Read the top page.
     #if 0
@@ -582,11 +528,12 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
             return ret;
         }
-        if (!ret) break;
 
-        ninserted += ret;
-        radix->ondev->nentries += ret;
-        nvm_persist_struct_ptr(radix->ondev);
+        if (ret) {
+            ninserted += ret;
+            radix->ondev->nentries += ret;
+            nvm_persist_struct_ptr(radix->ondev);
+        }
 
         if (is_full(radix) && can_grow(radix)) {
             paddr_t old_top = top_page(radix), new_top = 0;
@@ -628,6 +575,8 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
             inc_global_stats(radix);
             pmlock_wr_unlock(&radix->ondev->rwlock);
             return ninserted ? ninserted : -ENOSPC;
+        } else if (!ret) {
+            panic("Didn't insert anything and didn't grow!");
         }
     }
     
@@ -709,9 +658,12 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 {
     GET_RADIX(idx_struct);
 
+    // bug?
+    npages = npages > radix->ondev->nentries ? radix->ondev->nentries : npages;
+
     if (laddr + npages != radix->ondev->nentries) {
-        fprintf(stderr, "laddr + npages (%lu) != nentries (%u) "
-                "-- Cannot remove from the middle!\n", laddr + npages, 
+        fprintf(stderr, "laddr (%u) + npages (%lu) (=%lu) != nentries (%u) "
+                "-- Cannot remove from the middle!\n", laddr, npages, laddr + npages,
                 radix->ondev->nentries);
         panic("Bad arguments to remove");
     }
