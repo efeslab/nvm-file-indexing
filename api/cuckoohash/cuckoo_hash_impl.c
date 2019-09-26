@@ -207,24 +207,90 @@ lookup_parallel(const struct cuckoo_hash *hash, u512i_64_t *keys,
     mod_simd32(mod, h1, &idx1);
     mod_simd32(mod, h2, &idx2);
 
+#if 0
+    for (int i = 0; i < 8; ++i) {
+        cuckoo_elem_t *elem = bin_at(hash, (h1->arr[i] % mod));
+
+        //if (elem->hash2 == h2 && elem->hash1 == h1
+        if (elem->key == keys->arr[i]) {
+            ret->arr[i] = (uint64_t)elem;
+        }
+
+        elem = bin_at(hash, (h2->arr[i] % mod));
+        //if (elem->hash2 == h1 && elem->hash1 == h2
+        if (elem->key == keys->arr[i]) {
+            ret->arr[i] = (uint64_t)elem;
+        }
+    }
+    return;
+#endif
+
     u512i_64_t elem1, elem2, keys1, keys2;
 
     bin_at_parallel(hash, &idx1, &elem1);
     bin_at_parallel(hash, &idx2, &elem2);
 
+#if 0
+    for (int i = 0; i < 8; ++i) {
+        cuckoo_elem_t *elem = (cuckoo_elem_t*)elem1.arr[i];
+
+        //if (elem->hash2 == h2 && elem->hash1 == h1
+        if (elem->key == keys->arr[i]) {
+            ret->arr[i] = (uint64_t)elem;
+        }
+
+        elem = (cuckoo_elem_t*)elem2.arr[i];
+        //if (elem->hash2 == h1 && elem->hash1 == h2
+        if (elem->key == keys->arr[i]) {
+            ret->arr[i] = (uint64_t)elem;
+        }
+    }
+    return;
+#endif
     bin_keys_at_parallel(hash, &idx1, &keys1); 
     bin_keys_at_parallel(hash, &idx2, &keys2); 
 
+#if 0
+    for (int i = 0; i < 8; ++i) {
+        cuckoo_elem_t *elem = (cuckoo_elem_t*)elem1.arr[i];
+
+        //if (elem->hash2 == h2 && elem->hash1 == h1
+        if (keys1.arr[i] == keys->arr[i]) {
+            ret->arr[i] = (uint64_t)elem;
+        }
+
+        elem = (cuckoo_elem_t*)elem2.arr[i];
+        //if (elem->hash2 == h1 && elem->hash1 == h2
+        if (keys2.arr[i] == keys->arr[i]) {
+            ret->arr[i] = (uint64_t)elem;
+        }
+    }
+    return;
+#endif
     __mmask8 m1, m2;
 
     m1 = _mm512_cmp_epi64_mask(keys->vec, keys1.vec, 0);
     m2 = _mm512_cmp_epi64_mask(keys->vec, keys2.vec, 0);
 
-    // move to ret
-    static u512i_64_t zero = {.arr = {0,}};
-    ret->vec = zero.vec;
-    
-    ret->vec = _mm512_mask_mov_epi64(zero.vec, m1, elem1.vec);
+#if 0
+    for (int i = 0; i < 8; ++i) {
+        cuckoo_elem_t *elem = (cuckoo_elem_t*)elem1.arr[i];
+
+        //if (elem->hash2 == h2 && elem->hash1 == h1
+        if (m1 & (1 << i)) {
+            ret->arr[i] = (uint64_t)elem;
+        }
+
+        elem = (cuckoo_elem_t*)elem2.arr[i];
+        //if (elem->hash2 == h1 && elem->hash1 == h2
+        if (m2 & (1 << i)) {
+            ret->arr[i] = (uint64_t)elem;
+        }
+    }
+    return;
+#endif
+
+    ret->vec = _mm512_mask_mov_epi64(ret->vec, m1, elem1.vec);
     ret->vec = _mm512_mask_mov_epi64(ret->vec, m2, elem2.vec);
 }
 

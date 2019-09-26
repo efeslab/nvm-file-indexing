@@ -520,8 +520,8 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         laddr_t new_laddr = laddr + ninserted;
         paddr_t new_paddr = (*paddr) + ninserted;
         
-        int ret = index_and_insert(radix, top_page(radix), radix->ondev->nlevels, 
-                                    nalloc - ninserted, new_laddr, new_paddr);
+        ssize_t ret = index_and_insert(radix, top_page(radix), radix->ondev->nlevels, 
+                                       nalloc - ninserted, new_laddr, new_paddr);
 
         if (ret < 0) {
             pmlock_wr_unlock(&radix->ondev->rwlock);
@@ -537,9 +537,9 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
         if (is_full(radix) && can_grow(radix)) {
             paddr_t old_top = top_page(radix), new_top = 0;
-            ssize_t nalloc = CB(radix, cb_alloc_metadata, 
+            ssize_t nmeta = CB(radix, cb_alloc_metadata, 
                             radix->nblk_per_node, &new_top);
-            if (nalloc != radix->nblk_per_node) return -ENOMEM;
+            if (nmeta != radix->nblk_per_node) return -ENOMEM;
 
             clear_node(radix, new_top);
             
@@ -583,7 +583,7 @@ ssize_t radixtree_create(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     //if_then_panic(write_metadata(radix), "Could not update metadata!");
     inc_global_stats(radix);
     pmlock_wr_unlock(&radix->ondev->rwlock);
-    return nalloc;
+    return ninserted;
 }
 
 ssize_t index_and_remove(radixtree_meta_t *radix, paddr_t page, uint16_t level, 
@@ -665,7 +665,8 @@ ssize_t radixtree_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
         fprintf(stderr, "laddr (%u) + npages (%lu) (=%lu) != nentries (%u) "
                 "-- Cannot remove from the middle!\n", laddr, npages, laddr + npages,
                 radix->ondev->nentries);
-        panic("Bad arguments to remove");
+        //panic("Bad arguments to remove");
+        npages = radix->ondev->nentries;
     }
 
     pmlock_wr_lock(&radix->ondev->rwlock);
