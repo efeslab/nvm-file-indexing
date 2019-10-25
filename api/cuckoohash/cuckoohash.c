@@ -44,30 +44,51 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t size, paddr_t *paddr) {
     CUCKOOHASH(idx_struct, ht);
 
-    size = size > UINT8_MAX ? UINT8_MAX : size;
     ssize_t nalloc = CB(idx_struct, cb_alloc_data, size, paddr);
 
     if (nalloc < 0) {
         return -EINVAL;
     } else if (nalloc == 0) {
         return -ENOMEM;
-    }
+    } 
 
-    for (size_t blkno = 0; blkno < nalloc; ++blkno) {
-        hash_key_t k = MAKECUCKOOKEY(inum, laddr + blkno);
-        // Range: how many more logical blocks are contiguous after this one?
-        uint32_t range = (uint32_t)(nalloc - blkno);
-        // Index: how many more logical blocks are contiguous before this one?
-        uint32_t index = (uint32_t)blkno;
-        int err = cuckoo_hash_insert(ht, k, (*paddr) + blkno, index, range);
+    for (size_t chunk = 0; chunk < nalloc; chunk += UINT8_MAX) {
+        size_t chunk_sz = nalloc - chunk;
+        chunk_sz = chunk_sz > UINT8_MAX ? UINT8_MAX : chunk_sz;
 
-        if (!err) {
-            ssize_t dealloc = CB(idx_struct, cb_dealloc_data, nalloc, *paddr);
-            if_then_panic(nalloc != dealloc, "could not free data blocks!\n");
-            *paddr = 0;
-            return -EEXIST;
+        size_t prev_sz = 0;
+        for (size_t blkno = 0; blkno < chunk_sz; ++blkno) {
+            hash_key_t k = MAKECUCKOOKEY(inum, laddr + blkno + chunk);
+            // Range: how many more logical blocks are contiguous after this one?
+            uint32_t range = (uint32_t)(chunk_sz - blkno);
+            // Index: how many more logical blocks are contiguous before this one?
+            uint32_t index = (uint32_t)(blkno + prev_sz) % UINT8_MAX;
+
+            // See if we can coalesce with previous entries
+            if (blkno == 0 && chunk == 0 && laddr > 0) {
+                hash_key_t p = MAKECUCKOOKEY(inum, laddr - 1);
+                paddr_t prev; uint32_t sz;
+                int err = cuckoo_hash_lookup(ht, p, &prev, &sz);
+                if (!err && prev == *paddr - 1 && prev_sz < UINT8_MAX) {
+                    prev_sz = sz;
+                    index = (uint32_t)(blkno + prev_sz) % UINT8_MAX;
+                    size_t new_size = prev_sz + chunk_sz > UINT8_MAX ? UINT8_MAX : prev_sz + chunk_sz;
+                    err = cuckoo_hash_update(ht, p, new_size);
+                    if (err) return -ENOENT;
+                }
+            }
+
+            int err = cuckoo_hash_insert(ht, k, (*paddr) + blkno + chunk, index, range);
+
+            if (!err) {
+                ssize_t dealloc = CB(idx_struct, cb_dealloc_data, nalloc, *paddr);
+                if_then_panic(nalloc != dealloc, "could not free data blocks!\n");
+                *paddr = 0;
+                return -EEXIST;
+            }
         }
     }
+
 
     if (ht->do_stats) {
         INCR_STAT(&cstats, nwrites);

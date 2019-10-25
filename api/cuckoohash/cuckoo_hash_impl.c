@@ -26,10 +26,8 @@ nvm_cuckoo_stats_t cstats = {0,};
 
 static inline
 void
-compute_hash(paddr_t key, uint32_t *h1, uint32_t *h2, bool compact_idx)
+compute_hash(paddr_t key, uint64_t *h1, uint64_t *h2, bool compact_idx)
 {
-    static __thread paddr_t last_key = 0;
-    static __thread uint32_t last_h1, last_h2; 
 #if 0
     extern void hashlittle2(const void *key, size_t length,
                             uint32_t *pc, uint32_t *pb);
@@ -39,7 +37,9 @@ compute_hash(paddr_t key, uint32_t *h1, uint32_t *h2, bool compact_idx)
     *h2 = 0x6d7839d0;
     // TODO: might be inefficient
     hashlittle2(&key, sizeof(key), h1, h2);
-#elif 1
+#elif 0
+    static __thread paddr_t last_key = 0;
+    static __thread uint32_t last_h1, last_h2; 
     if (compact_idx) {
         *h1 = key == last_key ? last_h1 : (uint32_t)(key);
         *h2 = key == last_key ? last_h2 : (uint32_t)(key + 1);
@@ -50,6 +50,11 @@ compute_hash(paddr_t key, uint32_t *h1, uint32_t *h2, bool compact_idx)
     last_h1 = *h1;
     last_h2 = *h2;
     last_key = key;
+#elif 1
+	//*h1 = mix(key);
+	//*h2 = mix(~key);
+	*h1 = hash64_64(key);
+	*h2 = hash64_64(~key);
 #endif
     if (*h1 == *h2) {
         *h2 = ~*h2;
@@ -68,6 +73,9 @@ cuckoo_hash_init(nvm_cuckoo_idx_t **ht, paddr_t meta_block,
     // Read metadata to see if it exists or not.
     ssize_t err = CB(idx_spec, cb_get_addr, meta_block, 0, (char**)&(hash->meta));
     if (err) return err;
+
+    // Avoid conflicts
+    max_entries *= 2.5;
 
     if (hash->meta->magic != CUCKOO_MAGIC) {
         device_info_t devinfo;
@@ -130,23 +138,25 @@ bin_at(const struct cuckoo_hash *hash, uint32_t index)
 
 static inline
 struct cuckoo_hash_elem *
-lookup(const struct cuckoo_hash *hash, paddr_t key, uint32_t h1, uint32_t h2)
+lookup(const struct cuckoo_hash *hash, paddr_t key, uint64_t h1, uint64_t h2)
 {
-    uint32_t mod = hash->meta->max_size;
+    uint64_t mod = (uint64_t)hash->meta->max_size;
 
-    struct cuckoo_hash_elem *elem = NULL;
+    struct cuckoo_hash_elem *elem1 = NULL, *elem2 = NULL;
 
-    elem = bin_at(hash, (h1 % mod));
+    elem1 = bin_at(hash, (h1 % mod));
 
     //if (elem->hash2 == h2 && elem->hash1 == h1
-    if (elem->key == key) {
-        return elem;
+    if (elem1->key == key) {
+        if (hash->do_stats) cstats.nbuckets_checked++;
+        return elem1;
     }
 
-    elem = bin_at(hash, (h2 % mod));
+    elem2 = bin_at(hash, (h2 % mod));
     //if (elem->hash2 == h1 && elem->hash1 == h2
-    if (elem->key == key) {
-        return elem;
+    if (elem2->key == key) {
+        if (hash->do_stats) cstats.nbuckets_checked++;
+        return elem2;
     }
 
     return NULL;
@@ -154,13 +164,17 @@ lookup(const struct cuckoo_hash *hash, paddr_t key, uint32_t h1, uint32_t h2)
 
 static inline
 void
-compute_hash_simd64(const struct cuckoo_hash *hash,
-                    u512i_64_t *keys1, u512i_64_t *keys2,
-                    u256i_32_t *h1s, u256i_32_t *h2s) 
+compute_hash_simd64(u512i_64_t *keys1, u512i_64_t *keys2,
+                    u512i_64_t *h1s, u512i_64_t *h2s) 
 {
+#if 0
     uint32_t mod = hash->meta->max_size;
     nvm_mixHash_simd64(mod, keys1, h1s);
     nvm_mixHash_simd64(mod, keys2, h2s);
+#else
+    hash64_simd64(keys1, h1s);
+    hash64_simd64(keys2, h2s);
+#endif
 }
 
 
@@ -195,100 +209,31 @@ bin_keys_at_parallel(const struct cuckoo_hash *hash,
                                 sz.vec), hash->table, 1);
 }
 
-static inline
+static 
 void
 lookup_parallel(const struct cuckoo_hash *hash, u512i_64_t *keys,
-                u256i_32_t *h1, u256i_32_t *h2, u512i_64_t *ret)
+                u512i_64_t *h1, u512i_64_t *h2, u512i_64_t *ret)
 {
-    uint32_t mod = hash->meta->max_size;
+    printf("lookup_parallel\n");
+    uint64_t mod = (uint64_t)hash->meta->max_size;
 
     u256i_32_t idx1, idx2;
 
     mod_simd32(mod, h1, &idx1);
     mod_simd32(mod, h2, &idx2);
 
-#if 0
-    for (int i = 0; i < 8; ++i) {
-        cuckoo_elem_t *elem = bin_at(hash, (h1->arr[i] % mod));
-
-        //if (elem->hash2 == h2 && elem->hash1 == h1
-        if (elem->key == keys->arr[i]) {
-            ret->arr[i] = (uint64_t)elem;
-        }
-
-        elem = bin_at(hash, (h2->arr[i] % mod));
-        //if (elem->hash2 == h1 && elem->hash1 == h2
-        if (elem->key == keys->arr[i]) {
-            ret->arr[i] = (uint64_t)elem;
-        }
-    }
-    return;
-#endif
-
     u512i_64_t elem1, elem2, keys1, keys2;
 
     bin_at_parallel(hash, &idx1, &elem1);
     bin_at_parallel(hash, &idx2, &elem2);
 
-#if 0
-    for (int i = 0; i < 8; ++i) {
-        cuckoo_elem_t *elem = (cuckoo_elem_t*)elem1.arr[i];
-
-        //if (elem->hash2 == h2 && elem->hash1 == h1
-        if (elem->key == keys->arr[i]) {
-            ret->arr[i] = (uint64_t)elem;
-        }
-
-        elem = (cuckoo_elem_t*)elem2.arr[i];
-        //if (elem->hash2 == h1 && elem->hash1 == h2
-        if (elem->key == keys->arr[i]) {
-            ret->arr[i] = (uint64_t)elem;
-        }
-    }
-    return;
-#endif
     bin_keys_at_parallel(hash, &idx1, &keys1); 
     bin_keys_at_parallel(hash, &idx2, &keys2); 
 
-#if 0
-    for (int i = 0; i < 8; ++i) {
-        cuckoo_elem_t *elem = (cuckoo_elem_t*)elem1.arr[i];
-
-        //if (elem->hash2 == h2 && elem->hash1 == h1
-        if (keys1.arr[i] == keys->arr[i]) {
-            ret->arr[i] = (uint64_t)elem;
-        }
-
-        elem = (cuckoo_elem_t*)elem2.arr[i];
-        //if (elem->hash2 == h1 && elem->hash1 == h2
-        if (keys2.arr[i] == keys->arr[i]) {
-            ret->arr[i] = (uint64_t)elem;
-        }
-    }
-    return;
-#endif
     __mmask8 m1, m2;
 
     m1 = _mm512_cmp_epi64_mask(keys->vec, keys1.vec, 0);
     m2 = _mm512_cmp_epi64_mask(keys->vec, keys2.vec, 0);
-
-#if 0
-    for (int i = 0; i < 8; ++i) {
-        cuckoo_elem_t *elem = (cuckoo_elem_t*)elem1.arr[i];
-
-        //if (elem->hash2 == h2 && elem->hash1 == h1
-        if (m1 & (1 << i)) {
-            ret->arr[i] = (uint64_t)elem;
-        }
-
-        elem = (cuckoo_elem_t*)elem2.arr[i];
-        //if (elem->hash2 == h1 && elem->hash1 == h2
-        if (m2 & (1 << i)) {
-            ret->arr[i] = (uint64_t)elem;
-        }
-    }
-    return;
-#endif
 
     ret->vec = _mm512_mask_mov_epi64(ret->vec, m1, elem1.vec);
     ret->vec = _mm512_mask_mov_epi64(ret->vec, m2, elem2.vec);
@@ -304,14 +249,14 @@ cuckoo_hash_lookup_parallel(const struct cuckoo_hash *hash,
     u512i_64_t keys_og, keys1, keys2;
 
     keys1.vec = _mm512_add_epi64(offsets.vec, _mm512_set1_epi64(key));
-    keys2.vec = _mm512_add_epi64(offsets.vec, 
-                    _mm512_xor_epi64(_mm512_set1_epi64(key), _mm512_set1_epi64(~0)));
+    keys2.vec = _mm512_xor_epi64(_mm512_set1_epi64(~0), 
+                    _mm512_add_epi64(_mm512_set1_epi64(key), offsets.vec));
 
     keys_og.vec = keys1.vec;
 
-    u256i_32_t h1, h2;
+    u512i_64_t h1, h2;
     if (hash->do_stats) START_TIMING();
-    compute_hash_simd64(hash, &keys1, &keys2, &h1, &h2);
+    compute_hash_simd64(&keys1, &keys2, &h1, &h2);
     if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
 
     u512i_64_t elems;
@@ -339,11 +284,13 @@ cuckoo_hash_lookup(const struct cuckoo_hash *hash,
 
     static int tsx_success = 0;
 
-    uint32_t h1, h2;
+    uint64_t h1, h2;
     if (hash->do_stats) START_TIMING();
     compute_hash(key, &h1, &h2, hash->compact_idx);
-    if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
+    //if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
 
+    if (hash->do_stats) cstats.nlookups++;
+#if 0
     unsigned status;
     pmlock_rd_lock(&hash->meta->rwlock);
     if ((status = _xbegin ()) == _XBEGIN_STARTED) {
@@ -359,7 +306,9 @@ cuckoo_hash_lookup(const struct cuckoo_hash *hash,
         *size = elem->range;
         _xend();
         pmlock_rd_unlock(&hash->meta->rwlock);
+        if (hash->do_stats) UPDATE_TIMING(&cstats, non_conflict_time);
     } else {
+        if (hash->do_stats) cstats.nconflicts++;
         // Effectively serializes
         pmlock_rd_unlock(&hash->meta->rwlock);
         pmlock_wr_lock(&hash->meta->rwlock);
@@ -375,7 +324,25 @@ cuckoo_hash_lookup(const struct cuckoo_hash *hash,
         *size = elem->range;
 
         pmlock_wr_unlock(&hash->meta->rwlock);
+        if (hash->do_stats) UPDATE_TIMING(&cstats, conflict_time);
     }
+#else
+    // Effectively serializes
+    pmlock_wr_lock(&hash->meta->rwlock);
+
+    cuckoo_elem_t *elem = lookup(hash, key, h1, h2);
+    if (!elem) {
+        pmlock_wr_unlock(&hash->meta->rwlock);
+        return -ENOENT;
+    }
+
+    *value = ( ((uint64_t)elem->value_hi) << 16 ) 
+             + ((uint64_t)elem->value_lo);
+    *size = elem->range;
+
+    pmlock_wr_unlock(&hash->meta->rwlock);
+    if (hash->do_stats) UPDATE_TIMING(&cstats, conflict_time);
+#endif
 
     return 0;
 }
@@ -383,12 +350,11 @@ cuckoo_hash_lookup(const struct cuckoo_hash *hash,
 int
 cuckoo_hash_update(const struct cuckoo_hash *hash, paddr_t key, uint32_t size)
 {
-    uint32_t h1, h2;
+    uint64_t h1, h2;
     DECLARE_TIMING();
     if (hash->do_stats) START_TIMING();
     compute_hash(key, &h1, &h2, hash->compact_idx);
     if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
-
 
     unsigned status;
     cuckoo_elem_t *elem;
@@ -428,7 +394,7 @@ int
 cuckoo_hash_remove(struct cuckoo_hash *hash, paddr_t key, paddr_t *value,
                    uint32_t *index, uint32_t *range)
 {
-    uint32_t h1, h2;
+    uint64_t h1, h2;
     DECLARE_TIMING();
     if (hash->do_stats) START_TIMING();
     compute_hash(key, &h1, &h2, hash->compact_idx);
@@ -481,18 +447,18 @@ undo_insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item,
             size_t max_depth)
 {
     DECLARE_TIMING();
-    uint32_t mod = (uint32_t) hash->meta->max_size;
+    uint64_t mod = (uint64_t)hash->meta->max_size;
 
     bool rot = false;
 
     for (size_t depth = 0; depth < max_depth; ++depth) {
 
-        uint32_t ih1, ih2;
+        uint64_t ih1, ih2;
         if (hash->do_stats) START_TIMING();
         compute_hash(item->key, &ih1, &ih2, hash->compact_idx);
         if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
 
-        uint32_t h2m = rot ? ih1 % mod : ih2 % mod;
+        uint64_t h2m = rot ? ih1 % mod : ih2 % mod;
         struct cuckoo_hash_elem *elem = bin_at(hash, h2m);
 
         struct cuckoo_hash_elem victim = *elem;
@@ -506,12 +472,12 @@ undo_insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item,
             INCR_NR_CACHELINE(&cstats, ncachelines_written, sizeof(*elem));
         }
 
-        uint32_t vh1, vh2;
+        uint64_t vh1, vh2;
         if (hash->do_stats) START_TIMING();
         compute_hash(victim.key, &vh1, &vh2, hash->compact_idx);
         if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
 
-        uint32_t h1m = vh1 % mod;
+        uint64_t h1m = vh1 % mod;
         if (h1m != h2m) {
             assert(depth >= max_depth);
 
@@ -534,19 +500,19 @@ bool
 insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item)
 {
     DECLARE_TIMING();
-    size_t max_depth = 32;//(size_t) hash->meta.max_size;
+    size_t max_depth = 128;//(size_t) hash->meta.max_size;
 
-    uint32_t mod = (uint32_t) hash->meta->max_size;
+    uint64_t mod = (uint64_t) hash->meta->max_size;
 
     bool rot = false;
 
     for (size_t depth = 0; depth < max_depth; ++depth) {
-        uint32_t ih1, ih2;
+        uint64_t ih1, ih2;
         if (hash->do_stats) START_TIMING();
         compute_hash(item->key, &ih1, &ih2, hash->compact_idx);
         if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
 
-        uint32_t h1m = rot ? ih2 % mod : ih1 % mod;
+        uint64_t h1m = rot ? ih2 % mod : ih1 % mod;
         cuckoo_elem_t *elem = bin_at(hash, h1m);
 
         if (elem->key == 0) {
@@ -556,11 +522,13 @@ insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item)
                 INCR_NR_CACHELINE(&cstats, ncachelines_written, sizeof(*elem));
             }
 
+	        //if (depth > 0) printf("depth: %lu\n", depth);	
+
             return true;
         }
 
         cuckoo_elem_t victim = *elem;
-        uint32_t vh1, vh2;
+        uint64_t vh1, vh2;
         if (hash->do_stats) START_TIMING();
         compute_hash(victim.key, &vh1, &vh2, hash->compact_idx);
         if (hash->do_stats) UPDATE_TIMING(&cstats, compute_hash);
@@ -591,7 +559,7 @@ int
 cuckoo_hash_insert(struct cuckoo_hash *hash, paddr_t key, paddr_t value, 
                    uint32_t index, uint32_t range)
 {
-    uint32_t h1, h2;
+    uint64_t h1, h2;
     DECLARE_TIMING();
     if (hash->do_stats) START_TIMING();
     compute_hash(key, &h1, &h2, hash->compact_idx);

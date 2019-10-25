@@ -86,6 +86,11 @@ typedef struct cuckoo_hash_stats {
     uint64_t nblocks_inserted;
     uint64_t nwrites;
     STAT_FIELD(compute_hash);
+    STAT_FIELD(non_conflict_time);
+    STAT_FIELD(conflict_time);
+    uint64_t nlookups;
+    uint64_t nbuckets_checked;
+    uint64_t nconflicts;
 } nvm_cuckoo_stats_t;
 
 extern nvm_cuckoo_stats_t cstats;
