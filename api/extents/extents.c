@@ -148,8 +148,7 @@ int extent_tree_init(const idx_spec_t *idx_spec,
     EXTHDR(ext_meta, eh);
 
     if (eh->eh_magic != cpu_to_le16(EXT_MAGIC)) {
-        eh->eh_depth = 0;
-        eh->eh_entries = 0;
+        memset(eh, 0, sizeof(*eh));
         eh->eh_magic = cpu_to_le16(EXT_MAGIC);
         eh->eh_max = cpu_to_le16(ents_root);
 
@@ -187,10 +186,6 @@ static int read_extent_tree_block(idx_struct_t *ext_idx, char **buf,
     if (ext_meta->et_enable_stats) {
         START_TIMING();
     }
-    device_info_t devinfo;
-    int err = CB(ext_idx, cb_get_dev_info, &devinfo);
-    if (err) return err;
-
     if (depth >= MAX_DEPTH) {
         fprintf(stderr, "depth (%d) >= MAX_DEPTH (%d)!\n", depth, MAX_DEPTH);
         panic("not enough buffers!");
@@ -198,6 +193,9 @@ static int read_extent_tree_block(idx_struct_t *ext_idx, char **buf,
 
     uint64_t second_tsc = _asm_rdtscp();
     #if 0
+    device_info_t devinfo;
+    err = CB(ext_idx, cb_get_dev_info, &devinfo);
+    if (err) return err;
     ssize_t nbytes = CB(ext_idx, cb_read,
                         pblk, 0, devinfo.di_block_size, buf);
     #elif 0
@@ -212,12 +210,12 @@ static int read_extent_tree_block(idx_struct_t *ext_idx, char **buf,
     if (nbytes != devinfo.di_block_size) {
         return -EIO;
     }
-    #else 
+    #elif 0
     if (err) return -EIO;
     #endif
 
     if (depth >= 0) {
-        err = ext_check(ext_idx, ext_header_from_block(*buf), depth, pblk);
+        int err = ext_check(ext_idx, ext_header_from_block(*buf), depth, pblk);
         if (err) return err;
     }
 
@@ -536,7 +534,7 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
     /* walk through internal nodes (index nodes) of the tree from a root */
     while (i) {
 
-        #if defined(DO_MEMOIZATION)
+        #if defined(EXT_MEMOIZATION)
         extent_path_t *prevp = &(ext_meta->prev_path[ppos]);
         extent_path_t *prevp_next = &(ext_meta->prev_path[ppos + 1]);
         if (prevp->p_hdr) {
@@ -797,10 +795,9 @@ static int ext_split(idx_struct_t *ext_idx,
     */
 
     neh = ext_header_from_block(buf);
-    neh->eh_entries = 0;
+    memset(neh, 0, sizeof(*neh));
     neh->eh_max = cpu_to_le16(ext_space_block(ext_idx));
     neh->eh_magic = cpu_to_le16(EXT_MAGIC);
-    neh->eh_depth = 0;
     
     /* move remainder of path[depth] to the new leaf */
     if (unlikely(path[depth].p_hdr->eh_entries != path[depth].p_hdr->eh_max)) {
@@ -877,6 +874,7 @@ static int ext_split(idx_struct_t *ext_idx,
         neh->eh_magic = cpu_to_le16(EXT_MAGIC);
         neh->eh_max = cpu_to_le16(ext_space_block_idx(ext_idx));
         neh->eh_depth = cpu_to_le16(depth - i);
+        memset(&neh->eh_lock, 0, sizeof(neh->eh_lock));
         fidx = EXT_FIRST_INDEX(neh);
         fidx->ei_block = border;
         idx_store_pblock(fidx, oldblock);
@@ -1017,8 +1015,11 @@ static int ext_grow_indepth(idx_struct_t *ext_idx, unsigned int flags)
     } else {
         neh->eh_max = cpu_to_le16(ext_space_block(ext_idx));
     }
+
     neh->eh_magic = cpu_to_le16(EXT_MAGIC);
     extent_block_csum_set(ext_idx, neh);
+    memset(&neh->eh_lock, 0, sizeof(neh->eh_lock));
+    
     nvm_persist_struct_ptr(neh);
     if (g_do_stats) {
         INCR_NR_CACHELINE(&estats, ncachelines_written, sizeof(*neh));
@@ -2528,6 +2529,8 @@ ssize_t extent_tree_create(idx_struct_t *ext_idx, inum_t inum,
     int read_ret = read_ext_direct_data(ext_idx);
     if (read_ret) return read_ret;
 
+    write_lock(ext_idx);
+
     /* find extent for this block */
     path = ext_meta->path;
     path = find_extent(ext_idx, laddr, &(path), 0);
@@ -2656,9 +2659,12 @@ out2:
         INCR_STAT(&estats, depth_nr);
     }
 
+    write_unlock(ext_idx);
+
     return err ? err : allocated;
 }
 
+static pthread_mutex_t lmutex = PTHREAD_MUTEX_INITIALIZER;
 ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
                            laddr_t laddr, size_t max, paddr_t* paddr)
 {
@@ -2671,29 +2677,36 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
     *paddr = 0;
     ret = 0;
 
+
     int read_ret = read_ext_direct_data(ext_idx);
     if (read_ret) return read_ret;
 
     EXTMETA(ext_idx, ext_meta);
+    read_lock(ext_idx);
 
-    #ifdef DO_MEMOIZATION
+    static __thread extent_path_t path_arr[MAX_DEPTH]; // concurrency things
+    #ifdef EXT_MEMOIZATION
     depth = ext_tree_depth(ext_idx);
     ret = search_extent_leaf(ext_meta->prev_path[depth].p_ext, laddr, paddr);
     if (ret > 0) {
+        read_unlock(ext_idx);
         return ret;
     }
     #endif
 
     /* find extent for this block */
-    extent_path_t *pathp = (extent_path_t*)ext_meta->path;
+    extent_path_t *pathp = &path_arr[0];
     path = find_extent(ext_idx, laddr, &(pathp), 0);   
     if (IS_ERR(path)) {
         err = PTR_ERR(path);
         path = NULL;
+        read_unlock(ext_idx);
         return err;
     }
 
-    assert(path == ext_meta->path);
+    //if (path != ext_meta->path) {
+    //    abort();
+    //}
 
     depth = ext_tree_depth(ext_idx);
 
@@ -2706,20 +2719,37 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
  
     ret = search_extent_leaf(path[depth].p_ext, laddr, paddr);
 
-    #ifdef DO_MEMOIZATION
+#if 0
+    if (!ret) {
+        if (path[depth].p_ext) {
+            printf("%x\n", path[depth].p_ext->ee_len);
+            printf("%u not in %u--%u\n", laddr, path[depth].p_ext->ee_block, 
+                    path[depth].p_ext->ee_block
+                    + ((uint32_t)path[depth].p_ext->ee_len));
+        }
+
+        //while(1);
+    }
+#endif
+
+    #if 1 && defined(EXT_MEMOIZATION)
     if (ret > 0) {
-        #if 1
+        (void)pthread_mutex_lock(&lmutex);
+        #if 0
         extent_path_t *tmp = ext_meta->prev_path;
         ext_meta->prev_path = ext_meta->path;
         ext_meta->path = tmp;
         #elif 0
         memcpy(ext_meta->prev_path, ext_meta->path, sizeof(*ext_meta->path) * MAX_DEPTH);
-        #else
+        #elif 0
         extent_path_t *tmp = ext_meta->prev_path;
         ext_meta->prev_path = ext_meta->path;
         ext_meta->path = tmp;
         memset(ext_meta->path, 0, sizeof(*ext_meta->path)*MAX_DEPTH);
+        #else
+        memcpy(ext_meta->prev_path, path_arr, sizeof(*ext_meta->path) * MAX_DEPTH);
         #endif
+        (void)pthread_mutex_unlock(&lmutex);
     }
     #endif
 
@@ -2727,6 +2757,8 @@ ssize_t extent_tree_lookup(idx_struct_t *ext_idx, inum_t inum,
         ADD_STAT(&estats, depth_total, depth);
         INCR_STAT(&estats, depth_nr);
     }
+
+    read_unlock(ext_idx);
 
     return ret;
 }
@@ -2736,7 +2768,12 @@ ssize_t extent_tree_remove(idx_struct_t *ext_idx,
     int read_ret = read_ext_direct_data(ext_idx);
     if (read_ret) return read_ret;
 
+    EXTMETA(ext_idx, ext_meta);
+
+    write_lock(ext_idx);
     int err = ext_truncate(ext_idx, laddr, laddr + size - 1);
+    write_unlock(ext_idx);
+    
     if (err) return err;
     
     return size;

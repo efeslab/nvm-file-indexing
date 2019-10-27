@@ -207,6 +207,53 @@ static inline int read_ext_direct_data(const idx_struct_t *ext_idx)
     return 0;
 }
 
+static inline 
+void read_lock(idx_struct_t *ext_idx) {
+    EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, ext_hdr);
+    if_then_panic(ext_hdr->eh_magic != EXT_MAGIC, 
+            "locking an uninitialized header lock!");
+    pmlock_rd_lock(&ext_hdr->eh_lock);
+    if (ext_meta->et_cached) {
+        if_then_panic(write_ext_direct_data(ext_idx), "could not write!");
+    }
+}
+
+static inline 
+void read_unlock(idx_struct_t *ext_idx) {
+    EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, ext_hdr);
+    if_then_panic(ext_hdr->eh_magic != EXT_MAGIC, 
+            "locking an uninitialized header lock!");
+    pmlock_rd_unlock(&ext_hdr->eh_lock);
+    if (ext_meta->et_cached) {
+        if_then_panic(write_ext_direct_data(ext_idx), "could not write!");
+    }
+}
+
+static inline 
+void write_lock(idx_struct_t *ext_idx) {
+    EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, ext_hdr);
+    //if (ext_hdr->eh_magic != EXT_MAGIC) return;
+
+    if_then_panic(ext_hdr->eh_magic != EXT_MAGIC, 
+            "locking an uninitialized header lock!");
+    pmlock_wr_lock(&ext_hdr->eh_lock);
+    if (ext_meta->et_cached) {
+        if_then_panic(write_ext_direct_data(ext_idx), "could not write!");
+    }
+}
+
+static inline 
+void write_unlock(idx_struct_t *ext_idx) {
+    EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, ext_hdr);
+    //if (ext_hdr->eh_magic != EXT_MAGIC) return;
+    if_then_panic(ext_hdr->eh_magic != EXT_MAGIC, 
+            "locking an uninitialized header lock!");
+    pmlock_wr_unlock(&ext_hdr->eh_lock);
+    if (ext_meta->et_cached) {
+        if_then_panic(write_ext_direct_data(ext_idx), "could not write!");
+    }
+}
+
 static inline extent_header_t *ext_header_from_block(char *buf)
 {
     return (extent_header_t*)buf;
