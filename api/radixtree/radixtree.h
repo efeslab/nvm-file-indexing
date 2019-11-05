@@ -58,6 +58,9 @@ _Static_assert(sizeof(ondev_radix_meta_t) <= 64, "On-device metadata > 64!");
 typedef struct radixtree_stats {
     uint64_t depth_total;
     uint64_t depth_nr;
+    uint64_t memo_hits;
+    uint64_t references;
+    uint64_t nlookups;
 } radixtree_stats_t;
 
 extern radixtree_stats_t rstats;
@@ -67,6 +70,10 @@ static void print_radixtree_stats(radixtree_stats_t *s) {
     printf("Radixtree stats:\n");
     printf("\tAverage depth: %.1f\n", 
            (double)s->depth_total / (double)s->depth_nr);
+    printf("\tAverage references per lookup: %.1f\n",
+           (double)s->references / (double)s->nlookups);
+    printf("\tAverage memo hit ratio: %.1f\n",
+           (double)s->memo_hits / (double)s->references);
 }
 
 #define print_global_radixtree_stats() print_radixtree_stats(&rstats)

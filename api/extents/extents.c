@@ -534,7 +534,7 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
     /* walk through internal nodes (index nodes) of the tree from a root */
     while (i) {
 
-        #if defined(EXT_MEMOIZATION)
+        #if 0 && defined(EXT_MEMOIZATION)
         extent_path_t *prevp = &(ext_meta->prev_path[ppos]);
         extent_path_t *prevp_next = &(ext_meta->prev_path[ppos + 1]);
         if (prevp->p_hdr) {
@@ -569,6 +569,7 @@ extent_path_t *find_extent(idx_struct_t *ext_idx, laddr_t block,
         path[ppos].p_block = idx_pblock(path[ppos].p_idx);
         path[ppos].p_depth = i;
         path[ppos].p_ext = NULL;
+
 
         i--;
 

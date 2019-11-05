@@ -205,7 +205,7 @@ int cuckoohash_invalidate_caches(idx_struct_t *idx_struct) {
 
 void cuckoohash_set_stats(idx_struct_t *idx_struct, bool enable) {
     CUCKOOHASH(idx_struct, ht);
-    ht->do_stats = enable;
+    ht->do_stats = false;//enable;
 }
 
 void cuckoohash_print_stats(idx_struct_t *idx_struct) {
@@ -220,7 +220,15 @@ void cuckoohash_print_global_stats(void) {
     printf("\tInserts: %.1f cachelines per op (%lu / %lu)\n",
         (float)cstats.ncachelines_written / (float)cstats.nwrites, 
         cstats.ncachelines_written, cstats.nwrites);
+    printf("\tBuckets per lookup: %.1f (%lu / %lu)\n",
+        (float)cstats.nbuckets_checked / (float)cstats.nlookups,
+        cstats.nbuckets_checked, cstats.nlookups);
+    printf("\tConflicts per lookup: %.2f (%lu / %lu)\n",
+            (float)cstats.nconflicts / (float)cstats.nlookups,
+            cstats.nconflicts, cstats.nlookups);
     PFIELD(&cstats, compute_hash);
+    PFIELD(&cstats, conflict_time);
+    PFIELD(&cstats, non_conflict_time);
 }
 
 void cuckoohash_clean_global_stats(void) {
@@ -230,6 +238,11 @@ void cuckoohash_clean_global_stats(void) {
 void cuckoohash_add_global_to_json(json_object *root) {
    js_add_int64(root, "compute_tsc", cstats.compute_hash_tsc); 
    js_add_int64(root, "compute_nr", cstats.compute_hash_nr); 
+   js_add_int64(root, "nlookups", cstats.nlookups);
+   js_add_int64(root, "nconflicts", cstats.nconflicts);
+   js_add_int64(root, "nbuckets_checked", cstats.nbuckets_checked);
+   js_add_double(root, "nbuckets_per_lookup", (double)cstats.nbuckets_checked / (double)cstats.nlookups);
+   js_add_double(root, "nconflicts_per_lookup", (double)cstats.nconflicts / (double)cstats.nlookups);
 }
 
 idx_fns_t cuckoohash_fns = {

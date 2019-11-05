@@ -148,14 +148,14 @@ lookup(const struct cuckoo_hash *hash, paddr_t key, uint64_t h1, uint64_t h2)
 
     //if (elem->hash2 == h2 && elem->hash1 == h1
     if (elem1->key == key) {
-        if (hash->do_stats) cstats.nbuckets_checked++;
+        cstats.nbuckets_checked += 1;
         return elem1;
     }
 
     elem2 = bin_at(hash, (h2 % mod));
     //if (elem->hash2 == h1 && elem->hash1 == h2
     if (elem2->key == key) {
-        if (hash->do_stats) cstats.nbuckets_checked++;
+        cstats.nbuckets_checked += 2;
         return elem2;
     }
 
@@ -328,11 +328,11 @@ cuckoo_hash_lookup(const struct cuckoo_hash *hash,
     }
 #else
     // Effectively serializes
-    pmlock_wr_lock(&hash->meta->rwlock);
+    //pmlock_wr_lock(&hash->meta->rwlock);
 
     cuckoo_elem_t *elem = lookup(hash, key, h1, h2);
     if (!elem) {
-        pmlock_wr_unlock(&hash->meta->rwlock);
+        //pmlock_wr_unlock(&hash->meta->rwlock);
         return -ENOENT;
     }
 
@@ -340,7 +340,7 @@ cuckoo_hash_lookup(const struct cuckoo_hash *hash,
              + ((uint64_t)elem->value_lo);
     *size = elem->range;
 
-    pmlock_wr_unlock(&hash->meta->rwlock);
+    //pmlock_wr_unlock(&hash->meta->rwlock);
     if (hash->do_stats) UPDATE_TIMING(&cstats, conflict_time);
 #endif
 
@@ -535,6 +535,8 @@ insert(struct cuckoo_hash *hash, struct cuckoo_hash_elem *item)
 
         if (vh1 % mod == h1m) rot = true;
         else rot = false;
+
+        //printf("%lx (h1m = %x, h2m = %x)\n", item->key, ih1 % mod, ih2 % mod);
 
         *elem = *item;
         nvm_persist_struct(*elem);

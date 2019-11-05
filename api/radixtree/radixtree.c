@@ -89,15 +89,18 @@ static inline paddr_t index_dev_node(radixtree_meta_t *radix, int level,
 {
     if (!node) return 0;
 
+    if (g_radix_do_stats) rstats.references++;
+
     #ifdef DO_MEMOIZATION
     if (radix->prev_path[level].page == node &&
         radix->prev_path[level].max_level == radix->ondev->nlevels) {
+        if (g_radix_do_stats) rstats.memo_hits++;
         if (radix->prev_path[level].last_idx == idx) {
             return radix->prev_path[level].last_ent;
         } else if (radix->prev_path[level].contents) {
             return radix->prev_path[level].contents[idx];
         }
-    }
+    } 
     #endif
 
 #if 0
@@ -207,6 +210,7 @@ static inline int lookup_dev_entry(radixtree_meta_t *radix, paddr_t node,
 {
     *entry = 0;
 
+    if (g_radix_do_stats) rstats.references++;
     paddr_t *node_contents = get_contents(radix, node);
     //int rerr = get_page(radix, node, &node_contents);
     //if (rerr) return rerr;
@@ -300,7 +304,8 @@ ssize_t index_and_find(radixtree_meta_t *radix, paddr_t page, uint16_t level, si
     *paddr = 0;
 
     if (use_direct(radix)) {
-        for (laddr_t i = start_idx; i < RADIX_NDIRECT; ++i, ++nfound) {
+        for (laddr_t i = start_idx; i < RADIX_NDIRECT && nfound < n; ++i, ++nfound) {
+            if (g_radix_do_stats) rstats.references++;
             paddr_t new_paddr = radix->direct_entries[i];
 
             if (!*paddr) *paddr = new_paddr;
@@ -415,6 +420,8 @@ ssize_t radixtree_lookup(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     inc_global_stats(radix);
 
     pmlock_rd_unlock(&radix->ondev->rwlock);
+
+    if (g_radix_do_stats) rstats.nlookups++;
 
     return ret;
 }
@@ -748,8 +755,14 @@ void radixtree_clean_global_stats(void) {
 }
 
 void radixtree_add_global_to_json(json_object *root) {
-   js_add_int64(root, "compute_tsc", 0); 
-   js_add_int64(root, "compute_nr", 0); 
+    js_add_int64(root, "compute_tsc", 0); 
+    js_add_int64(root, "compute_nr", 0); 
+    double avg_depth = (double)rstats.depth_total / (double)rstats.depth_nr;
+    js_add_double(root, "avg_depth", avg_depth);
+    double ref_lookup = (double)rstats.references / (double)rstats.nlookups;
+    js_add_double(root, "ref_per_lookup", ref_lookup);
+    double hit_ratio = (double)rstats.memo_hits / (double)rstats.references;
+    js_add_double(root, "memo_hit_ratio", hit_ratio);
 }
 
 idx_fns_t radixtree_fns = {

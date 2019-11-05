@@ -26,6 +26,7 @@ uint32_t crc32c(uint32_t crc, const void *buf, size_t size);
 #define EXTMETA(i, n) ext_meta_t *(n) = (ext_meta_t*)(i)->idx_metadata
 #define EXTHDR(m, n)  extent_header_t *(n) = (extent_header_t*)((m)->et_direct_data)
 
+
 #define EXT_MAGIC (0xf30a)
 
 #define EXTENT_TAIL_OFFSET(hdr)                 \
