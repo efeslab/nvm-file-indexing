@@ -29,7 +29,7 @@ make
 
 ```
 sudo apt install golang
-export GOPATH=~/go
+export GOPATH=$(realpath ./go)
 export PATH=$GOPATH/bin:$PATH
 go get github.com/hamano/lb
 ```
