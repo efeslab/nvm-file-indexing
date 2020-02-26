@@ -10,3 +10,6 @@
 [submodule "api/test/googletest"]
 	path = api/test/googletest
 	url = https://github.com/google/googletest.git
+[submodule "benchmarks/ldap/lb"]
+	path = benchmarks/ldap/lb
+	url = https://github.com/hamano/lb
