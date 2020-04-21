@@ -13,3 +13,15 @@
 [submodule "benchmarks/ldap/lb"]
 	path = benchmarks/ldap/lb
 	url = https://github.com/hamano/lb
+[submodule "benchmarks/sqlite/--force"]
+	path = benchmarks/sqlite/--force
+	url = git@github.com:efeslab/py-tpcc.git
+[submodule "benchmarks/sqlite/py-tpcc"]
+	path = benchmarks/sqlite/py-tpcc
+	url = git@github.com:efeslab/py-tpcc.git
+[submodule "benchmarks/YCSB-C"]
+	path = benchmarks/YCSB-C
+	url = git@github.com:efeslab/YCSB-C.git
+[submodule "benchmarks/FlameGraph"]
+	path = benchmarks/FlameGraph
+	url = https://github.com/brendangregg/FlameGraph
