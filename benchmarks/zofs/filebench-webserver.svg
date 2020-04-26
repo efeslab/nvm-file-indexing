@@ -1,0 +1,3156 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1200" height="598" onload="init(evt)" viewBox="0 0 1200 598" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples. -->
+<!-- NOTES:  -->
+<defs>
+	<linearGradient id="background" y1="0" y2="1" x1="0" x2="0" >
+		<stop stop-color="#eeeeee" offset="5%" />
+		<stop stop-color="#eeeeb0" offset="95%" />
+	</linearGradient>
+</defs>
+<style type="text/css">
+	text { font-family:Verdana; font-size:12px; fill:rgb(0,0,0); }
+	#search, #ignorecase { opacity:0.1; cursor:pointer; }
+	#search:hover, #search.show, #ignorecase:hover, #ignorecase.show { opacity:1; }
+	#subtitle { text-anchor:middle; font-color:rgb(160,160,160); }
+	#title { text-anchor:middle; font-size:17px}
+	#unzoom { cursor:pointer; }
+	#frames > *:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+	.hide { display:none; }
+	.parent { opacity:0.5; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	"use strict";
+	var details, searchbtn, unzoombtn, matchedtxt, svg, searching, currentSearchTerm, ignorecase, ignorecaseBtn;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		ignorecaseBtn = document.getElementById("ignorecase");
+		unzoombtn = document.getElementById("unzoom");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+		currentSearchTerm = null;
+	}
+
+	window.addEventListener("click", function(e) {
+		var target = find_group(e.target);
+		if (target) {
+			if (target.nodeName == "a") {
+				if (e.ctrlKey === false) return;
+				e.preventDefault();
+			}
+			if (target.classList.contains("parent")) unzoom();
+			zoom(target);
+		}
+		else if (e.target.id == "unzoom") unzoom();
+		else if (e.target.id == "search") search_prompt();
+		else if (e.target.id == "ignorecase") toggle_ignorecase();
+	}, false)
+
+	// mouse-over for info
+	// show
+	window.addEventListener("mouseover", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = "Function: " + g_to_text(target);
+	}, false)
+
+	// clear
+	window.addEventListener("mouseout", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = ' ';
+	}, false)
+
+	// ctrl-F for search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+	}, false)
+
+	// ctrl-I to toggle case-sensitive search
+	window.addEventListener("keydown",function (e) {
+		if (e.ctrlKey && e.keyCode === 73) {
+			e.preventDefault();
+			toggle_ignorecase();
+		}
+	}, false)
+
+	// functions
+	function find_child(node, selector) {
+		var children = node.querySelectorAll(selector);
+		if (children.length) return children[0];
+		return;
+	}
+	function find_group(node) {
+		var parent = node.parentElement;
+		if (!parent) return;
+		if (parent.id == "frames") return node;
+		return find_group(parent);
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_" + attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_" + attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_" + attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		// if there's any manipulation we want to do to the function
+		// name before it's searched, do it here before returning.
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes.width.value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes.x.value = parseFloat(r.attributes.x.value) + 3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2 * 12 * 0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		// Fit in full text width
+		if (/^ *$/.test(txt) || t.getSubStringLength(0, txt.length) < w)
+			return;
+
+		for (var x = txt.length - 2; x > 0; x--) {
+			if (t.getSubStringLength(0, x + 2) <= w) {
+				t.textContent = txt.substring(0, x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = (parseFloat(e.attributes.x.value) - x - 10) * ratio + 10;
+				if (e.tagName == "text")
+					e.attributes.x.value = find_child(e.parentNode, "rect[x]").attributes.x.value + 3;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseFloat(e.attributes.width.value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_child(c[i], x - 10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = 10;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseInt(svg.width.baseVal.value) - (10 * 2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr.width.value);
+		var xmin = parseFloat(attr.x.value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr.y.value);
+		var ratio = (svg.width.baseVal.value - 2 * 10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		unzoombtn.classList.remove("hide");
+
+		var el = document.getElementById("frames").children;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a.x.value);
+			var ew = parseFloat(a.width.value);
+			var upstack;
+			// Is it an ancestor
+			if (0 == 0) {
+				upstack = parseFloat(a.y.value) > ymin;
+			} else {
+				upstack = parseFloat(a.y.value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.classList.add("parent");
+					zoom_parent(e);
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.classList.add("hide");
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.classList.add("hide");
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					update_text(e);
+				}
+			}
+		}
+		search();
+	}
+	function unzoom() {
+		unzoombtn.classList.add("hide");
+		var el = document.getElementById("frames").children;
+		for(var i = 0; i < el.length; i++) {
+			el[i].classList.remove("parent");
+			el[i].classList.remove("hide");
+			zoom_reset(el[i]);
+			update_text(el[i]);
+		}
+		search();
+	}
+
+	// search
+	function toggle_ignorecase() {
+		ignorecase = !ignorecase;
+		if (ignorecase) {
+			ignorecaseBtn.classList.add("show");
+		} else {
+			ignorecaseBtn.classList.remove("show");
+		}
+		reset_search();
+		search();
+	}
+	function reset_search() {
+		var el = document.querySelectorAll("#frames rect");
+		for (var i = 0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)"
+			    + (ignorecase ? ", ignoring case" : "")
+			    + "\nPress Ctrl-i to toggle case sensitivity", "");
+			if (term != null) {
+				currentSearchTerm = term;
+				search();
+			}
+		} else {
+			reset_search();
+			searching = 0;
+			currentSearchTerm = null;
+			searchbtn.classList.remove("show");
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.classList.add("hide");
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		if (currentSearchTerm === null) return;
+		var term = currentSearchTerm;
+
+		var re = new RegExp(term, ignorecase ? 'i' : '');
+		var el = document.getElementById("frames").children;
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes.width.value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes.x.value);
+				orig_save(rect, "fill");
+				rect.attributes.fill.value = "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+
+		searchbtn.classList.add("show");
+		searchbtn.firstChild.nodeValue = "Reset Search";
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+			return a - b;
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		var fudge = 0.0001;	// JavaScript floating point
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw - fudge) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.classList.remove("hide");
+		var pct = 100 * count / maxwidth;
+		if (pct != 100) pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+]]>
+</script>
+<rect x="0.0" y="0" width="1200.0" height="598.0" fill="url(#background)"  />
+<text id="title" x="600.00" y="24" >Flame Graph</text>
+<text id="details" x="10.00" y="581" > </text>
+<text id="unzoom" x="10.00" y="24" class="hide">Reset Zoom</text>
+<text id="search" x="1090.00" y="24" >Search</text>
+<text id="ignorecase" x="1174.00" y="24" >ic</text>
+<text id="matched" x="1090.00" y="581" > </text>
+<g id="frames">
+<g >
+<title>irq_exit (552 samples, 0.01%)</title><rect x="976.7" y="341" width="0.2" height="15.0" fill="rgb(205,119,14)" rx="2" ry="2" />
+<text  x="979.75" y="351.5" ></text>
+</g>
+<g >
+<title>sys_nanosleep (404 samples, 0.01%)</title><rect x="1052.6" y="453" width="0.2" height="15.0" fill="rgb(238,210,48)" rx="2" ry="2" />
+<text  x="1055.64" y="463.5" ></text>
+</g>
+<g >
+<title>__intel_pmu_enable_all.constprop.23 (16,926 samples, 0.39%)</title><rect x="184.2" y="293" width="4.6" height="15.0" fill="rgb(207,104,3)" rx="2" ry="2" />
+<text  x="187.22" y="303.5" ></text>
+</g>
+<g >
+<title>native_sched_clock (983 samples, 0.02%)</title><rect x="191.1" y="309" width="0.3" height="15.0" fill="rgb(223,27,2)" rx="2" ry="2" />
+<text  x="194.08" y="319.5" ></text>
+</g>
+<g >
+<title>__blkdev_issue_zero_pages (822 samples, 0.02%)</title><rect x="109.9" y="277" width="0.2" height="15.0" fill="rgb(242,68,8)" rx="2" ry="2" />
+<text  x="112.90" y="287.5" ></text>
+</g>
+<g >
+<title>__pthread_disable_asynccancel (2,040 samples, 0.05%)</title><rect x="1052.8" y="501" width="0.6" height="15.0" fill="rgb(207,103,9)" rx="2" ry="2" />
+<text  x="1055.81" y="511.5" ></text>
+</g>
+<g >
+<title>__vdso_gettimeofday (684 samples, 0.02%)</title><rect x="1091.9" y="501" width="0.2" height="15.0" fill="rgb(234,137,15)" rx="2" ry="2" />
+<text  x="1094.90" y="511.5" ></text>
+</g>
+<g >
+<title>fsnotify (524 samples, 0.01%)</title><rect x="84.4" y="389" width="0.1" height="15.0" fill="rgb(240,2,38)" rx="2" ry="2" />
+<text  x="87.40" y="399.5" ></text>
+</g>
+<g >
+<title>common_file_perm (422 samples, 0.01%)</title><rect x="144.9" y="373" width="0.1" height="15.0" fill="rgb(241,58,53)" rx="2" ry="2" />
+<text  x="147.90" y="383.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum_set (1,305 samples, 0.03%)</title><rect x="119.9" y="277" width="0.3" height="15.0" fill="rgb(216,47,0)" rx="2" ry="2" />
+<text  x="122.88" y="287.5" ></text>
+</g>
+<g >
+<title>find_busiest_group (1,223 samples, 0.03%)</title><rect x="189.8" y="325" width="0.4" height="15.0" fill="rgb(221,85,3)" rx="2" ry="2" />
+<text  x="192.84" y="335.5" ></text>
+</g>
+<g >
+<title>fileset_pick (4,938 samples, 0.11%)</title><rect x="1099.2" y="501" width="1.4" height="15.0" fill="rgb(207,80,23)" rx="2" ry="2" />
+<text  x="1102.22" y="511.5" ></text>
+</g>
+<g >
+<title>__virt_addr_valid (1,037 samples, 0.02%)</title><rect x="43.4" y="309" width="0.3" height="15.0" fill="rgb(240,222,9)" rx="2" ry="2" />
+<text  x="46.38" y="319.5" ></text>
+</g>
+<g >
+<title>select_task_rq_fair (14,757 samples, 0.34%)</title><rect x="1041.1" y="373" width="4.0" height="15.0" fill="rgb(218,139,53)" rx="2" ry="2" />
+<text  x="1044.10" y="383.5" ></text>
+</g>
+<g >
+<title>ext4_journal_check_start (581 samples, 0.01%)</title><rect x="102.7" y="309" width="0.2" height="15.0" fill="rgb(209,75,14)" rx="2" ry="2" />
+<text  x="105.72" y="319.5" ></text>
+</g>
+<g >
+<title>vfs_open (21,165 samples, 0.49%)</title><rect x="1147.9" y="405" width="5.8" height="15.0" fill="rgb(206,82,34)" rx="2" ry="2" />
+<text  x="1150.94" y="415.5" ></text>
+</g>
+<g >
+<title>_raw_spin_unlock_irqrestore (1,411 samples, 0.03%)</title><rect x="1040.2" y="373" width="0.4" height="15.0" fill="rgb(220,2,35)" rx="2" ry="2" />
+<text  x="1043.19" y="383.5" ></text>
+</g>
+<g >
+<title>__copy_user_flushcache (472 samples, 0.01%)</title><rect x="86.3" y="277" width="0.1" height="15.0" fill="rgb(210,52,9)" rx="2" ry="2" />
+<text  x="89.25" y="287.5" ></text>
+</g>
+<g >
+<title>__inode_permission (1,600 samples, 0.04%)</title><rect x="1146.9" y="373" width="0.4" height="15.0" fill="rgb(238,77,52)" rx="2" ry="2" />
+<text  x="1149.90" y="383.5" ></text>
+</g>
+<g >
+<title>add_transaction_credits (627 samples, 0.01%)</title><rect x="103.5" y="277" width="0.1" height="15.0" fill="rgb(239,111,20)" rx="2" ry="2" />
+<text  x="106.46" y="287.5" ></text>
+</g>
+<g >
+<title>jbd2_journal_get_write_access (428 samples, 0.01%)</title><rect x="120.6" y="277" width="0.1" height="15.0" fill="rgb(207,199,35)" rx="2" ry="2" />
+<text  x="123.61" y="287.5" ></text>
+</g>
+<g >
+<title>lockref_put_return (588 samples, 0.01%)</title><rect x="1147.7" y="357" width="0.2" height="15.0" fill="rgb(250,17,47)" rx="2" ry="2" />
+<text  x="1150.72" y="367.5" ></text>
+</g>
+<g >
+<title>[unknown] (37,565 samples, 0.86%)</title><rect x="10.4" y="389" width="10.2" height="15.0" fill="rgb(242,143,54)" rx="2" ry="2" />
+<text  x="13.43" y="399.5" ></text>
+</g>
+<g >
+<title>ext4_dirty_inode (1,708 samples, 0.04%)</title><rect x="107.0" y="261" width="0.5" height="15.0" fill="rgb(253,178,40)" rx="2" ry="2" />
+<text  x="110.01" y="271.5" ></text>
+</g>
+<g >
+<title>activate_task (13,085 samples, 0.30%)</title><rect x="1045.1" y="357" width="3.6" height="15.0" fill="rgb(243,83,43)" rx="2" ry="2" />
+<text  x="1048.15" y="367.5" ></text>
+</g>
+<g >
+<title>fput (948 samples, 0.02%)</title><rect x="39.0" y="437" width="0.3" height="15.0" fill="rgb(206,226,37)" rx="2" ry="2" />
+<text  x="42.04" y="447.5" ></text>
+</g>
+<g >
+<title>hrtimer_interrupt (1,202 samples, 0.03%)</title><rect x="933.8" y="341" width="0.3" height="15.0" fill="rgb(213,23,24)" rx="2" ry="2" />
+<text  x="936.77" y="351.5" ></text>
+</g>
+<g >
+<title>__pthread_mutex_lock (86,114 samples, 1.98%)</title><rect x="1053.8" y="501" width="23.4" height="15.0" fill="rgb(216,154,8)" rx="2" ry="2" />
+<text  x="1056.81" y="511.5" >_..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64 (678 samples, 0.02%)</title><rect x="21.1" y="485" width="0.2" height="15.0" fill="rgb(211,105,11)" rx="2" ry="2" />
+<text  x="24.12" y="495.5" ></text>
+</g>
+<g >
+<title>sys_close (22,528 samples, 0.52%)</title><rect x="27.9" y="453" width="6.1" height="15.0" fill="rgb(208,204,35)" rx="2" ry="2" />
+<text  x="30.90" y="463.5" ></text>
+</g>
+<g >
+<title>rw_verify_area (8,575 samples, 0.20%)</title><rect x="82.2" y="421" width="2.3" height="15.0" fill="rgb(239,72,32)" rx="2" ry="2" />
+<text  x="85.21" y="431.5" ></text>
+</g>
+<g >
+<title>dput.part.26 (792 samples, 0.02%)</title><rect x="23.7" y="373" width="0.2" height="15.0" fill="rgb(235,169,21)" rx="2" ry="2" />
+<text  x="26.69" y="383.5" ></text>
+</g>
+<g >
+<title>__check_object_size (3,149 samples, 0.07%)</title><rect x="42.8" y="325" width="0.9" height="15.0" fill="rgb(205,170,2)" rx="2" ry="2" />
+<text  x="45.82" y="335.5" ></text>
+</g>
+<g >
+<title>ext4_block_bitmap (380 samples, 0.01%)</title><rect x="109.2" y="245" width="0.1" height="15.0" fill="rgb(234,213,52)" rx="2" ry="2" />
+<text  x="112.21" y="255.5" ></text>
+</g>
+<g >
+<title>ext4_llseek (2,399 samples, 0.06%)</title><rect x="1183.5" y="453" width="0.6" height="15.0" fill="rgb(231,12,23)" rx="2" ry="2" />
+<text  x="1186.45" y="463.5" ></text>
+</g>
+<g >
+<title>__check_block_validity.constprop.80 (1,771 samples, 0.04%)</title><rect x="67.7" y="309" width="0.5" height="15.0" fill="rgb(210,52,54)" rx="2" ry="2" />
+<text  x="70.71" y="319.5" ></text>
+</g>
+<g >
+<title>irq_exit (455 samples, 0.01%)</title><rect x="64.0" y="261" width="0.1" height="15.0" fill="rgb(241,137,43)" rx="2" ry="2" />
+<text  x="66.97" y="271.5" ></text>
+</g>
+<g >
+<title>iomap_apply (140,180 samples, 3.23%)</title><rect x="41.8" y="357" width="38.0" height="15.0" fill="rgb(242,100,51)" rx="2" ry="2" />
+<text  x="44.76" y="367.5" >iom..</text>
+</g>
+<g >
+<title>__update_load_avg_se.isra.37 (370 samples, 0.01%)</title><rect x="1048.6" y="293" width="0.1" height="15.0" fill="rgb(248,186,22)" rx="2" ry="2" />
+<text  x="1051.56" y="303.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64 (598 samples, 0.01%)</title><rect x="1180.6" y="501" width="0.2" height="15.0" fill="rgb(228,75,47)" rx="2" ry="2" />
+<text  x="1183.60" y="511.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (7,642 samples, 0.18%)</title><rect x="933.8" y="357" width="2.0" height="15.0" fill="rgb(205,8,16)" rx="2" ry="2" />
+<text  x="936.77" y="367.5" ></text>
+</g>
+<g >
+<title>__softirqentry_text_start (749 samples, 0.02%)</title><rect x="591.6" y="309" width="0.2" height="15.0" fill="rgb(218,206,8)" rx="2" ry="2" />
+<text  x="594.61" y="319.5" ></text>
+</g>
+<g >
+<title>__vfs_write (31,485 samples, 0.72%)</title><rect x="1111.7" y="437" width="8.6" height="15.0" fill="rgb(217,98,54)" rx="2" ry="2" />
+<text  x="1114.70" y="447.5" ></text>
+</g>
+<g >
+<title>__close (50,913 samples, 1.17%)</title><rect x="20.7" y="501" width="13.8" height="15.0" fill="rgb(213,146,51)" rx="2" ry="2" />
+<text  x="23.70" y="511.5" ></text>
+</g>
+<g >
+<title>rcu_segcblist_enqueue (717 samples, 0.02%)</title><rect x="23.4" y="357" width="0.2" height="15.0" fill="rgb(227,199,51)" rx="2" ry="2" />
+<text  x="26.44" y="367.5" ></text>
+</g>
+<g >
+<title>generic_make_request_checks (787 samples, 0.02%)</title><rect x="110.4" y="229" width="0.2" height="15.0" fill="rgb(243,59,25)" rx="2" ry="2" />
+<text  x="113.35" y="239.5" ></text>
+</g>
+<g >
+<title>native_sched_clock (602 samples, 0.01%)</title><rect x="171.9" y="277" width="0.1" height="15.0" fill="rgb(249,7,23)" rx="2" ry="2" />
+<text  x="174.85" y="287.5" ></text>
+</g>
+<g >
+<title>dput (963 samples, 0.02%)</title><rect x="23.7" y="389" width="0.2" height="15.0" fill="rgb(253,161,45)" rx="2" ry="2" />
+<text  x="26.68" y="399.5" ></text>
+</g>
+<g >
+<title>do_filp_open (116,539 samples, 2.68%)</title><rect x="1122.1" y="437" width="31.7" height="15.0" fill="rgb(244,45,13)" rx="2" ry="2" />
+<text  x="1125.13" y="447.5" >do..</text>
+</g>
+<g >
+<title>find_get_pages_range (1,383 samples, 0.03%)</title><rect x="104.2" y="277" width="0.4" height="15.0" fill="rgb(254,218,2)" rx="2" ry="2" />
+<text  x="107.21" y="287.5" ></text>
+</g>
+<g >
+<title>put_prev_task_fair (942 samples, 0.02%)</title><rect x="190.6" y="341" width="0.2" height="15.0" fill="rgb(241,112,4)" rx="2" ry="2" />
+<text  x="193.58" y="351.5" ></text>
+</g>
+<g >
+<title>mt_llrand (11,167 samples, 0.26%)</title><rect x="1185.0" y="517" width="3.1" height="15.0" fill="rgb(230,208,0)" rx="2" ry="2" />
+<text  x="1188.04" y="527.5" ></text>
+</g>
+<g >
+<title>ext4_journal_check_start (706 samples, 0.02%)</title><rect x="118.1" y="309" width="0.2" height="15.0" fill="rgb(224,108,24)" rx="2" ry="2" />
+<text  x="121.11" y="319.5" ></text>
+</g>
+<g >
+<title>update_process_times (886 samples, 0.02%)</title><rect x="523.6" y="261" width="0.3" height="15.0" fill="rgb(231,142,12)" rx="2" ry="2" />
+<text  x="526.62" y="271.5" ></text>
+</g>
+<g >
+<title>update_cfs_rq_h_load (1,580 samples, 0.04%)</title><rect x="1049.9" y="373" width="0.4" height="15.0" fill="rgb(223,62,16)" rx="2" ry="2" />
+<text  x="1052.90" y="383.5" ></text>
+</g>
+<g >
+<title>ext4_do_update_inode (3,476 samples, 0.08%)</title><rect x="119.3" y="293" width="1.0" height="15.0" fill="rgb(237,148,35)" rx="2" ry="2" />
+<text  x="122.32" y="303.5" ></text>
+</g>
+<g >
+<title>__update_idle_core (831 samples, 0.02%)</title><rect x="190.3" y="341" width="0.3" height="15.0" fill="rgb(239,71,18)" rx="2" ry="2" />
+<text  x="193.33" y="351.5" ></text>
+</g>
+<g >
+<title>_raw_read_lock (5,791 samples, 0.13%)</title><rect x="74.7" y="293" width="1.6" height="15.0" fill="rgb(216,133,2)" rx="2" ry="2" />
+<text  x="77.71" y="303.5" ></text>
+</g>
+<g >
+<title>drop_futex_key_refs.isra.15 (26,464 samples, 0.61%)</title><rect x="526.1" y="389" width="7.2" height="15.0" fill="rgb(207,225,32)" rx="2" ry="2" />
+<text  x="529.12" y="399.5" ></text>
+</g>
+<g >
+<title>wake_up_q (142,779 samples, 3.29%)</title><rect x="1012.0" y="405" width="38.8" height="15.0" fill="rgb(241,157,0)" rx="2" ry="2" />
+<text  x="1015.03" y="415.5" >wak..</text>
+</g>
+<g >
+<title>__pmem_direct_access (589 samples, 0.01%)</title><rect x="64.5" y="293" width="0.2" height="15.0" fill="rgb(239,45,24)" rx="2" ry="2" />
+<text  x="67.54" y="303.5" ></text>
+</g>
+<g >
+<title>__fdget_pos (8,070 samples, 0.19%)</title><rect x="1181.2" y="453" width="2.2" height="15.0" fill="rgb(242,133,29)" rx="2" ry="2" />
+<text  x="1184.24" y="463.5" ></text>
+</g>
+<g >
+<title>migrate_misplaced_page (1,372 samples, 0.03%)</title><rect x="97.8" y="181" width="0.4" height="15.0" fill="rgb(205,142,22)" rx="2" ry="2" />
+<text  x="100.82" y="191.5" ></text>
+</g>
+<g >
+<title>syscall_return_via_sysret (1,318 samples, 0.03%)</title><rect x="1163.5" y="501" width="0.3" height="15.0" fill="rgb(246,55,29)" rx="2" ry="2" />
+<text  x="1166.46" y="511.5" ></text>
+</g>
+<g >
+<title>legitimize_path.isra.29 (6,217 samples, 0.14%)</title><rect x="1122.8" y="373" width="1.6" height="15.0" fill="rgb(245,172,31)" rx="2" ry="2" />
+<text  x="1125.75" y="383.5" ></text>
+</g>
+<g >
+<title>hrtimer_interrupt (1,275 samples, 0.03%)</title><rect x="523.6" y="325" width="0.3" height="15.0" fill="rgb(222,87,8)" rx="2" ry="2" />
+<text  x="526.56" y="335.5" ></text>
+</g>
+<g >
+<title>smp_call_function_interrupt (430 samples, 0.01%)</title><rect x="525.8" y="341" width="0.1" height="15.0" fill="rgb(222,83,14)" rx="2" ry="2" />
+<text  x="528.83" y="351.5" ></text>
+</g>
+<g >
+<title>native_queued_spin_lock_slowpath (1,022,757 samples, 23.55%)</title><rect x="658.1" y="389" width="277.9" height="15.0" fill="rgb(253,184,11)" rx="2" ry="2" />
+<text  x="661.11" y="399.5" >native_queued_spin_lock_slowpath</text>
+</g>
+<g >
+<title>next_bio (622 samples, 0.01%)</title><rect x="110.0" y="261" width="0.1" height="15.0" fill="rgb(239,81,6)" rx="2" ry="2" />
+<text  x="112.96" y="271.5" ></text>
+</g>
+<g >
+<title>update_cfs_group (3,660 samples, 0.08%)</title><rect x="175.8" y="309" width="1.0" height="15.0" fill="rgb(228,206,13)" rx="2" ry="2" />
+<text  x="178.85" y="319.5" ></text>
+</g>
+<g >
+<title>copy_user_enhanced_fast_string (74,550 samples, 1.72%)</title><rect x="44.0" y="309" width="20.2" height="15.0" fill="rgb(242,147,24)" rx="2" ry="2" />
+<text  x="46.95" y="319.5" ></text>
+</g>
+<g >
+<title>sched_clock (638 samples, 0.01%)</title><rect x="171.8" y="293" width="0.2" height="15.0" fill="rgb(234,40,16)" rx="2" ry="2" />
+<text  x="174.84" y="303.5" ></text>
+</g>
+<g >
+<title>account_entity_dequeue (598 samples, 0.01%)</title><rect x="174.7" y="325" width="0.2" height="15.0" fill="rgb(218,176,19)" rx="2" ry="2" />
+<text  x="177.70" y="335.5" ></text>
+</g>
+<g >
+<title>ext4_read_block_bitmap_nowait (381 samples, 0.01%)</title><rect x="109.3" y="245" width="0.1" height="15.0" fill="rgb(209,109,12)" rx="2" ry="2" />
+<text  x="112.32" y="255.5" ></text>
+</g>
+<g >
+<title>sched_clock_cpu (1,123 samples, 0.03%)</title><rect x="191.0" y="341" width="0.4" height="15.0" fill="rgb(212,99,52)" rx="2" ry="2" />
+<text  x="194.05" y="351.5" ></text>
+</g>
+<g >
+<title>pmem_dax_direct_access (881 samples, 0.02%)</title><rect x="64.5" y="309" width="0.2" height="15.0" fill="rgb(210,219,53)" rx="2" ry="2" />
+<text  x="67.46" y="319.5" ></text>
+</g>
+<g >
+<title>rcu_process_callbacks (5,727 samples, 0.13%)</title><rect x="524.0" y="293" width="1.5" height="15.0" fill="rgb(237,122,8)" rx="2" ry="2" />
+<text  x="526.96" y="303.5" ></text>
+</g>
+<g >
+<title>__fget_light (6,317 samples, 0.15%)</title><rect x="36.8" y="421" width="1.8" height="15.0" fill="rgb(242,27,39)" rx="2" ry="2" />
+<text  x="39.84" y="431.5" ></text>
+</g>
+<g >
+<title>down_read_trylock (5,257 samples, 0.12%)</title><rect x="79.8" y="373" width="1.5" height="15.0" fill="rgb(240,215,32)" rx="2" ry="2" />
+<text  x="82.84" y="383.5" ></text>
+</g>
+<g >
+<title>ext4_reserve_inode_write (562 samples, 0.01%)</title><rect x="121.3" y="309" width="0.2" height="15.0" fill="rgb(225,213,45)" rx="2" ry="2" />
+<text  x="124.31" y="319.5" ></text>
+</g>
+<g >
+<title>__handle_mm_fault (802 samples, 0.02%)</title><rect x="1120.5" y="437" width="0.3" height="15.0" fill="rgb(218,53,7)" rx="2" ry="2" />
+<text  x="1123.54" y="447.5" ></text>
+</g>
+<g >
+<title>dax_iomap_rw (131,558 samples, 3.03%)</title><rect x="85.9" y="373" width="35.8" height="15.0" fill="rgb(250,166,46)" rx="2" ry="2" />
+<text  x="88.95" y="383.5" >dax..</text>
+</g>
+<g >
+<title>rcu_process_callbacks (376 samples, 0.01%)</title><rect x="64.0" y="229" width="0.1" height="15.0" fill="rgb(249,229,18)" rx="2" ry="2" />
+<text  x="66.98" y="239.5" ></text>
+</g>
+<g >
+<title>__srcu_read_unlock (2,960 samples, 0.07%)</title><rect x="65.0" y="309" width="0.8" height="15.0" fill="rgb(231,214,3)" rx="2" ry="2" />
+<text  x="67.95" y="319.5" ></text>
+</g>
+<g >
+<title>dax_read_lock (878 samples, 0.02%)</title><rect x="64.7" y="325" width="0.2" height="15.0" fill="rgb(212,178,23)" rx="2" ry="2" />
+<text  x="67.71" y="335.5" ></text>
+</g>
+<g >
+<title>ext4_superblock_csum_set (642 samples, 0.01%)</title><rect x="120.8" y="293" width="0.1" height="15.0" fill="rgb(234,31,38)" rx="2" ry="2" />
+<text  x="123.77" y="303.5" ></text>
+</g>
+<g >
+<title>try_to_unmap_one (922 samples, 0.02%)</title><rect x="97.9" y="101" width="0.3" height="15.0" fill="rgb(216,38,8)" rx="2" ry="2" />
+<text  x="100.92" y="111.5" ></text>
+</g>
+<g >
+<title>submit_bio_wait_endio (2,210 samples, 0.05%)</title><rect x="110.7" y="197" width="0.6" height="15.0" fill="rgb(233,72,40)" rx="2" ry="2" />
+<text  x="113.69" y="207.5" ></text>
+</g>
+<g >
+<title>update_process_times (812 samples, 0.02%)</title><rect x="933.8" y="277" width="0.2" height="15.0" fill="rgb(224,163,6)" rx="2" ry="2" />
+<text  x="936.82" y="287.5" ></text>
+</g>
+<g >
+<title>call_rcu_sched (2,322 samples, 0.05%)</title><rect x="23.0" y="389" width="0.7" height="15.0" fill="rgb(238,82,48)" rx="2" ry="2" />
+<text  x="26.02" y="399.5" ></text>
+</g>
+<g >
+<title>pmem_do_bvec (18,814 samples, 0.43%)</title><rect x="111.3" y="213" width="5.2" height="15.0" fill="rgb(219,70,23)" rx="2" ry="2" />
+<text  x="114.34" y="223.5" ></text>
+</g>
+<g >
+<title>__libc_write (219,481 samples, 5.05%)</title><rect x="85.4" y="501" width="59.7" height="15.0" fill="rgb(250,176,13)" rx="2" ry="2" />
+<text  x="88.45" y="511.5" >__libc..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (31,751 samples, 0.73%)</title><rect x="1111.7" y="501" width="8.6" height="15.0" fill="rgb(205,43,0)" rx="2" ry="2" />
+<text  x="1114.67" y="511.5" ></text>
+</g>
+<g >
+<title>__srcu_read_unlock (13,625 samples, 0.31%)</title><rect x="98.7" y="309" width="3.7" height="15.0" fill="rgb(248,125,48)" rx="2" ry="2" />
+<text  x="101.69" y="319.5" ></text>
+</g>
+<g >
+<title>generic_permission (8,349 samples, 0.19%)</title><rect x="1136.3" y="357" width="2.3" height="15.0" fill="rgb(242,9,53)" rx="2" ry="2" />
+<text  x="1139.34" y="367.5" ></text>
+</g>
+<g >
+<title>lockref_put_return (1,217 samples, 0.03%)</title><rect x="1151.0" y="309" width="0.3" height="15.0" fill="rgb(224,88,1)" rx="2" ry="2" />
+<text  x="1153.97" y="319.5" ></text>
+</g>
+<g >
+<title>touch_atime (1,755 samples, 0.04%)</title><rect x="81.3" y="373" width="0.5" height="15.0" fill="rgb(241,158,37)" rx="2" ry="2" />
+<text  x="84.28" y="383.5" ></text>
+</g>
+<g >
+<title>__ext4_journal_get_write_access (507 samples, 0.01%)</title><rect x="107.9" y="261" width="0.2" height="15.0" fill="rgb(221,74,47)" rx="2" ry="2" />
+<text  x="110.93" y="271.5" ></text>
+</g>
+<g >
+<title>dax_iomap_actor (60,380 samples, 1.39%)</title><rect x="86.1" y="341" width="16.4" height="15.0" fill="rgb(242,4,20)" rx="2" ry="2" />
+<text  x="89.05" y="351.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (7,669 samples, 0.18%)</title><rect x="933.8" y="373" width="2.0" height="15.0" fill="rgb(217,100,15)" rx="2" ry="2" />
+<text  x="936.76" y="383.5" ></text>
+</g>
+<g >
+<title>ext4_find_extent (1,731 samples, 0.04%)</title><rect x="106.4" y="293" width="0.5" height="15.0" fill="rgb(230,45,48)" rx="2" ry="2" />
+<text  x="109.43" y="303.5" ></text>
+</g>
+<g >
+<title>ext4_file_read_iter (152,549 samples, 3.51%)</title><rect x="40.6" y="389" width="41.4" height="15.0" fill="rgb(208,76,0)" rx="2" ry="2" />
+<text  x="43.59" y="399.5" >ext..</text>
+</g>
+<g >
+<title>link_path_walk (37,741 samples, 0.87%)</title><rect x="1134.1" y="405" width="10.3" height="15.0" fill="rgb(241,132,42)" rx="2" ry="2" />
+<text  x="1137.14" y="415.5" ></text>
+</g>
+<g >
+<title>prefetch_freepointer (402 samples, 0.01%)</title><rect x="1129.9" y="373" width="0.1" height="15.0" fill="rgb(253,90,3)" rx="2" ry="2" />
+<text  x="1132.86" y="383.5" ></text>
+</g>
+<g >
+<title>[unknown] (4,054,584 samples, 93.35%)</title><rect x="10.0" y="517" width="1101.5" height="15.0" fill="rgb(229,153,45)" rx="2" ry="2" />
+<text  x="13.00" y="527.5" >[unknown]</text>
+</g>
+<g >
+<title>__slab_free (385 samples, 0.01%)</title><rect x="935.3" y="261" width="0.2" height="15.0" fill="rgb(232,142,16)" rx="2" ry="2" />
+<text  x="938.35" y="271.5" ></text>
+</g>
+<g >
+<title>irq_exit (1,250 samples, 0.03%)</title><rect x="590.8" y="341" width="0.3" height="15.0" fill="rgb(210,84,16)" rx="2" ry="2" />
+<text  x="593.79" y="351.5" ></text>
+</g>
+<g >
+<title>ext4_release_file (1,211 samples, 0.03%)</title><rect x="23.9" y="389" width="0.4" height="15.0" fill="rgb(253,87,23)" rx="2" ry="2" />
+<text  x="26.94" y="399.5" ></text>
+</g>
+<g >
+<title>rwsem_down_write_failed (83,206 samples, 1.92%)</title><rect x="121.8" y="341" width="22.6" height="15.0" fill="rgb(241,107,53)" rx="2" ry="2" />
+<text  x="124.75" y="351.5" >r..</text>
+</g>
+<g >
+<title>ext4_iomap_begin (1,363 samples, 0.03%)</title><rect x="1112.2" y="357" width="0.4" height="15.0" fill="rgb(206,160,53)" rx="2" ry="2" />
+<text  x="1115.24" y="367.5" ></text>
+</g>
+<g >
+<title>path_openat (115,729 samples, 2.66%)</title><rect x="1122.3" y="421" width="31.4" height="15.0" fill="rgb(246,199,50)" rx="2" ry="2" />
+<text  x="1125.31" y="431.5" >pa..</text>
+</g>
+<g >
+<title>iput (15,152 samples, 0.35%)</title><rect x="159.9" y="389" width="4.2" height="15.0" fill="rgb(251,216,51)" rx="2" ry="2" />
+<text  x="162.95" y="399.5" ></text>
+</g>
+<g >
+<title>prefetch_freepointer (389 samples, 0.01%)</title><rect x="1161.6" y="389" width="0.1" height="15.0" fill="rgb(246,228,25)" rx="2" ry="2" />
+<text  x="1164.62" y="399.5" ></text>
+</g>
+<g >
+<title>avd_get_str (894 samples, 0.02%)</title><rect x="1093.1" y="501" width="0.2" height="15.0" fill="rgb(245,161,33)" rx="2" ry="2" />
+<text  x="1096.09" y="511.5" ></text>
+</g>
+<g >
+<title>__copy_user_nocache (1,666 samples, 0.04%)</title><rect x="1111.8" y="293" width="0.4" height="15.0" fill="rgb(221,50,1)" rx="2" ry="2" />
+<text  x="1114.76" y="303.5" ></text>
+</g>
+<g >
+<title>__fget (5,351 samples, 0.12%)</title><rect x="37.1" y="405" width="1.5" height="15.0" fill="rgb(214,43,6)" rx="2" ry="2" />
+<text  x="40.10" y="415.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64 (2,275 samples, 0.05%)</title><rect x="155.7" y="485" width="0.7" height="15.0" fill="rgb(237,57,44)" rx="2" ry="2" />
+<text  x="158.73" y="495.5" ></text>
+</g>
+<g >
+<title>kmem_cache_alloc (821 samples, 0.02%)</title><rect x="1133.6" y="373" width="0.2" height="15.0" fill="rgb(233,20,44)" rx="2" ry="2" />
+<text  x="1136.58" y="383.5" ></text>
+</g>
+<g >
+<title>dax_copy_from_iter (45,764 samples, 1.05%)</title><rect x="86.2" y="325" width="12.4" height="15.0" fill="rgb(232,75,16)" rx="2" ry="2" />
+<text  x="89.18" y="335.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (153,682 samples, 3.54%)</title><rect x="1121.5" y="485" width="41.8" height="15.0" fill="rgb(230,158,30)" rx="2" ry="2" />
+<text  x="1124.53" y="495.5" >do_..</text>
+</g>
+<g >
+<title>new_sync_read (155,174 samples, 3.57%)</title><rect x="39.9" y="405" width="42.2" height="15.0" fill="rgb(225,131,43)" rx="2" ry="2" />
+<text  x="42.92" y="415.5" >new..</text>
+</g>
+<g >
+<title>syscall_return_via_sysret (1,008 samples, 0.02%)</title><rect x="1184.5" y="501" width="0.3" height="15.0" fill="rgb(242,35,16)" rx="2" ry="2" />
+<text  x="1187.48" y="511.5" ></text>
+</g>
+<g >
+<title>fput (539 samples, 0.01%)</title><rect x="1184.1" y="453" width="0.1" height="15.0" fill="rgb(250,132,11)" rx="2" ry="2" />
+<text  x="1187.10" y="463.5" ></text>
+</g>
+<g >
+<title>file_free_rcu (618 samples, 0.01%)</title><rect x="189.0" y="261" width="0.2" height="15.0" fill="rgb(212,225,31)" rx="2" ry="2" />
+<text  x="192.00" y="271.5" ></text>
+</g>
+<g >
+<title>__softirqentry_text_start (493 samples, 0.01%)</title><rect x="1077.0" y="437" width="0.2" height="15.0" fill="rgb(211,11,37)" rx="2" ry="2" />
+<text  x="1080.04" y="447.5" ></text>
+</g>
+<g >
+<title>intel_bts_enable_local (632 samples, 0.01%)</title><rect x="184.6" y="277" width="0.2" height="15.0" fill="rgb(212,15,13)" rx="2" ry="2" />
+<text  x="187.58" y="287.5" ></text>
+</g>
+<g >
+<title>__check_heap_object (774 samples, 0.02%)</title><rect x="1162.4" y="373" width="0.2" height="15.0" fill="rgb(212,50,52)" rx="2" ry="2" />
+<text  x="1165.42" y="383.5" ></text>
+</g>
+<g >
+<title>malloc (1,086 samples, 0.03%)</title><rect x="1111.0" y="501" width="0.3" height="15.0" fill="rgb(215,34,40)" rx="2" ry="2" />
+<text  x="1113.96" y="511.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (154,506 samples, 3.56%)</title><rect x="1121.5" y="501" width="42.0" height="15.0" fill="rgb(229,51,41)" rx="2" ry="2" />
+<text  x="1124.48" y="511.5" >ent..</text>
+</g>
+<g >
+<title>__ext4_journal_start_sb (631 samples, 0.01%)</title><rect x="1112.3" y="341" width="0.1" height="15.0" fill="rgb(212,188,18)" rx="2" ry="2" />
+<text  x="1115.27" y="351.5" ></text>
+</g>
+<g >
+<title>dput.part.26 (845 samples, 0.02%)</title><rect x="1147.7" y="373" width="0.2" height="15.0" fill="rgb(232,12,44)" rx="2" ry="2" />
+<text  x="1150.66" y="383.5" ></text>
+</g>
+<g >
+<title>__lll_lock_wait (1,800,132 samples, 41.44%)</title><rect x="145.1" y="501" width="489.0" height="15.0" fill="rgb(248,181,45)" rx="2" ry="2" />
+<text  x="148.07" y="511.5" >__lll_lock_wait</text>
+</g>
+<g >
+<title>__read_extent_tree_block (823 samples, 0.02%)</title><rect x="106.6" y="277" width="0.3" height="15.0" fill="rgb(232,157,37)" rx="2" ry="2" />
+<text  x="109.64" y="287.5" ></text>
+</g>
+<g >
+<title>run_rebalance_domains (939 samples, 0.02%)</title><rect x="525.5" y="293" width="0.3" height="15.0" fill="rgb(209,26,36)" rx="2" ry="2" />
+<text  x="528.52" y="303.5" ></text>
+</g>
+<g >
+<title>vfs_write (218,171 samples, 5.02%)</title><rect x="85.8" y="437" width="59.2" height="15.0" fill="rgb(228,221,22)" rx="2" ry="2" />
+<text  x="88.75" y="447.5" >vfs_wr..</text>
+</g>
+<g >
+<title>flowop_start (1,899 samples, 0.04%)</title><rect x="1177.4" y="517" width="0.5" height="15.0" fill="rgb(234,29,4)" rx="2" ry="2" />
+<text  x="1180.39" y="527.5" ></text>
+</g>
+<g >
+<title>page_fault (1,273 samples, 0.03%)</title><rect x="1111.9" y="277" width="0.3" height="15.0" fill="rgb(237,36,12)" rx="2" ry="2" />
+<text  x="1114.87" y="287.5" ></text>
+</g>
+<g >
+<title>flowoplib_readwholefile (4,041 samples, 0.09%)</title><rect x="1178.2" y="517" width="1.1" height="15.0" fill="rgb(240,1,13)" rx="2" ry="2" />
+<text  x="1181.17" y="527.5" ></text>
+</g>
+<g >
+<title>avd_get_str (566 samples, 0.01%)</title><rect x="1165.1" y="517" width="0.1" height="15.0" fill="rgb(231,130,17)" rx="2" ry="2" />
+<text  x="1168.06" y="527.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (1,259 samples, 0.03%)</title><rect x="188.9" y="341" width="0.3" height="15.0" fill="rgb(236,61,53)" rx="2" ry="2" />
+<text  x="191.89" y="351.5" ></text>
+</g>
+<g >
+<title>dput (1,614 samples, 0.04%)</title><rect x="1150.9" y="341" width="0.4" height="15.0" fill="rgb(209,115,54)" rx="2" ry="2" />
+<text  x="1153.91" y="351.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum.isra.57 (1,076 samples, 0.02%)</title><rect x="119.9" y="261" width="0.3" height="15.0" fill="rgb(236,24,25)" rx="2" ry="2" />
+<text  x="122.94" y="271.5" ></text>
+</g>
+<g >
+<title>fsnotify (406 samples, 0.01%)</title><rect x="82.1" y="421" width="0.1" height="15.0" fill="rgb(208,116,47)" rx="2" ry="2" />
+<text  x="85.08" y="431.5" ></text>
+</g>
+<g >
+<title>jbd2_journal_stop (1,434 samples, 0.03%)</title><rect x="103.7" y="309" width="0.4" height="15.0" fill="rgb(240,217,26)" rx="2" ry="2" />
+<text  x="106.68" y="319.5" ></text>
+</g>
+<g >
+<title>do_page_fault (1,273 samples, 0.03%)</title><rect x="1111.9" y="261" width="0.3" height="15.0" fill="rgb(243,9,20)" rx="2" ry="2" />
+<text  x="1114.87" y="271.5" ></text>
+</g>
+<g >
+<title>__do_page_fault (1,262 samples, 0.03%)</title><rect x="1111.9" y="245" width="0.3" height="15.0" fill="rgb(245,94,29)" rx="2" ry="2" />
+<text  x="1114.87" y="255.5" ></text>
+</g>
+<g >
+<title>ext4_file_write_iter (31,425 samples, 0.72%)</title><rect x="1111.7" y="405" width="8.6" height="15.0" fill="rgb(208,111,13)" rx="2" ry="2" />
+<text  x="1114.71" y="415.5" ></text>
+</g>
+<g >
+<title>all (4,343,610 samples, 100%)</title><rect x="10.0" y="549" width="1180.0" height="15.0" fill="rgb(242,73,48)" rx="2" ry="2" />
+<text  x="13.00" y="559.5" ></text>
+</g>
+<g >
+<title>avd_get_int (397 samples, 0.01%)</title><rect x="1165.0" y="517" width="0.1" height="15.0" fill="rgb(245,5,36)" rx="2" ry="2" />
+<text  x="1167.95" y="527.5" ></text>
+</g>
+<g >
+<title>__memset_avx2_erms (1,742 samples, 0.04%)</title><rect x="1120.3" y="517" width="0.5" height="15.0" fill="rgb(215,224,24)" rx="2" ry="2" />
+<text  x="1123.33" y="527.5" ></text>
+</g>
+<g >
+<title>__softirqentry_text_start (549 samples, 0.01%)</title><rect x="976.7" y="325" width="0.2" height="15.0" fill="rgb(205,147,2)" rx="2" ry="2" />
+<text  x="979.75" y="335.5" ></text>
+</g>
+<g >
+<title>mutex_lock (666 samples, 0.02%)</title><rect x="1183.2" y="437" width="0.2" height="15.0" fill="rgb(251,150,48)" rx="2" ry="2" />
+<text  x="1186.25" y="447.5" ></text>
+</g>
+<g >
+<title>iput (26,251 samples, 0.60%)</title><rect x="526.2" y="373" width="7.1" height="15.0" fill="rgb(222,91,34)" rx="2" ry="2" />
+<text  x="529.18" y="383.5" ></text>
+</g>
+<g >
+<title>ext4_mark_iloc_dirty (993 samples, 0.02%)</title><rect x="117.2" y="309" width="0.3" height="15.0" fill="rgb(207,17,36)" rx="2" ry="2" />
+<text  x="120.20" y="319.5" ></text>
+</g>
+<g >
+<title>generic_permission (950 samples, 0.02%)</title><rect x="1147.0" y="357" width="0.3" height="15.0" fill="rgb(224,20,22)" rx="2" ry="2" />
+<text  x="1150.04" y="367.5" ></text>
+</g>
+<g >
+<title>errseq_sample (1,740 samples, 0.04%)</title><rect x="1153.2" y="389" width="0.4" height="15.0" fill="rgb(219,12,27)" rx="2" ry="2" />
+<text  x="1156.17" y="399.5" ></text>
+</g>
+<g >
+<title>_raw_spin_trylock (418 samples, 0.01%)</title><rect x="109.1" y="245" width="0.1" height="15.0" fill="rgb(210,94,45)" rx="2" ry="2" />
+<text  x="112.09" y="255.5" ></text>
+</g>
+<g >
+<title>do_futex (1,524,000 samples, 35.09%)</title><rect x="637.2" y="437" width="414.0" height="15.0" fill="rgb(215,187,1)" rx="2" ry="2" />
+<text  x="640.23" y="447.5" >do_futex</text>
+</g>
+<g >
+<title>jbd2_journal_get_write_access (473 samples, 0.01%)</title><rect x="107.9" y="245" width="0.2" height="15.0" fill="rgb(232,202,3)" rx="2" ry="2" />
+<text  x="110.94" y="255.5" ></text>
+</g>
+<g >
+<title>resched_curr (2,426 samples, 0.06%)</title><rect x="1049.1" y="325" width="0.6" height="15.0" fill="rgb(225,108,3)" rx="2" ry="2" />
+<text  x="1052.06" y="335.5" ></text>
+</g>
+<g >
+<title>ext4_iomap_end (444 samples, 0.01%)</title><rect x="79.7" y="341" width="0.1" height="15.0" fill="rgb(213,97,1)" rx="2" ry="2" />
+<text  x="82.68" y="351.5" ></text>
+</g>
+<g >
+<title>__wake_up_common_lock (713 samples, 0.02%)</title><rect x="103.8" y="277" width="0.2" height="15.0" fill="rgb(237,221,30)" rx="2" ry="2" />
+<text  x="106.84" y="287.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (1,253 samples, 0.03%)</title><rect x="188.9" y="325" width="0.3" height="15.0" fill="rgb(254,32,26)" rx="2" ry="2" />
+<text  x="191.89" y="335.5" ></text>
+</g>
+<g >
+<title>_copy_from_iter_flushcache (45,718 samples, 1.05%)</title><rect x="86.2" y="293" width="12.4" height="15.0" fill="rgb(240,111,47)" rx="2" ry="2" />
+<text  x="89.20" y="303.5" ></text>
+</g>
+<g >
+<title>filebench_log (4,021 samples, 0.09%)</title><rect x="1170.0" y="517" width="1.1" height="15.0" fill="rgb(232,41,51)" rx="2" ry="2" />
+<text  x="1172.97" y="527.5" ></text>
+</g>
+<g >
+<title>lookup_fast (7,735 samples, 0.18%)</title><rect x="1144.4" y="405" width="2.1" height="15.0" fill="rgb(228,157,47)" rx="2" ry="2" />
+<text  x="1147.40" y="415.5" ></text>
+</g>
+<g >
+<title>pmem_dax_direct_access (763 samples, 0.02%)</title><rect x="65.8" y="325" width="0.2" height="15.0" fill="rgb(253,19,41)" rx="2" ry="2" />
+<text  x="68.76" y="335.5" ></text>
+</g>
+<g >
+<title>fb_strlcat (11,425 samples, 0.26%)</title><rect x="1093.4" y="501" width="3.1" height="15.0" fill="rgb(247,97,42)" rx="2" ry="2" />
+<text  x="1096.42" y="511.5" ></text>
+</g>
+<g >
+<title>ext4_extent_block_csum_set (2,758 samples, 0.06%)</title><rect x="105.6" y="261" width="0.7" height="15.0" fill="rgb(250,0,39)" rx="2" ry="2" />
+<text  x="108.57" y="271.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (1,195 samples, 0.03%)</title><rect x="1036.3" y="373" width="0.3" height="15.0" fill="rgb(248,118,22)" rx="2" ry="2" />
+<text  x="1039.31" y="383.5" ></text>
+</g>
+<g >
+<title>submit_bio (22,948 samples, 0.53%)</title><rect x="110.3" y="261" width="6.2" height="15.0" fill="rgb(228,212,8)" rx="2" ry="2" />
+<text  x="113.28" y="271.5" ></text>
+</g>
+<g >
+<title>__follow_mount_rcu.isra.27 (2,446 samples, 0.06%)</title><rect x="1143.7" y="357" width="0.7" height="15.0" fill="rgb(229,158,54)" rx="2" ry="2" />
+<text  x="1146.71" y="367.5" ></text>
+</g>
+<g >
+<title>__sched_text_start (393 samples, 0.01%)</title><rect x="1052.6" y="389" width="0.2" height="15.0" fill="rgb(251,19,37)" rx="2" ry="2" />
+<text  x="1055.64" y="399.5" ></text>
+</g>
+<g >
+<title>crypto_shash_update (674 samples, 0.02%)</title><rect x="120.1" y="245" width="0.1" height="15.0" fill="rgb(211,64,41)" rx="2" ry="2" />
+<text  x="123.05" y="255.5" ></text>
+</g>
+<g >
+<title>get_empty_filp (34,949 samples, 0.80%)</title><rect x="1124.5" y="405" width="9.5" height="15.0" fill="rgb(245,146,43)" rx="2" ry="2" />
+<text  x="1127.46" y="415.5" ></text>
+</g>
+<g >
+<title>ipc_mutex_unlock (913 samples, 0.02%)</title><rect x="1110.0" y="501" width="0.2" height="15.0" fill="rgb(235,8,4)" rx="2" ry="2" />
+<text  x="1112.99" y="511.5" ></text>
+</g>
+<g >
+<title>dax_iomap_actor (1,803 samples, 0.04%)</title><rect x="1111.7" y="357" width="0.5" height="15.0" fill="rgb(235,123,24)" rx="2" ry="2" />
+<text  x="1114.74" y="367.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (382 samples, 0.01%)</title><rect x="936.0" y="389" width="0.1" height="15.0" fill="rgb(242,4,15)" rx="2" ry="2" />
+<text  x="938.96" y="399.5" ></text>
+</g>
+<g >
+<title>ext4_es_lookup_extent (1,727 samples, 0.04%)</title><rect x="104.8" y="309" width="0.5" height="15.0" fill="rgb(219,224,18)" rx="2" ry="2" />
+<text  x="107.84" y="319.5" ></text>
+</g>
+<g >
+<title>migrate_pages (557 samples, 0.01%)</title><rect x="1112.1" y="181" width="0.1" height="15.0" fill="rgb(221,19,15)" rx="2" ry="2" />
+<text  x="1115.05" y="191.5" ></text>
+</g>
+<g >
+<title>kmem_cache_alloc (8,337 samples, 0.19%)</title><rect x="1127.7" y="389" width="2.3" height="15.0" fill="rgb(241,122,11)" rx="2" ry="2" />
+<text  x="1130.70" y="399.5" ></text>
+</g>
+<g >
+<title>file_free_rcu (452 samples, 0.01%)</title><rect x="1040.4" y="277" width="0.1" height="15.0" fill="rgb(231,206,19)" rx="2" ry="2" />
+<text  x="1043.39" y="287.5" ></text>
+</g>
+<g >
+<title>sys_futex (1,749,709 samples, 40.28%)</title><rect x="157.3" y="453" width="475.4" height="15.0" fill="rgb(250,115,20)" rx="2" ry="2" />
+<text  x="160.32" y="463.5" >sys_futex</text>
+</g>
+<g >
+<title>ttwu_do_wakeup (4,188 samples, 0.10%)</title><rect x="1048.8" y="357" width="1.1" height="15.0" fill="rgb(212,69,29)" rx="2" ry="2" />
+<text  x="1051.76" y="367.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (681 samples, 0.02%)</title><rect x="976.0" y="373" width="0.2" height="15.0" fill="rgb(240,79,50)" rx="2" ry="2" />
+<text  x="979.04" y="383.5" ></text>
+</g>
+<g >
+<title>ttwu_do_activate (17,588 samples, 0.40%)</title><rect x="1045.1" y="373" width="4.8" height="15.0" fill="rgb(252,155,31)" rx="2" ry="2" />
+<text  x="1048.12" y="383.5" ></text>
+</g>
+<g >
+<title>fileset_pick (6,590 samples, 0.15%)</title><rect x="18.8" y="341" width="1.8" height="15.0" fill="rgb(218,44,4)" rx="2" ry="2" />
+<text  x="21.82" y="351.5" ></text>
+</g>
+<g >
+<title>fileset_openfile (4,296 samples, 0.10%)</title><rect x="1171.1" y="517" width="1.1" height="15.0" fill="rgb(251,70,31)" rx="2" ry="2" />
+<text  x="1174.06" y="527.5" ></text>
+</g>
+<g >
+<title>call_function_interrupt (390 samples, 0.01%)</title><rect x="935.8" y="373" width="0.1" height="15.0" fill="rgb(236,214,25)" rx="2" ry="2" />
+<text  x="938.84" y="383.5" ></text>
+</g>
+<g >
+<title>ext4_ext_map_blocks (16,476 samples, 0.38%)</title><rect x="105.3" y="309" width="4.5" height="15.0" fill="rgb(217,14,10)" rx="2" ry="2" />
+<text  x="108.33" y="319.5" ></text>
+</g>
+<g >
+<title>tick_sched_timer (920 samples, 0.02%)</title><rect x="933.8" y="309" width="0.2" height="15.0" fill="rgb(229,20,30)" rx="2" ry="2" />
+<text  x="936.80" y="319.5" ></text>
+</g>
+<g >
+<title>sched_clock (1,019 samples, 0.02%)</title><rect x="191.1" y="325" width="0.3" height="15.0" fill="rgb(252,136,4)" rx="2" ry="2" />
+<text  x="194.07" y="335.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (551 samples, 0.01%)</title><rect x="63.9" y="293" width="0.2" height="15.0" fill="rgb(254,134,37)" rx="2" ry="2" />
+<text  x="66.95" y="303.5" ></text>
+</g>
+<g >
+<title>_copy_to_iter (75,459 samples, 1.74%)</title><rect x="43.7" y="325" width="20.5" height="15.0" fill="rgb(229,178,44)" rx="2" ry="2" />
+<text  x="46.74" y="335.5" ></text>
+</g>
+<g >
+<title>__fdget_pos (928 samples, 0.02%)</title><rect x="1110.4" y="437" width="0.2" height="15.0" fill="rgb(214,218,49)" rx="2" ry="2" />
+<text  x="1113.39" y="447.5" ></text>
+</g>
+<g >
+<title>__unqueue_futex (18,150 samples, 0.42%)</title><rect x="1006.2" y="389" width="5.0" height="15.0" fill="rgb(248,195,24)" rx="2" ry="2" />
+<text  x="1009.22" y="399.5" ></text>
+</g>
+<g >
+<title>pmem_copy_from_iter (45,734 samples, 1.05%)</title><rect x="86.2" y="309" width="12.4" height="15.0" fill="rgb(223,37,13)" rx="2" ry="2" />
+<text  x="89.19" y="319.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (1,049,324 samples, 24.16%)</title><rect x="650.9" y="405" width="285.1" height="15.0" fill="rgb(215,182,19)" rx="2" ry="2" />
+<text  x="653.89" y="415.5" >_raw_spin_lock</text>
+</g>
+<g >
+<title>avd_get_bool (2,264 samples, 0.05%)</title><rect x="1092.1" y="501" width="0.6" height="15.0" fill="rgb(237,56,24)" rx="2" ry="2" />
+<text  x="1095.09" y="511.5" ></text>
+</g>
+<g >
+<title>__softirqentry_text_start (478 samples, 0.01%)</title><rect x="526.0" y="341" width="0.1" height="15.0" fill="rgb(253,86,49)" rx="2" ry="2" />
+<text  x="528.98" y="351.5" ></text>
+</g>
+<g >
+<title>plist_add (7,307 samples, 0.17%)</title><rect x="166.7" y="389" width="2.0" height="15.0" fill="rgb(241,70,9)" rx="2" ry="2" />
+<text  x="169.75" y="399.5" ></text>
+</g>
+<g >
+<title>__softirqentry_text_start (6,354 samples, 0.15%)</title><rect x="934.1" y="325" width="1.7" height="15.0" fill="rgb(225,160,40)" rx="2" ry="2" />
+<text  x="937.10" y="335.5" ></text>
+</g>
+<g >
+<title>fileset_unbusy (819 samples, 0.02%)</title><rect x="1101.9" y="501" width="0.2" height="15.0" fill="rgb(230,12,4)" rx="2" ry="2" />
+<text  x="1104.91" y="511.5" ></text>
+</g>
+<g >
+<title>sys_futex (1,525,620 samples, 35.12%)</title><rect x="636.8" y="453" width="414.5" height="15.0" fill="rgb(241,33,52)" rx="2" ry="2" />
+<text  x="639.81" y="463.5" >sys_futex</text>
+</g>
+<g >
+<title>__pthread_mutex_unlock (54,005 samples, 1.24%)</title><rect x="1077.2" y="501" width="14.7" height="15.0" fill="rgb(231,196,33)" rx="2" ry="2" />
+<text  x="1080.20" y="511.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (8,361 samples, 0.19%)</title><rect x="523.6" y="357" width="2.2" height="15.0" fill="rgb(222,138,3)" rx="2" ry="2" />
+<text  x="526.55" y="367.5" ></text>
+</g>
+<g >
+<title>bio_endio (2,343 samples, 0.05%)</title><rect x="110.7" y="213" width="0.6" height="15.0" fill="rgb(217,63,44)" rx="2" ry="2" />
+<text  x="113.65" y="223.5" ></text>
+</g>
+<g >
+<title>ctx_sched_out (3,666 samples, 0.08%)</title><rect x="171.2" y="325" width="1.0" height="15.0" fill="rgb(248,166,13)" rx="2" ry="2" />
+<text  x="174.20" y="335.5" ></text>
+</g>
+<g >
+<title>schedule (84,135 samples, 1.94%)</title><rect x="168.8" y="389" width="22.8" height="15.0" fill="rgb(228,200,46)" rx="2" ry="2" />
+<text  x="171.75" y="399.5" >s..</text>
+</g>
+<g >
+<title>__ext4_journal_get_write_access (583 samples, 0.01%)</title><rect x="117.5" y="293" width="0.2" height="15.0" fill="rgb(253,55,45)" rx="2" ry="2" />
+<text  x="120.53" y="303.5" ></text>
+</g>
+<g >
+<title>futex_wait (1,746,051 samples, 40.20%)</title><rect x="158.2" y="421" width="474.3" height="15.0" fill="rgb(251,91,9)" rx="2" ry="2" />
+<text  x="161.21" y="431.5" >futex_wait</text>
+</g>
+<g >
+<title>native_flush_tlb_others (827 samples, 0.02%)</title><rect x="97.9" y="53" width="0.3" height="15.0" fill="rgb(245,28,30)" rx="2" ry="2" />
+<text  x="100.95" y="63.5" ></text>
+</g>
+<g >
+<title>__ext4_handle_dirty_super (837 samples, 0.02%)</title><rect x="120.8" y="309" width="0.2" height="15.0" fill="rgb(217,80,31)" rx="2" ry="2" />
+<text  x="123.77" y="319.5" ></text>
+</g>
+<g >
+<title>llseek (2,632 samples, 0.06%)</title><rect x="1110.2" y="501" width="0.8" height="15.0" fill="rgb(231,205,19)" rx="2" ry="2" />
+<text  x="1113.24" y="511.5" ></text>
+</g>
+<g >
+<title>handle_mm_fault (920 samples, 0.02%)</title><rect x="1112.0" y="229" width="0.2" height="15.0" fill="rgb(217,53,52)" rx="2" ry="2" />
+<text  x="1114.96" y="239.5" ></text>
+</g>
+<g >
+<title>fileset_resolvepath (3,772 samples, 0.09%)</title><rect x="1172.2" y="517" width="1.0" height="15.0" fill="rgb(228,88,14)" rx="2" ry="2" />
+<text  x="1175.22" y="527.5" ></text>
+</g>
+<g >
+<title>ext4_do_update_inode (933 samples, 0.02%)</title><rect x="107.1" y="213" width="0.3" height="15.0" fill="rgb(248,216,3)" rx="2" ry="2" />
+<text  x="110.12" y="223.5" ></text>
+</g>
+<g >
+<title>futex_wait_queue_me (101,392 samples, 2.33%)</title><rect x="164.1" y="405" width="27.5" height="15.0" fill="rgb(247,23,13)" rx="2" ry="2" />
+<text  x="167.06" y="415.5" >f..</text>
+</g>
+<g >
+<title>__fdget_pos (8,457 samples, 0.19%)</title><rect x="36.6" y="437" width="2.3" height="15.0" fill="rgb(252,54,21)" rx="2" ry="2" />
+<text  x="39.63" y="447.5" ></text>
+</g>
+<g >
+<title>deactivate_task (22,828 samples, 0.53%)</title><rect x="174.2" y="357" width="6.2" height="15.0" fill="rgb(247,112,39)" rx="2" ry="2" />
+<text  x="177.25" y="367.5" ></text>
+</g>
+<g >
+<title>page_fault (1,373 samples, 0.03%)</title><rect x="1120.4" y="501" width="0.4" height="15.0" fill="rgb(205,75,48)" rx="2" ry="2" />
+<text  x="1123.43" y="511.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64 (1,225 samples, 0.03%)</title><rect x="35.3" y="485" width="0.4" height="15.0" fill="rgb(207,22,5)" rx="2" ry="2" />
+<text  x="38.35" y="495.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock_irqsave (13,084 samples, 0.30%)</title><rect x="1036.6" y="373" width="3.6" height="15.0" fill="rgb(237,37,52)" rx="2" ry="2" />
+<text  x="1039.63" y="383.5" ></text>
+</g>
+<g >
+<title>syscall_return_via_sysret (2,176 samples, 0.05%)</title><rect x="84.9" y="485" width="0.5" height="15.0" fill="rgb(236,24,21)" rx="2" ry="2" />
+<text  x="87.85" y="495.5" ></text>
+</g>
+<g >
+<title>native_sched_clock (665 samples, 0.02%)</title><rect x="184.9" y="277" width="0.2" height="15.0" fill="rgb(220,123,17)" rx="2" ry="2" />
+<text  x="187.93" y="287.5" ></text>
+</g>
+<g >
+<title>sys_futex (1,407 samples, 0.03%)</title><rect x="1051.3" y="469" width="0.3" height="15.0" fill="rgb(220,100,39)" rx="2" ry="2" />
+<text  x="1054.27" y="479.5" ></text>
+</g>
+<g >
+<title>dequeue_task_fair (22,370 samples, 0.52%)</title><rect x="174.4" y="341" width="6.0" height="15.0" fill="rgb(250,13,14)" rx="2" ry="2" />
+<text  x="177.37" y="351.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (8,331 samples, 0.19%)</title><rect x="523.6" y="341" width="2.2" height="15.0" fill="rgb(234,229,12)" rx="2" ry="2" />
+<text  x="526.56" y="351.5" ></text>
+</g>
+<g >
+<title>get_futex_value_locked (31,374 samples, 0.72%)</title><rect x="623.5" y="389" width="8.5" height="15.0" fill="rgb(241,101,36)" rx="2" ry="2" />
+<text  x="626.45" y="399.5" ></text>
+</g>
+<g >
+<title>ext4_mb_new_blocks (10,558 samples, 0.24%)</title><rect x="106.9" y="293" width="2.9" height="15.0" fill="rgb(232,81,33)" rx="2" ry="2" />
+<text  x="109.90" y="303.5" ></text>
+</g>
+<g >
+<title>common_file_perm (6,084 samples, 0.14%)</title><rect x="82.7" y="373" width="1.6" height="15.0" fill="rgb(212,93,43)" rx="2" ry="2" />
+<text  x="85.68" y="383.5" ></text>
+</g>
+<g >
+<title>lockref_get (704 samples, 0.02%)</title><rect x="1151.5" y="357" width="0.1" height="15.0" fill="rgb(211,70,20)" rx="2" ry="2" />
+<text  x="1154.46" y="367.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock_irqsave (603 samples, 0.01%)</title><rect x="103.9" y="261" width="0.1" height="15.0" fill="rgb(251,203,47)" rx="2" ry="2" />
+<text  x="106.86" y="271.5" ></text>
+</g>
+<g >
+<title>flowoplib_openfile_common (5,982 samples, 0.14%)</title><rect x="1105.8" y="501" width="1.7" height="15.0" fill="rgb(236,227,19)" rx="2" ry="2" />
+<text  x="1108.83" y="511.5" ></text>
+</g>
+<g >
+<title>write_pmem (18,704 samples, 0.43%)</title><rect x="111.4" y="197" width="5.1" height="15.0" fill="rgb(230,207,30)" rx="2" ry="2" />
+<text  x="114.37" y="207.5" ></text>
+</g>
+<g >
+<title>update_load_avg (5,581 samples, 0.13%)</title><rect x="178.6" y="309" width="1.5" height="15.0" fill="rgb(220,217,31)" rx="2" ry="2" />
+<text  x="181.58" y="319.5" ></text>
+</g>
+<g >
+<title>call_function_interrupt (447 samples, 0.01%)</title><rect x="525.8" y="357" width="0.1" height="15.0" fill="rgb(242,1,49)" rx="2" ry="2" />
+<text  x="528.82" y="367.5" ></text>
+</g>
+<g >
+<title>ext4_map_blocks (45,909 samples, 1.06%)</title><rect x="104.1" y="325" width="12.5" height="15.0" fill="rgb(250,106,17)" rx="2" ry="2" />
+<text  x="107.10" y="335.5" ></text>
+</g>
+<g >
+<title>____fput (17,698 samples, 0.41%)</title><rect x="22.5" y="421" width="4.8" height="15.0" fill="rgb(244,58,47)" rx="2" ry="2" />
+<text  x="25.48" y="431.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (409 samples, 0.01%)</title><rect x="1052.6" y="469" width="0.2" height="15.0" fill="rgb(238,190,36)" rx="2" ry="2" />
+<text  x="1055.64" y="479.5" ></text>
+</g>
+<g >
+<title>handle_mm_fault (816 samples, 0.02%)</title><rect x="1120.5" y="453" width="0.3" height="15.0" fill="rgb(234,124,14)" rx="2" ry="2" />
+<text  x="1123.53" y="463.5" ></text>
+</g>
+<g >
+<title>ext4_reserve_inode_write (814 samples, 0.02%)</title><rect x="117.5" y="309" width="0.2" height="15.0" fill="rgb(224,74,19)" rx="2" ry="2" />
+<text  x="120.47" y="319.5" ></text>
+</g>
+<g >
+<title>blkdev_issue_zeroout (24,634 samples, 0.57%)</title><rect x="109.8" y="293" width="6.7" height="15.0" fill="rgb(212,4,23)" rx="2" ry="2" />
+<text  x="112.85" y="303.5" ></text>
+</g>
+<g >
+<title>get_user_pages_fast (118,519 samples, 2.73%)</title><rect x="591.2" y="373" width="32.2" height="15.0" fill="rgb(254,171,13)" rx="2" ry="2" />
+<text  x="594.23" y="383.5" >ge..</text>
+</g>
+<g >
+<title>__ext4_journal_start_sb (2,681 samples, 0.06%)</title><rect x="118.1" y="325" width="0.7" height="15.0" fill="rgb(253,158,2)" rx="2" ry="2" />
+<text  x="121.10" y="335.5" ></text>
+</g>
+<g >
+<title>down_write (83,629 samples, 1.93%)</title><rect x="121.7" y="373" width="22.7" height="15.0" fill="rgb(217,140,11)" rx="2" ry="2" />
+<text  x="124.69" y="383.5" >d..</text>
+</g>
+<g >
+<title>tick_sched_timer (993 samples, 0.02%)</title><rect x="523.6" y="293" width="0.3" height="15.0" fill="rgb(206,178,24)" rx="2" ry="2" />
+<text  x="526.59" y="303.5" ></text>
+</g>
+<g >
+<title>page_fault (4,302 samples, 0.10%)</title><rect x="97.3" y="261" width="1.2" height="15.0" fill="rgb(242,128,11)" rx="2" ry="2" />
+<text  x="100.33" y="271.5" ></text>
+</g>
+<g >
+<title>generic_make_request (22,809 samples, 0.53%)</title><rect x="110.3" y="245" width="6.2" height="15.0" fill="rgb(214,224,1)" rx="2" ry="2" />
+<text  x="113.30" y="255.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock_irqsave (2,085 samples, 0.05%)</title><rect x="110.7" y="165" width="0.6" height="15.0" fill="rgb(214,167,50)" rx="2" ry="2" />
+<text  x="113.72" y="175.5" ></text>
+</g>
+<g >
+<title>file_free_rcu (451 samples, 0.01%)</title><rect x="591.6" y="277" width="0.2" height="15.0" fill="rgb(230,166,34)" rx="2" ry="2" />
+<text  x="594.65" y="287.5" ></text>
+</g>
+<g >
+<title>flowoplib_closefile (8,989 samples, 0.21%)</title><rect x="1102.4" y="501" width="2.4" height="15.0" fill="rgb(209,26,49)" rx="2" ry="2" />
+<text  x="1105.36" y="511.5" ></text>
+</g>
+<g >
+<title>__find_get_block (788 samples, 0.02%)</title><rect x="106.6" y="245" width="0.3" height="15.0" fill="rgb(254,222,26)" rx="2" ry="2" />
+<text  x="109.65" y="255.5" ></text>
+</g>
+<g >
+<title>dax_read_lock (540 samples, 0.01%)</title><rect x="66.0" y="341" width="0.1" height="15.0" fill="rgb(231,78,34)" rx="2" ry="2" />
+<text  x="68.96" y="351.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (8,571 samples, 0.20%)</title><rect x="1034.0" y="357" width="2.3" height="15.0" fill="rgb(247,169,42)" rx="2" ry="2" />
+<text  x="1036.98" y="367.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (878 samples, 0.02%)</title><rect x="1040.3" y="357" width="0.3" height="15.0" fill="rgb(243,27,35)" rx="2" ry="2" />
+<text  x="1043.31" y="367.5" ></text>
+</g>
+<g >
+<title>mutex_unlock (1,045 samples, 0.02%)</title><rect x="36.3" y="421" width="0.3" height="15.0" fill="rgb(223,226,47)" rx="2" ry="2" />
+<text  x="39.35" y="431.5" ></text>
+</g>
+<g >
+<title>scheduler_tick (489 samples, 0.01%)</title><rect x="933.9" y="261" width="0.1" height="15.0" fill="rgb(216,107,51)" rx="2" ry="2" />
+<text  x="936.90" y="271.5" ></text>
+</g>
+<g >
+<title>try_to_wake_up (138,902 samples, 3.20%)</title><rect x="1013.1" y="389" width="37.7" height="15.0" fill="rgb(234,222,25)" rx="2" ry="2" />
+<text  x="1016.08" y="399.5" >try..</text>
+</g>
+<g >
+<title>get_futex_key_refs.isra.13 (493 samples, 0.01%)</title><rect x="976.2" y="389" width="0.2" height="15.0" fill="rgb(254,178,26)" rx="2" ry="2" />
+<text  x="979.24" y="399.5" ></text>
+</g>
+<g >
+<title>fsnotify (448 samples, 0.01%)</title><rect x="1154.8" y="437" width="0.2" height="15.0" fill="rgb(248,182,23)" rx="2" ry="2" />
+<text  x="1157.84" y="447.5" ></text>
+</g>
+<g >
+<title>__softirqentry_text_start (1,025 samples, 0.02%)</title><rect x="188.9" y="293" width="0.3" height="15.0" fill="rgb(215,67,41)" rx="2" ry="2" />
+<text  x="191.95" y="303.5" ></text>
+</g>
+<g >
+<title>ext4_do_update_inode (872 samples, 0.02%)</title><rect x="117.2" y="293" width="0.3" height="15.0" fill="rgb(208,185,23)" rx="2" ry="2" />
+<text  x="120.23" y="303.5" ></text>
+</g>
+<g >
+<title>load_balance (1,394 samples, 0.03%)</title><rect x="189.8" y="341" width="0.4" height="15.0" fill="rgb(247,104,14)" rx="2" ry="2" />
+<text  x="192.80" y="351.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (47,627 samples, 1.10%)</title><rect x="21.3" y="485" width="12.9" height="15.0" fill="rgb(227,113,3)" rx="2" ry="2" />
+<text  x="24.31" y="495.5" ></text>
+</g>
+<g >
+<title>__mark_inode_dirty (1,777 samples, 0.04%)</title><rect x="107.0" y="277" width="0.5" height="15.0" fill="rgb(221,41,32)" rx="2" ry="2" />
+<text  x="109.99" y="287.5" ></text>
+</g>
+<g >
+<title>native_sched_clock (467 samples, 0.01%)</title><rect x="1050.7" y="325" width="0.1" height="15.0" fill="rgb(206,70,34)" rx="2" ry="2" />
+<text  x="1053.68" y="335.5" ></text>
+</g>
+<g >
+<title>apparmor_file_permission (428 samples, 0.01%)</title><rect x="82.3" y="405" width="0.1" height="15.0" fill="rgb(225,199,2)" rx="2" ry="2" />
+<text  x="85.27" y="415.5" ></text>
+</g>
+<g >
+<title>migrate_misplaced_page (557 samples, 0.01%)</title><rect x="1112.1" y="197" width="0.1" height="15.0" fill="rgb(208,229,29)" rx="2" ry="2" />
+<text  x="1115.05" y="207.5" ></text>
+</g>
+<g >
+<title>__vfs_write (217,266 samples, 5.00%)</title><rect x="85.8" y="421" width="59.1" height="15.0" fill="rgb(210,69,10)" rx="2" ry="2" />
+<text  x="88.85" y="431.5" >__vfs_..</text>
+</g>
+<g >
+<title>ext4_file_open (7,115 samples, 0.16%)</title><rect x="1149.4" y="373" width="2.0" height="15.0" fill="rgb(237,141,10)" rx="2" ry="2" />
+<text  x="1152.43" y="383.5" ></text>
+</g>
+<g >
+<title>migrate_pages (1,301 samples, 0.03%)</title><rect x="97.8" y="165" width="0.4" height="15.0" fill="rgb(225,71,30)" rx="2" ry="2" />
+<text  x="100.82" y="175.5" ></text>
+</g>
+<g >
+<title>pmem_copy_from_iter (1,684 samples, 0.04%)</title><rect x="1111.8" y="325" width="0.4" height="15.0" fill="rgb(214,179,25)" rx="2" ry="2" />
+<text  x="1114.76" y="335.5" ></text>
+</g>
+<g >
+<title>avd_get_int (1,432 samples, 0.03%)</title><rect x="1092.7" y="501" width="0.4" height="15.0" fill="rgb(244,162,41)" rx="2" ry="2" />
+<text  x="1095.70" y="511.5" ></text>
+</g>
+<g >
+<title>strncpy_from_user (3,845 samples, 0.09%)</title><rect x="1161.7" y="405" width="1.1" height="15.0" fill="rgb(217,123,40)" rx="2" ry="2" />
+<text  x="1164.75" y="415.5" ></text>
+</g>
+<g >
+<title>getname_flags (8,774 samples, 0.20%)</title><rect x="1160.4" y="421" width="2.4" height="15.0" fill="rgb(226,87,0)" rx="2" ry="2" />
+<text  x="1163.41" y="431.5" ></text>
+</g>
+<g >
+<title>intel_pmu_enable_all (17,165 samples, 0.40%)</title><rect x="184.2" y="309" width="4.7" height="15.0" fill="rgb(219,14,30)" rx="2" ry="2" />
+<text  x="187.22" y="319.5" ></text>
+</g>
+<g >
+<title>enqueue_task_fair (12,291 samples, 0.28%)</title><rect x="1045.4" y="341" width="3.3" height="15.0" fill="rgb(228,183,19)" rx="2" ry="2" />
+<text  x="1048.36" y="351.5" ></text>
+</g>
+<g >
+<title>__es_insert_extent (385 samples, 0.01%)</title><rect x="104.6" y="293" width="0.1" height="15.0" fill="rgb(219,36,42)" rx="2" ry="2" />
+<text  x="107.62" y="303.5" ></text>
+</g>
+<g >
+<title>rcu_process_callbacks (1,000 samples, 0.02%)</title><rect x="590.8" y="309" width="0.3" height="15.0" fill="rgb(247,215,27)" rx="2" ry="2" />
+<text  x="593.81" y="319.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64 (712 samples, 0.02%)</title><rect x="1121.3" y="501" width="0.2" height="15.0" fill="rgb(223,218,41)" rx="2" ry="2" />
+<text  x="1124.29" y="511.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (686 samples, 0.02%)</title><rect x="976.0" y="389" width="0.2" height="15.0" fill="rgb(250,197,34)" rx="2" ry="2" />
+<text  x="979.04" y="399.5" ></text>
+</g>
+<g >
+<title>down_write_trylock (431 samples, 0.01%)</title><rect x="144.4" y="373" width="0.1" height="15.0" fill="rgb(225,40,14)" rx="2" ry="2" />
+<text  x="147.41" y="383.5" ></text>
+</g>
+<g >
+<title>flush_tlb_mm_range (854 samples, 0.02%)</title><rect x="97.9" y="69" width="0.3" height="15.0" fill="rgb(209,180,5)" rx="2" ry="2" />
+<text  x="100.94" y="79.5" ></text>
+</g>
+<g >
+<title>security_file_open (5,531 samples, 0.13%)</title><rect x="1151.6" y="373" width="1.6" height="15.0" fill="rgb(249,116,46)" rx="2" ry="2" />
+<text  x="1154.65" y="383.5" ></text>
+</g>
+<g >
+<title>__ext4_handle_dirty_super (1,491 samples, 0.03%)</title><rect x="116.8" y="309" width="0.4" height="15.0" fill="rgb(219,149,3)" rx="2" ry="2" />
+<text  x="119.75" y="319.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (584 samples, 0.01%)</title><rect x="526.0" y="389" width="0.1" height="15.0" fill="rgb(247,99,8)" rx="2" ry="2" />
+<text  x="528.95" y="399.5" ></text>
+</g>
+<g >
+<title>idle_cpu (1,367 samples, 0.03%)</title><rect x="1044.6" y="341" width="0.4" height="15.0" fill="rgb(221,26,44)" rx="2" ry="2" />
+<text  x="1047.60" y="351.5" ></text>
+</g>
+<g >
+<title>sys_read (178,304 samples, 4.10%)</title><rect x="36.1" y="453" width="48.5" height="15.0" fill="rgb(225,66,51)" rx="2" ry="2" />
+<text  x="39.11" y="463.5" >sys_..</text>
+</g>
+<g >
+<title>jbd2__journal_start (1,935 samples, 0.04%)</title><rect x="118.3" y="309" width="0.5" height="15.0" fill="rgb(215,51,12)" rx="2" ry="2" />
+<text  x="121.30" y="319.5" ></text>
+</g>
+<g >
+<title>path_get (769 samples, 0.02%)</title><rect x="1151.4" y="373" width="0.2" height="15.0" fill="rgb(248,155,31)" rx="2" ry="2" />
+<text  x="1154.44" y="383.5" ></text>
+</g>
+<g >
+<title>[unknown] (37,895 samples, 0.87%)</title><rect x="10.4" y="501" width="10.3" height="15.0" fill="rgb(226,8,50)" rx="2" ry="2" />
+<text  x="13.40" y="511.5" ></text>
+</g>
+<g >
+<title>try_to_unmap (480 samples, 0.01%)</title><rect x="1112.1" y="165" width="0.1" height="15.0" fill="rgb(218,130,29)" rx="2" ry="2" />
+<text  x="1115.07" y="175.5" ></text>
+</g>
+<g >
+<title>apparmor_file_free_security (720 samples, 0.02%)</title><rect x="22.8" y="389" width="0.2" height="15.0" fill="rgb(253,8,4)" rx="2" ry="2" />
+<text  x="25.83" y="399.5" ></text>
+</g>
+<g >
+<title>update_rq_clock (1,272 samples, 0.03%)</title><rect x="191.0" y="357" width="0.4" height="15.0" fill="rgb(220,29,26)" rx="2" ry="2" />
+<text  x="194.01" y="367.5" ></text>
+</g>
+<g >
+<title>pick_next_task_idle (512 samples, 0.01%)</title><rect x="191.4" y="373" width="0.2" height="15.0" fill="rgb(206,169,46)" rx="2" ry="2" />
+<text  x="194.44" y="383.5" ></text>
+</g>
+<g >
+<title>do_page_fault (4,300 samples, 0.10%)</title><rect x="97.3" y="245" width="1.2" height="15.0" fill="rgb(219,95,25)" rx="2" ry="2" />
+<text  x="100.33" y="255.5" ></text>
+</g>
+<g >
+<title>[unknown] (37,567 samples, 0.86%)</title><rect x="10.4" y="437" width="10.2" height="15.0" fill="rgb(232,149,14)" rx="2" ry="2" />
+<text  x="13.43" y="447.5" ></text>
+</g>
+<g >
+<title>fb_strlcpy (6,190 samples, 0.14%)</title><rect x="1168.3" y="517" width="1.7" height="15.0" fill="rgb(228,13,4)" rx="2" ry="2" />
+<text  x="1171.28" y="527.5" ></text>
+</g>
+<g >
+<title>hash_futex (1,347 samples, 0.03%)</title><rect x="632.1" y="405" width="0.4" height="15.0" fill="rgb(244,114,19)" rx="2" ry="2" />
+<text  x="635.14" y="415.5" ></text>
+</g>
+<g >
+<title>dput (913 samples, 0.02%)</title><rect x="1147.7" y="389" width="0.2" height="15.0" fill="rgb(237,228,50)" rx="2" ry="2" />
+<text  x="1150.66" y="399.5" ></text>
+</g>
+<g >
+<title>__getblk_gfp (806 samples, 0.02%)</title><rect x="106.6" y="261" width="0.3" height="15.0" fill="rgb(235,124,46)" rx="2" ry="2" />
+<text  x="109.65" y="271.5" ></text>
+</g>
+<g >
+<title>__handle_mm_fault (3,224 samples, 0.07%)</title><rect x="97.5" y="197" width="0.9" height="15.0" fill="rgb(234,110,46)" rx="2" ry="2" />
+<text  x="100.53" y="207.5" ></text>
+</g>
+<g >
+<title>ext4_es_insert_extent (860 samples, 0.02%)</title><rect x="104.6" y="309" width="0.2" height="15.0" fill="rgb(208,122,53)" rx="2" ry="2" />
+<text  x="107.60" y="319.5" ></text>
+</g>
+<g >
+<title>memcpy_flushcache (18,512 samples, 0.43%)</title><rect x="111.4" y="181" width="5.1" height="15.0" fill="rgb(234,94,35)" rx="2" ry="2" />
+<text  x="114.43" y="191.5" ></text>
+</g>
+<g >
+<title>__softirqentry_text_start (6,962 samples, 0.16%)</title><rect x="523.9" y="309" width="1.9" height="15.0" fill="rgb(232,186,5)" rx="2" ry="2" />
+<text  x="526.92" y="319.5" ></text>
+</g>
+<g >
+<title>rcu_process_callbacks (402 samples, 0.01%)</title><rect x="1077.0" y="421" width="0.2" height="15.0" fill="rgb(219,56,47)" rx="2" ry="2" />
+<text  x="1080.05" y="431.5" ></text>
+</g>
+<g >
+<title>x86_pmu_disable (650 samples, 0.01%)</title><rect x="172.0" y="309" width="0.2" height="15.0" fill="rgb(238,14,21)" rx="2" ry="2" />
+<text  x="175.02" y="319.5" ></text>
+</g>
+<g >
+<title>memcg_kmem_get_cache (4,973 samples, 0.11%)</title><rect x="1128.4" y="373" width="1.4" height="15.0" fill="rgb(237,149,41)" rx="2" ry="2" />
+<text  x="1131.43" y="383.5" ></text>
+</g>
+<g >
+<title>run_rebalance_domains (862 samples, 0.02%)</title><rect x="935.6" y="309" width="0.2" height="15.0" fill="rgb(232,24,18)" rx="2" ry="2" />
+<text  x="938.56" y="319.5" ></text>
+</g>
+<g >
+<title>futex_wait_setup (1,621,322 samples, 37.33%)</title><rect x="191.6" y="405" width="440.5" height="15.0" fill="rgb(236,48,36)" rx="2" ry="2" />
+<text  x="194.61" y="415.5" >futex_wait_setup</text>
+</g>
+<g >
+<title>ext4_block_bitmap_csum_set (3,298 samples, 0.08%)</title><rect x="108.1" y="261" width="0.9" height="15.0" fill="rgb(234,95,18)" rx="2" ry="2" />
+<text  x="111.08" y="271.5" ></text>
+</g>
+<g >
+<title>cfree@GLIBC_2.2.5 (966 samples, 0.02%)</title><rect x="1165.2" y="517" width="0.3" height="15.0" fill="rgb(244,158,42)" rx="2" ry="2" />
+<text  x="1168.22" y="527.5" ></text>
+</g>
+<g >
+<title>fileset_resolvepath (4,951 samples, 0.11%)</title><rect x="1100.6" y="501" width="1.3" height="15.0" fill="rgb(249,198,42)" rx="2" ry="2" />
+<text  x="1103.56" y="511.5" ></text>
+</g>
+<g >
+<title>apparmor_file_alloc_security (11,659 samples, 0.27%)</title><rect x="1130.4" y="373" width="3.2" height="15.0" fill="rgb(210,45,39)" rx="2" ry="2" />
+<text  x="1133.41" y="383.5" ></text>
+</g>
+<g >
+<title>native_queued_spin_lock_slowpath (760 samples, 0.02%)</title><rect x="934.2" y="277" width="0.2" height="15.0" fill="rgb(236,217,30)" rx="2" ry="2" />
+<text  x="937.18" y="287.5" ></text>
+</g>
+<g >
+<title>vfs_read (166,375 samples, 3.83%)</title><rect x="39.4" y="437" width="45.2" height="15.0" fill="rgb(229,20,5)" rx="2" ry="2" />
+<text  x="42.35" y="447.5" >vfs_..</text>
+</g>
+<g >
+<title>get_mem_cgroup_from_mm (4,499 samples, 0.10%)</title><rect x="1128.6" y="357" width="1.2" height="15.0" fill="rgb(245,65,30)" rx="2" ry="2" />
+<text  x="1131.56" y="367.5" ></text>
+</g>
+<g >
+<title>__ext4_journal_get_write_access (472 samples, 0.01%)</title><rect x="120.6" y="293" width="0.1" height="15.0" fill="rgb(215,168,31)" rx="2" ry="2" />
+<text  x="123.60" y="303.5" ></text>
+</g>
+<g >
+<title>reweight_entity (1,786 samples, 0.04%)</title><rect x="1047.3" y="293" width="0.4" height="15.0" fill="rgb(251,220,5)" rx="2" ry="2" />
+<text  x="1050.26" y="303.5" ></text>
+</g>
+<g >
+<title>rcu_process_callbacks (837 samples, 0.02%)</title><rect x="189.0" y="277" width="0.2" height="15.0" fill="rgb(225,59,45)" rx="2" ry="2" />
+<text  x="191.96" y="287.5" ></text>
+</g>
+<g >
+<title>reweight_entity (1,482 samples, 0.03%)</title><rect x="176.4" y="293" width="0.4" height="15.0" fill="rgb(234,69,13)" rx="2" ry="2" />
+<text  x="179.44" y="303.5" ></text>
+</g>
+<g >
+<title>__softirqentry_text_start (1,241 samples, 0.03%)</title><rect x="590.8" y="325" width="0.3" height="15.0" fill="rgb(228,82,12)" rx="2" ry="2" />
+<text  x="593.80" y="335.5" ></text>
+</g>
+<g >
+<title>dput.part.26 (1,436 samples, 0.03%)</title><rect x="1150.9" y="325" width="0.4" height="15.0" fill="rgb(249,179,1)" rx="2" ry="2" />
+<text  x="1153.92" y="335.5" ></text>
+</g>
+<g >
+<title>select_idle_sibling (1,619 samples, 0.04%)</title><rect x="1044.5" y="357" width="0.5" height="15.0" fill="rgb(208,152,39)" rx="2" ry="2" />
+<text  x="1047.53" y="367.5" ></text>
+</g>
+<g >
+<title>rwsem_spin_on_owner (15,241 samples, 0.35%)</title><rect x="1116.0" y="341" width="4.1" height="15.0" fill="rgb(216,5,53)" rx="2" ry="2" />
+<text  x="1118.99" y="351.5" ></text>
+</g>
+<g >
+<title>__calc_delta (1,333 samples, 0.03%)</title><rect x="177.6" y="293" width="0.4" height="15.0" fill="rgb(227,154,53)" rx="2" ry="2" />
+<text  x="180.62" y="303.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (219,087 samples, 5.04%)</title><rect x="85.5" y="485" width="59.5" height="15.0" fill="rgb(207,5,37)" rx="2" ry="2" />
+<text  x="88.52" y="495.5" >entry_..</text>
+</g>
+<g >
+<title>__ext4_get_inode_loc (1,193 samples, 0.03%)</title><rect x="120.3" y="293" width="0.3" height="15.0" fill="rgb(206,215,31)" rx="2" ry="2" />
+<text  x="123.28" y="303.5" ></text>
+</g>
+<g >
+<title>__atime_needs_update (1,360 samples, 0.03%)</title><rect x="81.4" y="357" width="0.3" height="15.0" fill="rgb(254,193,41)" rx="2" ry="2" />
+<text  x="84.36" y="367.5" ></text>
+</g>
+<g >
+<title>get_futex_key (331,793 samples, 7.64%)</title><rect x="533.3" y="389" width="90.1" height="15.0" fill="rgb(205,196,54)" rx="2" ry="2" />
+<text  x="536.31" y="399.5" >get_futex_..</text>
+</g>
+<g >
+<title>__ext4_journal_stop (1,574 samples, 0.04%)</title><rect x="103.6" y="325" width="0.5" height="15.0" fill="rgb(226,185,30)" rx="2" ry="2" />
+<text  x="106.64" y="335.5" ></text>
+</g>
+<g >
+<title>check_preempt_curr (3,420 samples, 0.08%)</title><rect x="1048.8" y="341" width="0.9" height="15.0" fill="rgb(210,155,12)" rx="2" ry="2" />
+<text  x="1051.79" y="351.5" ></text>
+</g>
+<g >
+<title>ext4_mark_inode_dirty (5,526 samples, 0.13%)</title><rect x="119.2" y="325" width="1.5" height="15.0" fill="rgb(235,1,43)" rx="2" ry="2" />
+<text  x="122.25" y="335.5" ></text>
+</g>
+<g >
+<title>ext4_ext_insert_extent (3,626 samples, 0.08%)</title><rect x="105.4" y="293" width="1.0" height="15.0" fill="rgb(248,174,35)" rx="2" ry="2" />
+<text  x="108.44" y="303.5" ></text>
+</g>
+<g >
+<title>irq_exit (478 samples, 0.01%)</title><rect x="526.0" y="357" width="0.1" height="15.0" fill="rgb(206,85,1)" rx="2" ry="2" />
+<text  x="528.98" y="367.5" ></text>
+</g>
+<g >
+<title>fileset_unbusy (10,959 samples, 0.25%)</title><rect x="1173.2" y="517" width="3.0" height="15.0" fill="rgb(240,98,23)" rx="2" ry="2" />
+<text  x="1176.25" y="527.5" ></text>
+</g>
+<g >
+<title>file_free_rcu (3,895 samples, 0.09%)</title><rect x="934.4" y="293" width="1.1" height="15.0" fill="rgb(225,92,38)" rx="2" ry="2" />
+<text  x="937.39" y="303.5" ></text>
+</g>
+<g >
+<title>ext4_reserve_inode_write (1,776 samples, 0.04%)</title><rect x="120.3" y="309" width="0.4" height="15.0" fill="rgb(218,20,41)" rx="2" ry="2" />
+<text  x="123.27" y="319.5" ></text>
+</g>
+<g >
+<title>do_nanosleep (402 samples, 0.01%)</title><rect x="1052.6" y="421" width="0.2" height="15.0" fill="rgb(209,136,29)" rx="2" ry="2" />
+<text  x="1055.64" y="431.5" ></text>
+</g>
+<g >
+<title>pick_next_task_idle (2,142 samples, 0.05%)</title><rect x="190.3" y="357" width="0.5" height="15.0" fill="rgb(214,188,18)" rx="2" ry="2" />
+<text  x="193.25" y="367.5" ></text>
+</g>
+<g >
+<title>mutex_unlock (390 samples, 0.01%)</title><rect x="121.5" y="309" width="0.1" height="15.0" fill="rgb(215,159,50)" rx="2" ry="2" />
+<text  x="124.54" y="319.5" ></text>
+</g>
+<g >
+<title>finish_task_switch (32,004 samples, 0.74%)</title><rect x="180.6" y="357" width="8.7" height="15.0" fill="rgb(223,14,13)" rx="2" ry="2" />
+<text  x="183.58" y="367.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (876 samples, 0.02%)</title><rect x="1040.3" y="341" width="0.3" height="15.0" fill="rgb(237,62,15)" rx="2" ry="2" />
+<text  x="1043.31" y="351.5" ></text>
+</g>
+<g >
+<title>dax_read_unlock (2,985 samples, 0.07%)</title><rect x="64.9" y="325" width="0.9" height="15.0" fill="rgb(211,120,41)" rx="2" ry="2" />
+<text  x="67.95" y="335.5" ></text>
+</g>
+<g >
+<title>start_this_handle (413 samples, 0.01%)</title><rect x="1112.3" y="309" width="0.1" height="15.0" fill="rgb(236,81,23)" rx="2" ry="2" />
+<text  x="1115.33" y="319.5" ></text>
+</g>
+<g >
+<title>llseek (16,721 samples, 0.38%)</title><rect x="1180.2" y="517" width="4.6" height="15.0" fill="rgb(205,62,52)" rx="2" ry="2" />
+<text  x="1183.21" y="527.5" ></text>
+</g>
+<g >
+<title>__nanosleep (420 samples, 0.01%)</title><rect x="1052.6" y="501" width="0.2" height="15.0" fill="rgb(234,146,6)" rx="2" ry="2" />
+<text  x="1055.64" y="511.5" ></text>
+</g>
+<g >
+<title>kmem_cache_free (421 samples, 0.01%)</title><rect x="525.3" y="261" width="0.1" height="15.0" fill="rgb(228,133,39)" rx="2" ry="2" />
+<text  x="528.28" y="271.5" ></text>
+</g>
+<g >
+<title>lockref_put_return (549 samples, 0.01%)</title><rect x="23.7" y="357" width="0.2" height="15.0" fill="rgb(250,27,10)" rx="2" ry="2" />
+<text  x="26.74" y="367.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (2,325 samples, 0.05%)</title><rect x="1110.3" y="485" width="0.6" height="15.0" fill="rgb(250,103,28)" rx="2" ry="2" />
+<text  x="1113.30" y="495.5" ></text>
+</g>
+<g >
+<title>apparmor_file_permission (6,255 samples, 0.14%)</title><rect x="82.6" y="389" width="1.7" height="15.0" fill="rgb(250,127,39)" rx="2" ry="2" />
+<text  x="85.63" y="399.5" ></text>
+</g>
+<g >
+<title>__f_unlock_pos (1,071 samples, 0.02%)</title><rect x="36.3" y="437" width="0.3" height="15.0" fill="rgb(216,98,37)" rx="2" ry="2" />
+<text  x="39.34" y="447.5" ></text>
+</g>
+<g >
+<title>__fget (5,585 samples, 0.13%)</title><rect x="1181.7" y="421" width="1.5" height="15.0" fill="rgb(228,78,41)" rx="2" ry="2" />
+<text  x="1184.72" y="431.5" ></text>
+</g>
+<g >
+<title>filp_close (6,812 samples, 0.16%)</title><rect x="32.1" y="421" width="1.9" height="15.0" fill="rgb(217,143,31)" rx="2" ry="2" />
+<text  x="35.14" y="431.5" ></text>
+</g>
+<g >
+<title>__vdso_gettimeofday (2,768 samples, 0.06%)</title><rect x="1179.4" y="501" width="0.7" height="15.0" fill="rgb(239,141,7)" rx="2" ry="2" />
+<text  x="1182.37" y="511.5" ></text>
+</g>
+<g >
+<title>irq_exit (565 samples, 0.01%)</title><rect x="976.1" y="357" width="0.1" height="15.0" fill="rgb(248,109,25)" rx="2" ry="2" />
+<text  x="979.07" y="367.5" ></text>
+</g>
+<g >
+<title>pmem_make_request (21,586 samples, 0.50%)</title><rect x="110.6" y="229" width="5.9" height="15.0" fill="rgb(212,180,27)" rx="2" ry="2" />
+<text  x="113.60" y="239.5" ></text>
+</g>
+<g >
+<title>__find_get_block (749 samples, 0.02%)</title><rect x="120.3" y="261" width="0.2" height="15.0" fill="rgb(237,9,44)" rx="2" ry="2" />
+<text  x="123.34" y="271.5" ></text>
+</g>
+<g >
+<title>rmap_walk (954 samples, 0.02%)</title><rect x="97.9" y="133" width="0.3" height="15.0" fill="rgb(247,104,46)" rx="2" ry="2" />
+<text  x="100.92" y="143.5" ></text>
+</g>
+<g >
+<title>update_curr (6,408 samples, 0.15%)</title><rect x="176.8" y="309" width="1.8" height="15.0" fill="rgb(233,34,38)" rx="2" ry="2" />
+<text  x="179.84" y="319.5" ></text>
+</g>
+<g >
+<title>ext4_iomap_begin (57,180 samples, 1.32%)</title><rect x="102.5" y="341" width="15.5" height="15.0" fill="rgb(231,113,1)" rx="2" ry="2" />
+<text  x="105.47" y="351.5" ></text>
+</g>
+<g >
+<title>rcu_process_callbacks (598 samples, 0.01%)</title><rect x="591.6" y="293" width="0.2" height="15.0" fill="rgb(218,176,0)" rx="2" ry="2" />
+<text  x="594.62" y="303.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (807 samples, 0.02%)</title><rect x="934.2" y="293" width="0.2" height="15.0" fill="rgb(211,103,52)" rx="2" ry="2" />
+<text  x="937.17" y="303.5" ></text>
+</g>
+<g >
+<title>put_prev_task_fair (395 samples, 0.01%)</title><rect x="190.8" y="357" width="0.1" height="15.0" fill="rgb(217,185,0)" rx="2" ry="2" />
+<text  x="193.84" y="367.5" ></text>
+</g>
+<g >
+<title>fb_strlcat (7,790 samples, 0.18%)</title><rect x="1166.2" y="517" width="2.1" height="15.0" fill="rgb(238,55,16)" rx="2" ry="2" />
+<text  x="1169.17" y="527.5" ></text>
+</g>
+<g >
+<title>security_file_alloc (13,235 samples, 0.30%)</title><rect x="1130.4" y="389" width="3.6" height="15.0" fill="rgb(222,63,12)" rx="2" ry="2" />
+<text  x="1133.36" y="399.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (884 samples, 0.02%)</title><rect x="591.6" y="341" width="0.2" height="15.0" fill="rgb(208,186,7)" rx="2" ry="2" />
+<text  x="594.58" y="351.5" ></text>
+</g>
+<g >
+<title>update_blocked_averages (678 samples, 0.02%)</title><rect x="525.6" y="261" width="0.2" height="15.0" fill="rgb(231,197,42)" rx="2" ry="2" />
+<text  x="528.59" y="271.5" ></text>
+</g>
+<g >
+<title>__cgroup_account_cputime (407 samples, 0.01%)</title><rect x="178.0" y="293" width="0.1" height="15.0" fill="rgb(246,39,14)" rx="2" ry="2" />
+<text  x="180.98" y="303.5" ></text>
+</g>
+<g >
+<title>rebalance_domains (844 samples, 0.02%)</title><rect x="935.6" y="293" width="0.2" height="15.0" fill="rgb(254,227,31)" rx="2" ry="2" />
+<text  x="938.57" y="303.5" ></text>
+</g>
+<g >
+<title>_atomic_dec_and_lock (51,837 samples, 1.19%)</title><rect x="936.2" y="373" width="14.1" height="15.0" fill="rgb(206,162,30)" rx="2" ry="2" />
+<text  x="939.24" y="383.5" ></text>
+</g>
+<g >
+<title>task_numa_fault (545 samples, 0.01%)</title><rect x="98.3" y="181" width="0.1" height="15.0" fill="rgb(223,74,51)" rx="2" ry="2" />
+<text  x="101.26" y="191.5" ></text>
+</g>
+<g >
+<title>jbd2_journal_get_write_access (563 samples, 0.01%)</title><rect x="117.5" y="277" width="0.2" height="15.0" fill="rgb(220,41,54)" rx="2" ry="2" />
+<text  x="120.53" y="287.5" ></text>
+</g>
+<g >
+<title>dequeue_entity (19,945 samples, 0.46%)</title><rect x="174.9" y="325" width="5.4" height="15.0" fill="rgb(254,213,42)" rx="2" ry="2" />
+<text  x="177.88" y="335.5" ></text>
+</g>
+<g >
+<title>sched_clock (476 samples, 0.01%)</title><rect x="1050.7" y="341" width="0.1" height="15.0" fill="rgb(248,130,2)" rx="2" ry="2" />
+<text  x="1053.67" y="351.5" ></text>
+</g>
+<g >
+<title>radix_tree_next_chunk (1,326 samples, 0.03%)</title><rect x="104.2" y="261" width="0.4" height="15.0" fill="rgb(207,139,22)" rx="2" ry="2" />
+<text  x="107.22" y="271.5" ></text>
+</g>
+<g >
+<title>__libc_read (634 samples, 0.01%)</title><rect x="1111.5" y="517" width="0.2" height="15.0" fill="rgb(205,197,12)" rx="2" ry="2" />
+<text  x="1114.49" y="527.5" ></text>
+</g>
+<g >
+<title>ext4_file_write_iter (217,034 samples, 5.00%)</title><rect x="85.9" y="389" width="59.0" height="15.0" fill="rgb(253,167,49)" rx="2" ry="2" />
+<text  x="88.90" y="399.5" >ext4_f..</text>
+</g>
+<g >
+<title>native_queued_spin_lock_slowpath (873 samples, 0.02%)</title><rect x="524.0" y="261" width="0.2" height="15.0" fill="rgb(238,171,9)" rx="2" ry="2" />
+<text  x="527.01" y="271.5" ></text>
+</g>
+<g >
+<title>mutex_lock (1,325 samples, 0.03%)</title><rect x="38.6" y="421" width="0.3" height="15.0" fill="rgb(226,84,17)" rx="2" ry="2" />
+<text  x="41.57" y="431.5" ></text>
+</g>
+<g >
+<title>__fd_install (3,865 samples, 0.09%)</title><rect x="1153.8" y="421" width="1.0" height="15.0" fill="rgb(231,112,36)" rx="2" ry="2" />
+<text  x="1156.79" y="431.5" ></text>
+</g>
+<g >
+<title>native_flush_tlb_one_user (421 samples, 0.01%)</title><rect x="184.8" y="277" width="0.1" height="15.0" fill="rgb(207,84,9)" rx="2" ry="2" />
+<text  x="187.81" y="287.5" ></text>
+</g>
+<g >
+<title>up_write (700 samples, 0.02%)</title><rect x="144.7" y="373" width="0.2" height="15.0" fill="rgb(228,152,6)" rx="2" ry="2" />
+<text  x="147.67" y="383.5" ></text>
+</g>
+<g >
+<title>__wake_up (434 samples, 0.01%)</title><rect x="119.0" y="293" width="0.2" height="15.0" fill="rgb(227,75,31)" rx="2" ry="2" />
+<text  x="122.04" y="303.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (1,155,170 samples, 26.59%)</title><rect x="212.1" y="389" width="313.9" height="15.0" fill="rgb(224,148,30)" rx="2" ry="2" />
+<text  x="215.13" y="399.5" >_raw_spin_lock</text>
+</g>
+<g >
+<title>__lll_unlock_wake (1,540,641 samples, 35.47%)</title><rect x="634.1" y="501" width="418.5" height="15.0" fill="rgb(250,191,54)" rx="2" ry="2" />
+<text  x="637.10" y="511.5" >__lll_unlock_wake</text>
+</g>
+<g >
+<title>apic_timer_interrupt (1,491 samples, 0.03%)</title><rect x="590.7" y="373" width="0.4" height="15.0" fill="rgb(227,22,2)" rx="2" ry="2" />
+<text  x="593.73" y="383.5" ></text>
+</g>
+<g >
+<title>rwsem_spin_on_owner (50,071 samples, 1.15%)</title><rect x="130.7" y="325" width="13.6" height="15.0" fill="rgb(206,52,11)" rx="2" ry="2" />
+<text  x="133.70" y="335.5" ></text>
+</g>
+<g >
+<title>__do_page_fault (4,285 samples, 0.10%)</title><rect x="97.3" y="229" width="1.2" height="15.0" fill="rgb(239,28,7)" rx="2" ry="2" />
+<text  x="100.33" y="239.5" ></text>
+</g>
+<g >
+<title>__wake_up (732 samples, 0.02%)</title><rect x="103.8" y="293" width="0.2" height="15.0" fill="rgb(237,202,50)" rx="2" ry="2" />
+<text  x="106.84" y="303.5" ></text>
+</g>
+<g >
+<title>pagevec_lookup_range (1,435 samples, 0.03%)</title><rect x="104.2" y="293" width="0.4" height="15.0" fill="rgb(250,66,11)" rx="2" ry="2" />
+<text  x="107.20" y="303.5" ></text>
+</g>
+<g >
+<title>crypto_shash_update (2,694 samples, 0.06%)</title><rect x="105.6" y="245" width="0.7" height="15.0" fill="rgb(229,148,4)" rx="2" ry="2" />
+<text  x="108.59" y="255.5" ></text>
+</g>
+<g >
+<title>llist_add_batch (1,228 samples, 0.03%)</title><rect x="1040.6" y="373" width="0.3" height="15.0" fill="rgb(226,33,29)" rx="2" ry="2" />
+<text  x="1043.59" y="383.5" ></text>
+</g>
+<g >
+<title>__fget (671 samples, 0.02%)</title><rect x="1110.4" y="405" width="0.2" height="15.0" fill="rgb(236,145,5)" rx="2" ry="2" />
+<text  x="1113.44" y="415.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (652 samples, 0.02%)</title><rect x="976.7" y="357" width="0.2" height="15.0" fill="rgb(225,68,36)" rx="2" ry="2" />
+<text  x="979.72" y="367.5" ></text>
+</g>
+<g >
+<title>__ext4_ext_dirty (3,141 samples, 0.07%)</title><rect x="105.5" y="277" width="0.8" height="15.0" fill="rgb(224,27,34)" rx="2" ry="2" />
+<text  x="108.47" y="287.5" ></text>
+</g>
+<g >
+<title>[unknown] (37,567 samples, 0.86%)</title><rect x="10.4" y="421" width="10.2" height="15.0" fill="rgb(209,71,51)" rx="2" ry="2" />
+<text  x="13.43" y="431.5" ></text>
+</g>
+<g >
+<title>account_entity_enqueue (1,041 samples, 0.02%)</title><rect x="1046.1" y="325" width="0.3" height="15.0" fill="rgb(245,178,30)" rx="2" ry="2" />
+<text  x="1049.10" y="335.5" ></text>
+</g>
+<g >
+<title>do_sys_open (152,328 samples, 3.51%)</title><rect x="1121.7" y="453" width="41.4" height="15.0" fill="rgb(244,86,9)" rx="2" ry="2" />
+<text  x="1124.72" y="463.5" >do_..</text>
+</g>
+<g >
+<title>apparmor_file_open (4,896 samples, 0.11%)</title><rect x="1151.8" y="357" width="1.3" height="15.0" fill="rgb(213,67,16)" rx="2" ry="2" />
+<text  x="1154.75" y="367.5" ></text>
+</g>
+<g >
+<title>ptep_clear_flush (861 samples, 0.02%)</title><rect x="97.9" y="85" width="0.3" height="15.0" fill="rgb(224,197,26)" rx="2" ry="2" />
+<text  x="100.94" y="95.5" ></text>
+</g>
+<g >
+<title>__softirqentry_text_start (558 samples, 0.01%)</title><rect x="976.1" y="341" width="0.1" height="15.0" fill="rgb(225,9,35)" rx="2" ry="2" />
+<text  x="979.07" y="351.5" ></text>
+</g>
+<g >
+<title>x86_pmu_enable (17,359 samples, 0.40%)</title><rect x="184.2" y="325" width="4.7" height="15.0" fill="rgb(241,213,10)" rx="2" ry="2" />
+<text  x="187.17" y="335.5" ></text>
+</g>
+<g >
+<title>[unknown] (37,571 samples, 0.86%)</title><rect x="10.4" y="469" width="10.2" height="15.0" fill="rgb(250,159,15)" rx="2" ry="2" />
+<text  x="13.43" y="479.5" ></text>
+</g>
+<g >
+<title>rmap_walk_anon (944 samples, 0.02%)</title><rect x="97.9" y="117" width="0.3" height="15.0" fill="rgb(228,86,14)" rx="2" ry="2" />
+<text  x="100.92" y="127.5" ></text>
+</g>
+<g >
+<title>get_futex_key (191,916 samples, 4.42%)</title><rect x="950.3" y="405" width="52.2" height="15.0" fill="rgb(236,142,27)" rx="2" ry="2" />
+<text  x="953.33" y="415.5" >get_f..</text>
+</g>
+<g >
+<title>[[vdso]] (1,578 samples, 0.04%)</title><rect x="1179.7" y="485" width="0.4" height="15.0" fill="rgb(231,190,19)" rx="2" ry="2" />
+<text  x="1182.69" y="495.5" ></text>
+</g>
+<g >
+<title>memset_erms (488 samples, 0.01%)</title><rect x="1133.8" y="373" width="0.1" height="15.0" fill="rgb(209,197,9)" rx="2" ry="2" />
+<text  x="1136.82" y="383.5" ></text>
+</g>
+<g >
+<title>flowoplib_fdnum.isra.2 (532 samples, 0.01%)</title><rect x="1104.8" y="501" width="0.1" height="15.0" fill="rgb(225,117,50)" rx="2" ry="2" />
+<text  x="1107.80" y="511.5" ></text>
+</g>
+<g >
+<title>jbd2_journal_stop (1,262 samples, 0.03%)</title><rect x="118.8" y="309" width="0.4" height="15.0" fill="rgb(208,100,43)" rx="2" ry="2" />
+<text  x="121.84" y="319.5" ></text>
+</g>
+<g >
+<title>dequeue_task_fair (477 samples, 0.01%)</title><rect x="180.4" y="357" width="0.2" height="15.0" fill="rgb(207,37,26)" rx="2" ry="2" />
+<text  x="183.45" y="367.5" ></text>
+</g>
+<g >
+<title>irq_exit (1,036 samples, 0.02%)</title><rect x="188.9" y="309" width="0.3" height="15.0" fill="rgb(224,46,2)" rx="2" ry="2" />
+<text  x="191.94" y="319.5" ></text>
+</g>
+<g >
+<title>rcu_process_callbacks (394 samples, 0.01%)</title><rect x="526.0" y="325" width="0.1" height="15.0" fill="rgb(242,63,35)" rx="2" ry="2" />
+<text  x="528.98" y="335.5" ></text>
+</g>
+<g >
+<title>__d_lookup_rcu (7,095 samples, 0.16%)</title><rect x="1144.5" y="389" width="1.9" height="15.0" fill="rgb(223,117,9)" rx="2" ry="2" />
+<text  x="1147.52" y="399.5" ></text>
+</g>
+<g >
+<title>lockref_get_not_dead (5,216 samples, 0.12%)</title><rect x="1123.0" y="357" width="1.4" height="15.0" fill="rgb(254,93,10)" rx="2" ry="2" />
+<text  x="1126.02" y="367.5" ></text>
+</g>
+<g >
+<title>trunc_dirname (1,677 samples, 0.04%)</title><rect x="1189.5" y="517" width="0.5" height="15.0" fill="rgb(229,50,27)" rx="2" ry="2" />
+<text  x="1192.53" y="527.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (548 samples, 0.01%)</title><rect x="63.9" y="277" width="0.2" height="15.0" fill="rgb(240,57,37)" rx="2" ry="2" />
+<text  x="66.95" y="287.5" ></text>
+</g>
+<g >
+<title>get_unused_fd_flags (19,997 samples, 0.46%)</title><rect x="1155.0" y="437" width="5.4" height="15.0" fill="rgb(247,5,19)" rx="2" ry="2" />
+<text  x="1157.96" y="447.5" ></text>
+</g>
+<g >
+<title>fileset_entry_compare (37,565 samples, 0.86%)</title><rect x="10.4" y="357" width="10.2" height="15.0" fill="rgb(224,93,21)" rx="2" ry="2" />
+<text  x="13.43" y="367.5" ></text>
+</g>
+<g >
+<title>get_user_pages_fast (95,982 samples, 2.21%)</title><rect x="976.4" y="389" width="26.0" height="15.0" fill="rgb(217,61,39)" rx="2" ry="2" />
+<text  x="979.37" y="399.5" >g..</text>
+</g>
+<g >
+<title>[[vdso]] (3,315 samples, 0.08%)</title><rect x="1108.5" y="469" width="0.9" height="15.0" fill="rgb(208,186,27)" rx="2" ry="2" />
+<text  x="1111.52" y="479.5" ></text>
+</g>
+<g >
+<title>try_to_unmap (955 samples, 0.02%)</title><rect x="97.9" y="149" width="0.3" height="15.0" fill="rgb(219,17,49)" rx="2" ry="2" />
+<text  x="100.92" y="159.5" ></text>
+</g>
+<g >
+<title>kmem_cache_free (420 samples, 0.01%)</title><rect x="935.3" y="277" width="0.2" height="15.0" fill="rgb(211,179,41)" rx="2" ry="2" />
+<text  x="938.34" y="287.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (1,488 samples, 0.03%)</title><rect x="590.7" y="357" width="0.4" height="15.0" fill="rgb(229,128,32)" rx="2" ry="2" />
+<text  x="593.73" y="367.5" ></text>
+</g>
+<g >
+<title>gup_pgd_range (93,895 samples, 2.16%)</title><rect x="976.9" y="373" width="25.5" height="15.0" fill="rgb(242,79,8)" rx="2" ry="2" />
+<text  x="979.91" y="383.5" >g..</text>
+</g>
+<g >
+<title>put_prev_entity (635 samples, 0.01%)</title><rect x="190.7" y="325" width="0.1" height="15.0" fill="rgb(227,208,47)" rx="2" ry="2" />
+<text  x="193.66" y="335.5" ></text>
+</g>
+<g >
+<title>jbd2_write_access_granted.part.9 (555 samples, 0.01%)</title><rect x="117.5" y="261" width="0.2" height="15.0" fill="rgb(228,155,38)" rx="2" ry="2" />
+<text  x="120.54" y="271.5" ></text>
+</g>
+<g >
+<title>dget_parent (3,210 samples, 0.07%)</title><rect x="1150.0" y="341" width="0.9" height="15.0" fill="rgb(251,226,54)" rx="2" ry="2" />
+<text  x="1153.02" y="351.5" ></text>
+</g>
+<g >
+<title>native_write_msr (13,031 samples, 0.30%)</title><rect x="185.1" y="277" width="3.6" height="15.0" fill="rgb(251,117,42)" rx="2" ry="2" />
+<text  x="188.14" y="287.5" ></text>
+</g>
+<g >
+<title>jbd2_journal_dirty_metadata (400 samples, 0.01%)</title><rect x="117.0" y="293" width="0.2" height="15.0" fill="rgb(222,83,21)" rx="2" ry="2" />
+<text  x="120.05" y="303.5" ></text>
+</g>
+<g >
+<title>cpuacct_charge (1,509 samples, 0.03%)</title><rect x="178.1" y="293" width="0.4" height="15.0" fill="rgb(220,11,30)" rx="2" ry="2" />
+<text  x="181.10" y="303.5" ></text>
+</g>
+<g >
+<title>enqueue_entity (8,421 samples, 0.19%)</title><rect x="1046.4" y="325" width="2.3" height="15.0" fill="rgb(206,172,36)" rx="2" ry="2" />
+<text  x="1049.39" y="335.5" ></text>
+</g>
+<g >
+<title>__hrtimer_run_queues (1,074 samples, 0.02%)</title><rect x="523.6" y="309" width="0.3" height="15.0" fill="rgb(233,127,43)" rx="2" ry="2" />
+<text  x="526.57" y="319.5" ></text>
+</g>
+<g >
+<title>update_blocked_averages (629 samples, 0.01%)</title><rect x="935.6" y="277" width="0.2" height="15.0" fill="rgb(244,10,21)" rx="2" ry="2" />
+<text  x="938.62" y="287.5" ></text>
+</g>
+<g >
+<title>pick_next_task_fair (3,604 samples, 0.08%)</title><rect x="189.3" y="357" width="1.0" height="15.0" fill="rgb(229,102,52)" rx="2" ry="2" />
+<text  x="192.28" y="367.5" ></text>
+</g>
+<g >
+<title>osq_lock (32,113 samples, 0.74%)</title><rect x="121.9" y="325" width="8.7" height="15.0" fill="rgb(251,64,49)" rx="2" ry="2" />
+<text  x="124.93" y="335.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (7,290 samples, 0.17%)</title><rect x="172.3" y="357" width="1.9" height="15.0" fill="rgb(250,85,26)" rx="2" ry="2" />
+<text  x="175.27" y="367.5" ></text>
+</g>
+<g >
+<title>__check_block_validity.constprop.80 (923 samples, 0.02%)</title><rect x="67.1" y="325" width="0.3" height="15.0" fill="rgb(230,86,39)" rx="2" ry="2" />
+<text  x="70.10" y="335.5" ></text>
+</g>
+<g >
+<title>ext4_iomap_begin (49,907 samples, 1.15%)</title><rect x="66.1" y="341" width="13.6" height="15.0" fill="rgb(205,115,23)" rx="2" ry="2" />
+<text  x="69.12" y="351.5" ></text>
+</g>
+<g >
+<title>flush_tlb_mm_range (452 samples, 0.01%)</title><rect x="1112.1" y="85" width="0.1" height="15.0" fill="rgb(234,228,16)" rx="2" ry="2" />
+<text  x="1115.08" y="95.5" ></text>
+</g>
+<g >
+<title>irq_exit (7,004 samples, 0.16%)</title><rect x="523.9" y="325" width="1.9" height="15.0" fill="rgb(237,48,38)" rx="2" ry="2" />
+<text  x="526.91" y="335.5" ></text>
+</g>
+<g >
+<title>rmap_walk_anon (480 samples, 0.01%)</title><rect x="1112.1" y="133" width="0.1" height="15.0" fill="rgb(217,165,2)" rx="2" ry="2" />
+<text  x="1115.07" y="143.5" ></text>
+</g>
+<g >
+<title>ext4_data_block_valid (1,542 samples, 0.04%)</title><rect x="67.8" y="293" width="0.4" height="15.0" fill="rgb(240,111,35)" rx="2" ry="2" />
+<text  x="70.78" y="303.5" ></text>
+</g>
+<g >
+<title>sys_futex (1,372 samples, 0.03%)</title><rect x="632.7" y="469" width="0.3" height="15.0" fill="rgb(209,136,0)" rx="2" ry="2" />
+<text  x="635.65" y="479.5" ></text>
+</g>
+<g >
+<title>update_rq_clock (1,734 samples, 0.04%)</title><rect x="1050.3" y="373" width="0.5" height="15.0" fill="rgb(228,150,31)" rx="2" ry="2" />
+<text  x="1053.33" y="383.5" ></text>
+</g>
+<g >
+<title>__srcu_read_lock (839 samples, 0.02%)</title><rect x="64.7" y="309" width="0.2" height="15.0" fill="rgb(245,130,13)" rx="2" ry="2" />
+<text  x="67.72" y="319.5" ></text>
+</g>
+<g >
+<title>sys_lseek (12,109 samples, 0.28%)</title><rect x="1181.0" y="469" width="3.3" height="15.0" fill="rgb(215,209,53)" rx="2" ry="2" />
+<text  x="1184.00" y="479.5" ></text>
+</g>
+<g >
+<title>ext4_mark_iloc_dirty (3,686 samples, 0.08%)</title><rect x="119.3" y="309" width="1.0" height="15.0" fill="rgb(231,198,23)" rx="2" ry="2" />
+<text  x="122.27" y="319.5" ></text>
+</g>
+<g >
+<title>intel_pmu_disable_all (457 samples, 0.01%)</title><rect x="171.7" y="309" width="0.1" height="15.0" fill="rgb(227,189,29)" rx="2" ry="2" />
+<text  x="174.68" y="319.5" ></text>
+</g>
+<g >
+<title>__perf_event_task_sched_out (6,112 samples, 0.14%)</title><rect x="170.6" y="357" width="1.7" height="15.0" fill="rgb(227,209,12)" rx="2" ry="2" />
+<text  x="173.59" y="367.5" ></text>
+</g>
+<g >
+<title>rebalance_domains (914 samples, 0.02%)</title><rect x="525.5" y="277" width="0.3" height="15.0" fill="rgb(238,198,31)" rx="2" ry="2" />
+<text  x="528.53" y="287.5" ></text>
+</g>
+<g >
+<title>dax_iomap_rw (141,427 samples, 3.26%)</title><rect x="41.4" y="373" width="38.4" height="15.0" fill="rgb(254,176,35)" rx="2" ry="2" />
+<text  x="44.42" y="383.5" >dax..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (1,529,901 samples, 35.22%)</title><rect x="636.0" y="485" width="415.6" height="15.0" fill="rgb(223,86,53)" rx="2" ry="2" />
+<text  x="639.03" y="495.5" >entry_SYSCALL_64_after_hwframe</text>
+</g>
+<g >
+<title>__virt_addr_valid (461 samples, 0.01%)</title><rect x="1162.6" y="373" width="0.2" height="15.0" fill="rgb(209,11,2)" rx="2" ry="2" />
+<text  x="1165.63" y="383.5" ></text>
+</g>
+<g >
+<title>crypto_shash_update (3,270 samples, 0.08%)</title><rect x="108.1" y="245" width="0.9" height="15.0" fill="rgb(242,142,9)" rx="2" ry="2" />
+<text  x="111.09" y="255.5" ></text>
+</g>
+<g >
+<title>update_cfs_group (2,373 samples, 0.05%)</title><rect x="1047.1" y="309" width="0.6" height="15.0" fill="rgb(232,107,31)" rx="2" ry="2" />
+<text  x="1050.11" y="319.5" ></text>
+</g>
+<g >
+<title>ext4_lock_group (446 samples, 0.01%)</title><rect x="109.1" y="261" width="0.1" height="15.0" fill="rgb(221,41,50)" rx="2" ry="2" />
+<text  x="112.09" y="271.5" ></text>
+</g>
+<g >
+<title>_raw_read_lock (474 samples, 0.01%)</title><rect x="117.9" y="309" width="0.1" height="15.0" fill="rgb(246,111,24)" rx="2" ry="2" />
+<text  x="120.88" y="319.5" ></text>
+</g>
+<g >
+<title>hash_futex (1,329 samples, 0.03%)</title><rect x="1050.8" y="421" width="0.4" height="15.0" fill="rgb(218,190,27)" rx="2" ry="2" />
+<text  x="1053.84" y="431.5" ></text>
+</g>
+<g >
+<title>futex_wake (1,520,780 samples, 35.01%)</title><rect x="637.7" y="421" width="413.1" height="15.0" fill="rgb(215,97,54)" rx="2" ry="2" />
+<text  x="640.68" y="431.5" >futex_wake</text>
+</g>
+<g >
+<title>__ext4_handle_dirty_metadata (640 samples, 0.01%)</title><rect x="119.7" y="277" width="0.2" height="15.0" fill="rgb(232,124,36)" rx="2" ry="2" />
+<text  x="122.68" y="287.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (46,432 samples, 1.07%)</title><rect x="21.4" y="469" width="12.6" height="15.0" fill="rgb(209,178,20)" rx="2" ry="2" />
+<text  x="24.42" y="479.5" ></text>
+</g>
+<g >
+<title>scheduler_tick (543 samples, 0.01%)</title><rect x="523.7" y="245" width="0.1" height="15.0" fill="rgb(220,4,20)" rx="2" ry="2" />
+<text  x="526.70" y="255.5" ></text>
+</g>
+<g >
+<title>lockref_get_not_zero (3,132 samples, 0.07%)</title><rect x="1150.0" y="325" width="0.9" height="15.0" fill="rgb(220,37,18)" rx="2" ry="2" />
+<text  x="1153.04" y="335.5" ></text>
+</g>
+<g >
+<title>start_this_handle (2,263 samples, 0.05%)</title><rect x="103.0" y="293" width="0.6" height="15.0" fill="rgb(246,144,34)" rx="2" ry="2" />
+<text  x="106.02" y="303.5" ></text>
+</g>
+<g >
+<title>ext4_mb_use_preallocated.constprop.31 (642 samples, 0.01%)</title><rect x="109.5" y="277" width="0.2" height="15.0" fill="rgb(215,193,4)" rx="2" ry="2" />
+<text  x="112.50" y="287.5" ></text>
+</g>
+<g >
+<title>syscall_return_via_sysret (3,912 samples, 0.09%)</title><rect x="633.0" y="485" width="1.1" height="15.0" fill="rgb(234,147,26)" rx="2" ry="2" />
+<text  x="636.04" y="495.5" ></text>
+</g>
+<g >
+<title>resched_curr (633 samples, 0.01%)</title><rect x="1049.7" y="341" width="0.2" height="15.0" fill="rgb(221,112,3)" rx="2" ry="2" />
+<text  x="1052.72" y="351.5" ></text>
+</g>
+<g >
+<title>tick_sched_handle (829 samples, 0.02%)</title><rect x="933.8" y="293" width="0.2" height="15.0" fill="rgb(253,95,39)" rx="2" ry="2" />
+<text  x="936.82" y="303.5" ></text>
+</g>
+<g >
+<title>[unknown] (37,567 samples, 0.86%)</title><rect x="10.4" y="453" width="10.2" height="15.0" fill="rgb(228,96,45)" rx="2" ry="2" />
+<text  x="13.43" y="463.5" ></text>
+</g>
+<g >
+<title>_copy_from_iter_flushcache (1,681 samples, 0.04%)</title><rect x="1111.8" y="309" width="0.4" height="15.0" fill="rgb(228,165,28)" rx="2" ry="2" />
+<text  x="1114.76" y="319.5" ></text>
+</g>
+<g >
+<title>dax_iomap_rw (3,236 samples, 0.07%)</title><rect x="1111.7" y="389" width="0.9" height="15.0" fill="rgb(251,37,43)" rx="2" ry="2" />
+<text  x="1114.73" y="399.5" ></text>
+</g>
+<g >
+<title>drop_futex_key_refs.isra.15 (15,412 samples, 0.35%)</title><rect x="159.9" y="405" width="4.2" height="15.0" fill="rgb(229,188,7)" rx="2" ry="2" />
+<text  x="162.88" y="415.5" ></text>
+</g>
+<g >
+<title>gup_pgd_range (116,192 samples, 2.68%)</title><rect x="591.8" y="357" width="31.6" height="15.0" fill="rgb(209,215,15)" rx="2" ry="2" />
+<text  x="594.83" y="367.5" >gu..</text>
+</g>
+<g >
+<title>ext4_mark_inode_dirty (1,411 samples, 0.03%)</title><rect x="107.1" y="245" width="0.4" height="15.0" fill="rgb(250,144,27)" rx="2" ry="2" />
+<text  x="110.09" y="255.5" ></text>
+</g>
+<g >
+<title>sys_openat (643 samples, 0.01%)</title><rect x="1163.3" y="485" width="0.2" height="15.0" fill="rgb(237,60,11)" rx="2" ry="2" />
+<text  x="1166.28" y="495.5" ></text>
+</g>
+<g >
+<title>avl_is_empty (1,303 samples, 0.03%)</title><rect x="12.3" y="341" width="0.3" height="15.0" fill="rgb(210,6,17)" rx="2" ry="2" />
+<text  x="15.29" y="351.5" ></text>
+</g>
+<g >
+<title>jbd2_write_access_granted.part.9 (413 samples, 0.01%)</title><rect x="120.6" y="261" width="0.1" height="15.0" fill="rgb(247,219,52)" rx="2" ry="2" />
+<text  x="123.62" y="271.5" ></text>
+</g>
+<g >
+<title>task_work_run (21,325 samples, 0.49%)</title><rect x="22.1" y="437" width="5.8" height="15.0" fill="rgb(241,137,12)" rx="2" ry="2" />
+<text  x="25.10" y="447.5" ></text>
+</g>
+<g >
+<title>file_free_rcu (720 samples, 0.02%)</title><rect x="590.9" y="293" width="0.2" height="15.0" fill="rgb(236,166,17)" rx="2" ry="2" />
+<text  x="593.86" y="303.5" ></text>
+</g>
+<g >
+<title>pthread_cond_signal@@GLIBC_2.3.2 (2,061 samples, 0.05%)</title><rect x="1188.9" y="517" width="0.5" height="15.0" fill="rgb(239,226,9)" rx="2" ry="2" />
+<text  x="1191.87" y="527.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (31,742 samples, 0.73%)</title><rect x="1111.7" y="485" width="8.6" height="15.0" fill="rgb(241,103,28)" rx="2" ry="2" />
+<text  x="1114.67" y="495.5" ></text>
+</g>
+<g >
+<title>gethrtime (6,872 samples, 0.16%)</title><rect x="1107.6" y="501" width="1.8" height="15.0" fill="rgb(216,179,24)" rx="2" ry="2" />
+<text  x="1110.56" y="511.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (400 samples, 0.01%)</title><rect x="1091.8" y="485" width="0.1" height="15.0" fill="rgb(245,80,6)" rx="2" ry="2" />
+<text  x="1094.75" y="495.5" ></text>
+</g>
+<g >
+<title>fileset_entry_compare (22,139 samples, 0.51%)</title><rect x="12.7" y="341" width="6.0" height="15.0" fill="rgb(224,112,20)" rx="2" ry="2" />
+<text  x="15.70" y="351.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (399 samples, 0.01%)</title><rect x="1091.8" y="469" width="0.1" height="15.0" fill="rgb(224,112,38)" rx="2" ry="2" />
+<text  x="1094.75" y="479.5" ></text>
+</g>
+<g >
+<title>__lookup_mnt (692 samples, 0.02%)</title><rect x="1144.2" y="341" width="0.2" height="15.0" fill="rgb(207,81,9)" rx="2" ry="2" />
+<text  x="1147.19" y="351.5" ></text>
+</g>
+<g >
+<title>iomap_apply (3,226 samples, 0.07%)</title><rect x="1111.7" y="373" width="0.9" height="15.0" fill="rgb(215,159,12)" rx="2" ry="2" />
+<text  x="1114.73" y="383.5" ></text>
+</g>
+<g >
+<title>avl_find (6,799 samples, 0.16%)</title><rect x="10.4" y="341" width="1.9" height="15.0" fill="rgb(206,115,44)" rx="2" ry="2" />
+<text  x="13.44" y="351.5" ></text>
+</g>
+<g >
+<title>ext4_mark_iloc_dirty (1,017 samples, 0.02%)</title><rect x="107.1" y="229" width="0.3" height="15.0" fill="rgb(221,224,3)" rx="2" ry="2" />
+<text  x="110.10" y="239.5" ></text>
+</g>
+<g >
+<title>kmem_cache_free (458 samples, 0.01%)</title><rect x="26.9" y="373" width="0.2" height="15.0" fill="rgb(237,24,14)" rx="2" ry="2" />
+<text  x="29.95" y="383.5" ></text>
+</g>
+<g >
+<title>ext4_superblock_csum_set (1,077 samples, 0.02%)</title><rect x="116.8" y="293" width="0.2" height="15.0" fill="rgb(242,198,18)" rx="2" ry="2" />
+<text  x="119.76" y="303.5" ></text>
+</g>
+<g >
+<title>inode_permission (401 samples, 0.01%)</title><rect x="1134.0" y="405" width="0.1" height="15.0" fill="rgb(251,138,8)" rx="2" ry="2" />
+<text  x="1137.03" y="415.5" ></text>
+</g>
+<g >
+<title>update_min_vruntime (740 samples, 0.02%)</title><rect x="180.1" y="309" width="0.2" height="15.0" fill="rgb(251,25,53)" rx="2" ry="2" />
+<text  x="183.10" y="319.5" ></text>
+</g>
+<g >
+<title>irq_exit (498 samples, 0.01%)</title><rect x="1077.0" y="453" width="0.2" height="15.0" fill="rgb(219,208,21)" rx="2" ry="2" />
+<text  x="1080.04" y="463.5" ></text>
+</g>
+<g >
+<title>filebench_log (833 samples, 0.02%)</title><rect x="1099.0" y="501" width="0.2" height="15.0" fill="rgb(236,48,26)" rx="2" ry="2" />
+<text  x="1101.95" y="511.5" ></text>
+</g>
+<g >
+<title>__inode_permission (11,554 samples, 0.27%)</title><rect x="1135.7" y="373" width="3.2" height="15.0" fill="rgb(251,173,41)" rx="2" ry="2" />
+<text  x="1138.74" y="383.5" ></text>
+</g>
+<g >
+<title>crypto_shash_update (1,052 samples, 0.02%)</title><rect x="116.8" y="277" width="0.2" height="15.0" fill="rgb(206,0,41)" rx="2" ry="2" />
+<text  x="119.76" y="287.5" ></text>
+</g>
+<g >
+<title>dax_direct_access (1,317 samples, 0.03%)</title><rect x="64.3" y="325" width="0.4" height="15.0" fill="rgb(226,158,31)" rx="2" ry="2" />
+<text  x="67.35" y="335.5" ></text>
+</g>
+<g >
+<title>irq_exit (747 samples, 0.02%)</title><rect x="1040.3" y="325" width="0.3" height="15.0" fill="rgb(219,156,19)" rx="2" ry="2" />
+<text  x="1043.35" y="335.5" ></text>
+</g>
+<g >
+<title>native_queued_spin_lock_slowpath (3,758 samples, 0.09%)</title><rect x="31.1" y="405" width="1.0" height="15.0" fill="rgb(249,21,5)" rx="2" ry="2" />
+<text  x="34.10" y="415.5" ></text>
+</g>
+<g >
+<title>ext4_issue_zeroout (24,754 samples, 0.57%)</title><rect x="109.8" y="309" width="6.7" height="15.0" fill="rgb(236,188,34)" rx="2" ry="2" />
+<text  x="112.82" y="319.5" ></text>
+</g>
+<g >
+<title>sys_read (1,045 samples, 0.02%)</title><rect x="84.6" y="469" width="0.3" height="15.0" fill="rgb(253,189,5)" rx="2" ry="2" />
+<text  x="87.57" y="479.5" ></text>
+</g>
+<g >
+<title>_raw_read_lock (8,183 samples, 0.19%)</title><rect x="77.4" y="309" width="2.3" height="15.0" fill="rgb(243,174,34)" rx="2" ry="2" />
+<text  x="80.45" y="319.5" ></text>
+</g>
+<g >
+<title>native_queued_spin_lock_slowpath (3,380 samples, 0.08%)</title><rect x="1159.3" y="389" width="0.9" height="15.0" fill="rgb(252,195,42)" rx="2" ry="2" />
+<text  x="1162.32" y="399.5" ></text>
+</g>
+<g >
+<title>wake_q_add (2,928 samples, 0.07%)</title><rect x="1011.2" y="389" width="0.8" height="15.0" fill="rgb(220,74,51)" rx="2" ry="2" />
+<text  x="1014.20" y="399.5" ></text>
+</g>
+<g >
+<title>jbd2_transaction_committed (12,321 samples, 0.28%)</title><rect x="76.3" y="325" width="3.4" height="15.0" fill="rgb(217,222,5)" rx="2" ry="2" />
+<text  x="79.33" y="335.5" ></text>
+</g>
+<g >
+<title>vfs_write (31,659 samples, 0.73%)</title><rect x="1111.7" y="453" width="8.6" height="15.0" fill="rgb(253,28,27)" rx="2" ry="2" />
+<text  x="1114.69" y="463.5" ></text>
+</g>
+<g >
+<title>putname (628 samples, 0.01%)</title><rect x="1162.9" y="437" width="0.2" height="15.0" fill="rgb(244,160,10)" rx="2" ry="2" />
+<text  x="1165.89" y="447.5" ></text>
+</g>
+<g >
+<title>path_init (726 samples, 0.02%)</title><rect x="1147.4" y="405" width="0.2" height="15.0" fill="rgb(248,6,20)" rx="2" ry="2" />
+<text  x="1150.36" y="415.5" ></text>
+</g>
+<g >
+<title>ext4_orphan_del (3,301 samples, 0.08%)</title><rect x="120.7" y="325" width="0.9" height="15.0" fill="rgb(221,150,27)" rx="2" ry="2" />
+<text  x="123.75" y="335.5" ></text>
+</g>
+<g >
+<title>update_cfs_rq_h_load (508 samples, 0.01%)</title><rect x="1045.0" y="357" width="0.1" height="15.0" fill="rgb(243,45,0)" rx="2" ry="2" />
+<text  x="1047.97" y="367.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (654 samples, 0.02%)</title><rect x="976.7" y="373" width="0.2" height="15.0" fill="rgb(224,99,28)" rx="2" ry="2" />
+<text  x="979.72" y="383.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (11,971 samples, 0.28%)</title><rect x="1157.0" y="405" width="3.2" height="15.0" fill="rgb(226,119,52)" rx="2" ry="2" />
+<text  x="1159.99" y="415.5" ></text>
+</g>
+<g >
+<title>irq_exit (6,389 samples, 0.15%)</title><rect x="934.1" y="341" width="1.7" height="15.0" fill="rgb(240,50,24)" rx="2" ry="2" />
+<text  x="937.10" y="351.5" ></text>
+</g>
+<g >
+<title>rmap_walk (480 samples, 0.01%)</title><rect x="1112.1" y="149" width="0.1" height="15.0" fill="rgb(240,33,40)" rx="2" ry="2" />
+<text  x="1115.07" y="159.5" ></text>
+</g>
+<g >
+<title>__open64 (158,267 samples, 3.64%)</title><rect x="1120.8" y="517" width="43.0" height="15.0" fill="rgb(235,79,35)" rx="2" ry="2" />
+<text  x="1123.82" y="527.5" >__op..</text>
+</g>
+<g >
+<title>filebench (4,343,566 samples, 100.00%)</title><rect x="10.0" y="533" width="1180.0" height="15.0" fill="rgb(230,42,1)" rx="2" ry="2" />
+<text  x="13.00" y="543.5" >filebench</text>
+</g>
+<g >
+<title>__pthread_enable_asynccancel (1,638 samples, 0.04%)</title><rect x="1053.4" y="501" width="0.4" height="15.0" fill="rgb(215,98,18)" rx="2" ry="2" />
+<text  x="1056.36" y="511.5" ></text>
+</g>
+<g >
+<title>sys_close (782 samples, 0.02%)</title><rect x="34.0" y="469" width="0.2" height="15.0" fill="rgb(230,95,6)" rx="2" ry="2" />
+<text  x="37.03" y="479.5" ></text>
+</g>
+<g >
+<title>__slab_alloc (611 samples, 0.01%)</title><rect x="1128.2" y="373" width="0.2" height="15.0" fill="rgb(232,103,16)" rx="2" ry="2" />
+<text  x="1131.24" y="383.5" ></text>
+</g>
+<g >
+<title>__update_load_avg_se.isra.37 (1,510 samples, 0.03%)</title><rect x="179.5" y="293" width="0.4" height="15.0" fill="rgb(212,214,49)" rx="2" ry="2" />
+<text  x="182.50" y="303.5" ></text>
+</g>
+<g >
+<title>fileset_find_entry (373 samples, 0.01%)</title><rect x="18.7" y="341" width="0.1" height="15.0" fill="rgb(246,92,18)" rx="2" ry="2" />
+<text  x="21.72" y="351.5" ></text>
+</g>
+<g >
+<title>task_ctx_sched_out (3,937 samples, 0.09%)</title><rect x="171.2" y="341" width="1.1" height="15.0" fill="rgb(248,52,0)" rx="2" ry="2" />
+<text  x="174.19" y="351.5" ></text>
+</g>
+<g >
+<title>_atomic_dec_and_lock (14,887 samples, 0.34%)</title><rect x="160.0" y="373" width="4.1" height="15.0" fill="rgb(217,217,23)" rx="2" ry="2" />
+<text  x="163.02" y="383.5" ></text>
+</g>
+<g >
+<title>memset_erms (934 samples, 0.02%)</title><rect x="1130.1" y="389" width="0.2" height="15.0" fill="rgb(234,90,4)" rx="2" ry="2" />
+<text  x="1133.06" y="399.5" ></text>
+</g>
+<g >
+<title>__task_rq_lock (8,908 samples, 0.21%)</title><rect x="1033.9" y="373" width="2.4" height="15.0" fill="rgb(221,198,4)" rx="2" ry="2" />
+<text  x="1036.89" y="383.5" ></text>
+</g>
+<g >
+<title>rcu_process_callbacks (466 samples, 0.01%)</title><rect x="976.8" y="309" width="0.1" height="15.0" fill="rgb(217,191,5)" rx="2" ry="2" />
+<text  x="979.75" y="319.5" ></text>
+</g>
+<g >
+<title>__check_object_size (1,668 samples, 0.04%)</title><rect x="1162.3" y="389" width="0.5" height="15.0" fill="rgb(233,140,3)" rx="2" ry="2" />
+<text  x="1165.31" y="399.5" ></text>
+</g>
+<g >
+<title>ext4_orphan_add (4,157 samples, 0.10%)</title><rect x="116.7" y="325" width="1.1" height="15.0" fill="rgb(231,77,43)" rx="2" ry="2" />
+<text  x="119.68" y="335.5" ></text>
+</g>
+<g >
+<title>__libc_write (31,778 samples, 0.73%)</title><rect x="1111.7" y="517" width="8.6" height="15.0" fill="rgb(228,174,13)" rx="2" ry="2" />
+<text  x="1114.66" y="527.5" ></text>
+</g>
+<g >
+<title>ext4_mb_mark_diskspace_used (6,682 samples, 0.15%)</title><rect x="107.7" y="277" width="1.8" height="15.0" fill="rgb(207,61,24)" rx="2" ry="2" />
+<text  x="110.66" y="287.5" ></text>
+</g>
+<g >
+<title>ptep_clear_flush (455 samples, 0.01%)</title><rect x="1112.1" y="101" width="0.1" height="15.0" fill="rgb(219,87,25)" rx="2" ry="2" />
+<text  x="1115.08" y="111.5" ></text>
+</g>
+<g >
+<title>_atomic_dec_and_lock (25,990 samples, 0.60%)</title><rect x="526.2" y="357" width="7.1" height="15.0" fill="rgb(252,20,36)" rx="2" ry="2" />
+<text  x="529.25" y="367.5" ></text>
+</g>
+<g >
+<title>crc_array (380 samples, 0.01%)</title><rect x="108.9" y="229" width="0.1" height="15.0" fill="rgb(226,43,2)" rx="2" ry="2" />
+<text  x="111.86" y="239.5" ></text>
+</g>
+<g >
+<title>rcu_process_callbacks (5,216 samples, 0.12%)</title><rect x="934.1" y="309" width="1.5" height="15.0" fill="rgb(228,175,52)" rx="2" ry="2" />
+<text  x="937.14" y="319.5" ></text>
+</g>
+<g >
+<title>__do_page_fault (1,360 samples, 0.03%)</title><rect x="1120.4" y="469" width="0.4" height="15.0" fill="rgb(206,37,25)" rx="2" ry="2" />
+<text  x="1123.43" y="479.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (2,096 samples, 0.05%)</title><rect x="1110.3" y="469" width="0.6" height="15.0" fill="rgb(233,110,47)" rx="2" ry="2" />
+<text  x="1113.34" y="479.5" ></text>
+</g>
+<g >
+<title>handle_mm_fault (3,400 samples, 0.08%)</title><rect x="97.5" y="213" width="0.9" height="15.0" fill="rgb(252,94,36)" rx="2" ry="2" />
+<text  x="100.49" y="223.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (600 samples, 0.01%)</title><rect x="1077.0" y="485" width="0.2" height="15.0" fill="rgb(231,80,7)" rx="2" ry="2" />
+<text  x="1080.01" y="495.5" ></text>
+</g>
+<g >
+<title>___slab_alloc (573 samples, 0.01%)</title><rect x="1128.2" y="357" width="0.2" height="15.0" fill="rgb(251,152,45)" rx="2" ry="2" />
+<text  x="1131.24" y="367.5" ></text>
+</g>
+<g >
+<title>irq_exit (757 samples, 0.02%)</title><rect x="591.6" y="325" width="0.2" height="15.0" fill="rgb(226,216,47)" rx="2" ry="2" />
+<text  x="594.61" y="335.5" ></text>
+</g>
+<g >
+<title>ext4_read_block_bitmap (780 samples, 0.02%)</title><rect x="109.2" y="261" width="0.2" height="15.0" fill="rgb(230,42,12)" rx="2" ry="2" />
+<text  x="112.21" y="271.5" ></text>
+</g>
+<g >
+<title>__pthread_disable_asynccancel (3,262 samples, 0.08%)</title><rect x="1163.8" y="517" width="0.9" height="15.0" fill="rgb(249,77,14)" rx="2" ry="2" />
+<text  x="1166.82" y="527.5" ></text>
+</g>
+<g >
+<title>__vdso_gettimeofday (5,942 samples, 0.14%)</title><rect x="1107.8" y="485" width="1.6" height="15.0" fill="rgb(205,126,39)" rx="2" ry="2" />
+<text  x="1110.81" y="495.5" ></text>
+</g>
+<g >
+<title>__copy_user_nocache (44,601 samples, 1.03%)</title><rect x="86.4" y="277" width="12.1" height="15.0" fill="rgb(215,35,9)" rx="2" ry="2" />
+<text  x="89.38" y="287.5" ></text>
+</g>
+<g >
+<title>iput (52,243 samples, 1.20%)</title><rect x="936.1" y="389" width="14.2" height="15.0" fill="rgb(241,3,34)" rx="2" ry="2" />
+<text  x="939.13" y="399.5" ></text>
+</g>
+<g >
+<title>lookup_fast (17,052 samples, 0.39%)</title><rect x="1139.8" y="373" width="4.6" height="15.0" fill="rgb(231,181,21)" rx="2" ry="2" />
+<text  x="1142.76" y="383.5" ></text>
+</g>
+<g >
+<title>ext4_map_blocks (32,833 samples, 0.76%)</title><rect x="67.4" y="325" width="8.9" height="15.0" fill="rgb(239,155,24)" rx="2" ry="2" />
+<text  x="70.41" y="335.5" ></text>
+</g>
+<g >
+<title>flowoplib_pickfile (386 samples, 0.01%)</title><rect x="1107.5" y="501" width="0.1" height="15.0" fill="rgb(229,69,8)" rx="2" ry="2" />
+<text  x="1110.46" y="511.5" ></text>
+</g>
+<g >
+<title>syscall_return_via_sysret (1,046 samples, 0.02%)</title><rect x="34.2" y="485" width="0.3" height="15.0" fill="rgb(251,36,31)" rx="2" ry="2" />
+<text  x="37.25" y="495.5" ></text>
+</g>
+<g >
+<title>mts_refresh (2,787 samples, 0.06%)</title><rect x="1188.1" y="517" width="0.7" height="15.0" fill="rgb(206,38,13)" rx="2" ry="2" />
+<text  x="1191.07" y="527.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (179,382 samples, 4.13%)</title><rect x="35.8" y="469" width="48.8" height="15.0" fill="rgb(226,158,4)" rx="2" ry="2" />
+<text  x="38.84" y="479.5" >do_s..</text>
+</g>
+<g >
+<title>account_entity_dequeue (477 samples, 0.01%)</title><rect x="175.6" y="309" width="0.1" height="15.0" fill="rgb(225,119,51)" rx="2" ry="2" />
+<text  x="178.61" y="319.5" ></text>
+</g>
+<g >
+<title>security_file_permission (457 samples, 0.01%)</title><rect x="144.9" y="405" width="0.1" height="15.0" fill="rgb(241,57,33)" rx="2" ry="2" />
+<text  x="147.90" y="415.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (924 samples, 0.02%)</title><rect x="524.0" y="277" width="0.2" height="15.0" fill="rgb(229,192,13)" rx="2" ry="2" />
+<text  x="526.99" y="287.5" ></text>
+</g>
+<g >
+<title>new_sync_write (217,249 samples, 5.00%)</title><rect x="85.9" y="405" width="59.0" height="15.0" fill="rgb(232,85,1)" rx="2" ry="2" />
+<text  x="88.85" y="415.5" >new_sy..</text>
+</g>
+<g >
+<title>__perf_event_task_sched_in (17,975 samples, 0.41%)</title><rect x="184.0" y="341" width="4.9" height="15.0" fill="rgb(241,135,25)" rx="2" ry="2" />
+<text  x="187.00" y="351.5" ></text>
+</g>
+<g >
+<title>sys_write (31,726 samples, 0.73%)</title><rect x="1111.7" y="469" width="8.6" height="15.0" fill="rgb(253,22,26)" rx="2" ry="2" />
+<text  x="1114.67" y="479.5" ></text>
+</g>
+<g >
+<title>__sched_text_start (82,669 samples, 1.90%)</title><rect x="168.9" y="373" width="22.5" height="15.0" fill="rgb(209,225,20)" rx="2" ry="2" />
+<text  x="171.89" y="383.5" >_..</text>
+</g>
+<g >
+<title>complete_walk (6,552 samples, 0.15%)</title><rect x="1122.7" y="405" width="1.7" height="15.0" fill="rgb(220,153,31)" rx="2" ry="2" />
+<text  x="1125.67" y="415.5" ></text>
+</g>
+<g >
+<title>inode_permission (12,258 samples, 0.28%)</title><rect x="1135.7" y="389" width="3.3" height="15.0" fill="rgb(237,174,40)" rx="2" ry="2" />
+<text  x="1138.68" y="399.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (1,754,651 samples, 40.40%)</title><rect x="156.4" y="485" width="476.6" height="15.0" fill="rgb(225,73,33)" rx="2" ry="2" />
+<text  x="159.35" y="495.5" >entry_SYSCALL_64_after_hwframe</text>
+</g>
+<g >
+<title>__vfs_read (155,581 samples, 3.58%)</title><rect x="39.8" y="421" width="42.3" height="15.0" fill="rgb(246,103,23)" rx="2" ry="2" />
+<text  x="42.81" y="431.5" >__v..</text>
+</g>
+<g >
+<title>__slab_free (391 samples, 0.01%)</title><rect x="525.3" y="245" width="0.1" height="15.0" fill="rgb(247,217,30)" rx="2" ry="2" />
+<text  x="528.29" y="255.5" ></text>
+</g>
+<g >
+<title>crypto_shash_update (624 samples, 0.01%)</title><rect x="120.8" y="277" width="0.1" height="15.0" fill="rgb(206,19,45)" rx="2" ry="2" />
+<text  x="123.77" y="287.5" ></text>
+</g>
+<g >
+<title>complete (2,162 samples, 0.05%)</title><rect x="110.7" y="181" width="0.6" height="15.0" fill="rgb(210,192,20)" rx="2" ry="2" />
+<text  x="113.70" y="191.5" ></text>
+</g>
+<g >
+<title>ext4_iomap_end (13,481 samples, 0.31%)</title><rect x="118.0" y="341" width="3.7" height="15.0" fill="rgb(240,56,24)" rx="2" ry="2" />
+<text  x="121.01" y="351.5" ></text>
+</g>
+<g >
+<title>schedule (393 samples, 0.01%)</title><rect x="1052.6" y="405" width="0.2" height="15.0" fill="rgb(223,35,17)" rx="2" ry="2" />
+<text  x="1055.64" y="415.5" ></text>
+</g>
+<g >
+<title>jbd2__journal_start (492 samples, 0.01%)</title><rect x="1112.3" y="325" width="0.1" height="15.0" fill="rgb(251,30,28)" rx="2" ry="2" />
+<text  x="1115.31" y="335.5" ></text>
+</g>
+<g >
+<title>native_queued_spin_lock_slowpath (1,145,929 samples, 26.38%)</title><rect x="214.6" y="373" width="311.4" height="15.0" fill="rgb(236,218,5)" rx="2" ry="2" />
+<text  x="217.64" y="383.5" >native_queued_spin_lock_slowpath</text>
+</g>
+<g >
+<title>__alloc_fd (19,450 samples, 0.45%)</title><rect x="1155.1" y="421" width="5.2" height="15.0" fill="rgb(210,219,15)" rx="2" ry="2" />
+<text  x="1158.06" y="431.5" ></text>
+</g>
+<g >
+<title>sched_clock_cpu (770 samples, 0.02%)</title><rect x="171.8" y="309" width="0.2" height="15.0" fill="rgb(208,36,23)" rx="2" ry="2" />
+<text  x="174.81" y="319.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (12,709 samples, 0.29%)</title><rect x="28.7" y="421" width="3.4" height="15.0" fill="rgb(227,146,36)" rx="2" ry="2" />
+<text  x="31.66" y="431.5" ></text>
+</g>
+<g >
+<title>rcu_process_callbacks (458 samples, 0.01%)</title><rect x="976.1" y="325" width="0.1" height="15.0" fill="rgb(208,104,7)" rx="2" ry="2" />
+<text  x="979.07" y="335.5" ></text>
+</g>
+<g >
+<title>native_flush_tlb_others (432 samples, 0.01%)</title><rect x="1112.1" y="69" width="0.1" height="15.0" fill="rgb(206,115,28)" rx="2" ry="2" />
+<text  x="1115.08" y="79.5" ></text>
+</g>
+<g >
+<title>__handle_mm_fault (787 samples, 0.02%)</title><rect x="1112.0" y="213" width="0.2" height="15.0" fill="rgb(224,185,26)" rx="2" ry="2" />
+<text  x="1114.99" y="223.5" ></text>
+</g>
+<g >
+<title>clean_bdev_aliases (1,513 samples, 0.03%)</title><rect x="104.2" y="309" width="0.4" height="15.0" fill="rgb(237,201,36)" rx="2" ry="2" />
+<text  x="107.18" y="319.5" ></text>
+</g>
+<g >
+<title>__d_lookup_rcu (11,492 samples, 0.26%)</title><rect x="1140.6" y="357" width="3.1" height="15.0" fill="rgb(222,162,2)" rx="2" ry="2" />
+<text  x="1143.59" y="367.5" ></text>
+</g>
+<g >
+<title>smp_call_function_many (431 samples, 0.01%)</title><rect x="1112.1" y="53" width="0.1" height="15.0" fill="rgb(206,184,35)" rx="2" ry="2" />
+<text  x="1115.08" y="63.5" ></text>
+</g>
+<g >
+<title>bio_alloc_bioset (573 samples, 0.01%)</title><rect x="110.0" y="245" width="0.1" height="15.0" fill="rgb(240,183,48)" rx="2" ry="2" />
+<text  x="112.97" y="255.5" ></text>
+</g>
+<g >
+<title>fput (6,327 samples, 0.15%)</title><rect x="32.2" y="405" width="1.7" height="15.0" fill="rgb(248,170,34)" rx="2" ry="2" />
+<text  x="35.21" y="415.5" ></text>
+</g>
+<g >
+<title>__ext4_journal_start_sb (3,481 samples, 0.08%)</title><rect x="102.7" y="325" width="0.9" height="15.0" fill="rgb(209,76,5)" rx="2" ry="2" />
+<text  x="105.69" y="335.5" ></text>
+</g>
+<g >
+<title>[unknown] (37,565 samples, 0.86%)</title><rect x="10.4" y="373" width="10.2" height="15.0" fill="rgb(236,51,16)" rx="2" ry="2" />
+<text  x="13.43" y="383.5" ></text>
+</g>
+<g >
+<title>do_futex (1,748,084 samples, 40.24%)</title><rect x="157.7" y="437" width="474.9" height="15.0" fill="rgb(245,214,22)" rx="2" ry="2" />
+<text  x="160.73" y="447.5" >do_futex</text>
+</g>
+<g >
+<title>update_load_avg (3,187 samples, 0.07%)</title><rect x="1047.8" y="309" width="0.9" height="15.0" fill="rgb(243,42,46)" rx="2" ry="2" />
+<text  x="1050.81" y="319.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum_set (374 samples, 0.01%)</title><rect x="107.3" y="197" width="0.1" height="15.0" fill="rgb(242,50,2)" rx="2" ry="2" />
+<text  x="110.26" y="207.5" ></text>
+</g>
+<g >
+<title>__fget_light (799 samples, 0.02%)</title><rect x="1110.4" y="421" width="0.2" height="15.0" fill="rgb(227,132,2)" rx="2" ry="2" />
+<text  x="1113.40" y="431.5" ></text>
+</g>
+<g >
+<title>__hrtimer_run_queues (991 samples, 0.02%)</title><rect x="933.8" y="325" width="0.2" height="15.0" fill="rgb(227,32,25)" rx="2" ry="2" />
+<text  x="936.78" y="335.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (181,008 samples, 4.17%)</title><rect x="35.7" y="485" width="49.2" height="15.0" fill="rgb(222,110,49)" rx="2" ry="2" />
+<text  x="38.68" y="495.5" >entr..</text>
+</g>
+<g >
+<title>sys_lseek (2,024 samples, 0.05%)</title><rect x="1110.4" y="453" width="0.5" height="15.0" fill="rgb(231,66,12)" rx="2" ry="2" />
+<text  x="1113.36" y="463.5" ></text>
+</g>
+<g >
+<title>ext4_llseek (919 samples, 0.02%)</title><rect x="1110.6" y="437" width="0.3" height="15.0" fill="rgb(227,28,15)" rx="2" ry="2" />
+<text  x="1113.65" y="447.5" ></text>
+</g>
+<g >
+<title>malloc (996 samples, 0.02%)</title><rect x="1184.8" y="517" width="0.2" height="15.0" fill="rgb(241,146,45)" rx="2" ry="2" />
+<text  x="1187.77" y="527.5" ></text>
+</g>
+<g >
+<title>security_file_permission (7,830 samples, 0.18%)</title><rect x="82.4" y="405" width="2.1" height="15.0" fill="rgb(251,214,41)" rx="2" ry="2" />
+<text  x="85.41" y="415.5" ></text>
+</g>
+<g >
+<title>sched_clock_cpu (530 samples, 0.01%)</title><rect x="1050.7" y="357" width="0.1" height="15.0" fill="rgb(209,5,42)" rx="2" ry="2" />
+<text  x="1053.66" y="367.5" ></text>
+</g>
+<g >
+<title>osq_lock (12,148 samples, 0.28%)</title><rect x="1112.7" y="341" width="3.3" height="15.0" fill="rgb(211,39,23)" rx="2" ry="2" />
+<text  x="1115.68" y="351.5" ></text>
+</g>
+<g >
+<title>flowoplib_fileattrs (947 samples, 0.02%)</title><rect x="1104.9" y="501" width="0.3" height="15.0" fill="rgb(245,72,17)" rx="2" ry="2" />
+<text  x="1107.94" y="511.5" ></text>
+</g>
+<g >
+<title>task_work_add (1,327 samples, 0.03%)</title><rect x="33.6" y="389" width="0.3" height="15.0" fill="rgb(240,151,49)" rx="2" ry="2" />
+<text  x="36.57" y="399.5" ></text>
+</g>
+<g >
+<title>smp_call_function_interrupt (373 samples, 0.01%)</title><rect x="935.8" y="357" width="0.1" height="15.0" fill="rgb(207,70,13)" rx="2" ry="2" />
+<text  x="938.85" y="367.5" ></text>
+</g>
+<g >
+<title>tick_sched_handle (901 samples, 0.02%)</title><rect x="523.6" y="277" width="0.3" height="15.0" fill="rgb(215,111,37)" rx="2" ry="2" />
+<text  x="526.61" y="287.5" ></text>
+</g>
+<g >
+<title>_raw_read_lock (754 samples, 0.02%)</title><rect x="103.3" y="277" width="0.2" height="15.0" fill="rgb(221,219,19)" rx="2" ry="2" />
+<text  x="106.26" y="287.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (13,679 samples, 0.31%)</title><rect x="1180.8" y="501" width="3.7" height="15.0" fill="rgb(240,123,12)" rx="2" ry="2" />
+<text  x="1183.77" y="511.5" ></text>
+</g>
+<g >
+<title>__softirqentry_text_start (740 samples, 0.02%)</title><rect x="1040.3" y="309" width="0.2" height="15.0" fill="rgb(220,49,24)" rx="2" ry="2" />
+<text  x="1043.35" y="319.5" ></text>
+</g>
+<g >
+<title>__softirqentry_text_start (450 samples, 0.01%)</title><rect x="64.0" y="245" width="0.1" height="15.0" fill="rgb(233,104,6)" rx="2" ry="2" />
+<text  x="66.97" y="255.5" ></text>
+</g>
+<g >
+<title>terminate_walk (1,349 samples, 0.03%)</title><rect x="1147.6" y="405" width="0.3" height="15.0" fill="rgb(208,83,48)" rx="2" ry="2" />
+<text  x="1150.58" y="415.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (411 samples, 0.01%)</title><rect x="1052.6" y="485" width="0.2" height="15.0" fill="rgb(220,113,45)" rx="2" ry="2" />
+<text  x="1055.64" y="495.5" ></text>
+</g>
+<g >
+<title>fd_install (3,891 samples, 0.09%)</title><rect x="1153.8" y="437" width="1.0" height="15.0" fill="rgb(240,200,44)" rx="2" ry="2" />
+<text  x="1156.78" y="447.5" ></text>
+</g>
+<g >
+<title>ipc_mutex_lock (1,923 samples, 0.04%)</title><rect x="1109.5" y="501" width="0.5" height="15.0" fill="rgb(226,136,54)" rx="2" ry="2" />
+<text  x="1112.47" y="511.5" ></text>
+</g>
+<g >
+<title>dbs_update_util_handler (513 samples, 0.01%)</title><rect x="179.9" y="293" width="0.1" height="15.0" fill="rgb(221,133,34)" rx="2" ry="2" />
+<text  x="182.91" y="303.5" ></text>
+</g>
+<g >
+<title>down_write (27,867 samples, 0.64%)</title><rect x="1112.6" y="389" width="7.6" height="15.0" fill="rgb(209,135,5)" rx="2" ry="2" />
+<text  x="1115.61" y="399.5" ></text>
+</g>
+<g >
+<title>pthread_mutex_lock@plt (463 samples, 0.01%)</title><rect x="1111.3" y="501" width="0.1" height="15.0" fill="rgb(244,184,8)" rx="2" ry="2" />
+<text  x="1114.28" y="511.5" ></text>
+</g>
+<g >
+<title>file_free_rcu (4,209 samples, 0.10%)</title><rect x="524.3" y="277" width="1.1" height="15.0" fill="rgb(217,218,48)" rx="2" ry="2" />
+<text  x="527.25" y="287.5" ></text>
+</g>
+<g >
+<title>mark_wake_futex (34,858 samples, 0.80%)</title><rect x="1002.5" y="405" width="9.5" height="15.0" fill="rgb(213,51,52)" rx="2" ry="2" />
+<text  x="1005.52" y="415.5" ></text>
+</g>
+<g >
+<title>__update_load_avg_se.isra.37 (383 samples, 0.01%)</title><rect x="1046.9" y="309" width="0.2" height="15.0" fill="rgb(206,225,25)" rx="2" ry="2" />
+<text  x="1049.95" y="319.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (1,527,281 samples, 35.16%)</title><rect x="636.4" y="469" width="414.9" height="15.0" fill="rgb(218,178,8)" rx="2" ry="2" />
+<text  x="639.36" y="479.5" >do_syscall_64</text>
+</g>
+<g >
+<title>do_page_fault (1,364 samples, 0.03%)</title><rect x="1120.4" y="485" width="0.4" height="15.0" fill="rgb(220,71,22)" rx="2" ry="2" />
+<text  x="1123.43" y="495.5" ></text>
+</g>
+<g >
+<title>ext4_meta_trans_blocks (409 samples, 0.01%)</title><rect x="116.6" y="325" width="0.1" height="15.0" fill="rgb(212,47,34)" rx="2" ry="2" />
+<text  x="119.57" y="335.5" ></text>
+</g>
+<g >
+<title>__legitimize_mnt (776 samples, 0.02%)</title><rect x="1122.8" y="357" width="0.2" height="15.0" fill="rgb(209,169,53)" rx="2" ry="2" />
+<text  x="1125.81" y="367.5" ></text>
+</g>
+<g >
+<title>mntput_no_expire (455 samples, 0.01%)</title><rect x="24.4" y="373" width="0.1" height="15.0" fill="rgb(216,223,1)" rx="2" ry="2" />
+<text  x="27.40" y="383.5" ></text>
+</g>
+<g >
+<title>apparmor_file_free_security (8,533 samples, 0.20%)</title><rect x="24.6" y="373" width="2.3" height="15.0" fill="rgb(254,206,8)" rx="2" ry="2" />
+<text  x="27.63" y="383.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64 (2,247 samples, 0.05%)</title><rect x="635.4" y="485" width="0.6" height="15.0" fill="rgb(251,198,40)" rx="2" ry="2" />
+<text  x="638.42" y="495.5" ></text>
+</g>
+<g >
+<title>[unknown] (37,580 samples, 0.87%)</title><rect x="10.4" y="485" width="10.2" height="15.0" fill="rgb(217,216,5)" rx="2" ry="2" />
+<text  x="13.43" y="495.5" ></text>
+</g>
+<g >
+<title>current_time (704 samples, 0.02%)</title><rect x="81.5" y="341" width="0.2" height="15.0" fill="rgb(239,101,17)" rx="2" ry="2" />
+<text  x="84.52" y="351.5" ></text>
+</g>
+<g >
+<title>__ext4_journal_stop (1,300 samples, 0.03%)</title><rect x="118.8" y="325" width="0.4" height="15.0" fill="rgb(245,228,20)" rx="2" ry="2" />
+<text  x="121.83" y="335.5" ></text>
+</g>
+<g >
+<title>ext4_do_update_inode (693 samples, 0.02%)</title><rect x="121.1" y="293" width="0.2" height="15.0" fill="rgb(253,5,25)" rx="2" ry="2" />
+<text  x="124.12" y="303.5" ></text>
+</g>
+<g >
+<title>sys_lseek (702 samples, 0.02%)</title><rect x="1184.3" y="485" width="0.2" height="15.0" fill="rgb(221,75,18)" rx="2" ry="2" />
+<text  x="1187.29" y="495.5" ></text>
+</g>
+<g >
+<title>dax_copy_from_iter (1,687 samples, 0.04%)</title><rect x="1111.8" y="341" width="0.4" height="15.0" fill="rgb(240,167,20)" rx="2" ry="2" />
+<text  x="1114.76" y="351.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (384 samples, 0.01%)</title><rect x="936.0" y="405" width="0.1" height="15.0" fill="rgb(251,164,46)" rx="2" ry="2" />
+<text  x="938.96" y="415.5" ></text>
+</g>
+<g >
+<title>submit_bio_wait (23,113 samples, 0.53%)</title><rect x="110.3" y="277" width="6.2" height="15.0" fill="rgb(234,76,24)" rx="2" ry="2" />
+<text  x="113.26" y="287.5" ></text>
+</g>
+<g >
+<title>__fput (16,896 samples, 0.39%)</title><rect x="22.5" y="405" width="4.6" height="15.0" fill="rgb(254,131,21)" rx="2" ry="2" />
+<text  x="25.48" y="415.5" ></text>
+</g>
+<g >
+<title>jbd2__journal_start (2,808 samples, 0.06%)</title><rect x="102.9" y="309" width="0.7" height="15.0" fill="rgb(251,81,17)" rx="2" ry="2" />
+<text  x="105.87" y="319.5" ></text>
+</g>
+<g >
+<title>kmem_cache_alloc (1,827 samples, 0.04%)</title><rect x="1161.2" y="405" width="0.5" height="15.0" fill="rgb(230,43,45)" rx="2" ry="2" />
+<text  x="1164.23" y="415.5" ></text>
+</g>
+<g >
+<title>up_read (1,030 samples, 0.02%)</title><rect x="81.8" y="373" width="0.2" height="15.0" fill="rgb(253,36,48)" rx="2" ry="2" />
+<text  x="84.76" y="383.5" ></text>
+</g>
+<g >
+<title>dax_read_unlock (13,652 samples, 0.31%)</title><rect x="98.7" y="325" width="3.7" height="15.0" fill="rgb(245,31,1)" rx="2" ry="2" />
+<text  x="101.68" y="335.5" ></text>
+</g>
+<g >
+<title>rwsem_down_write_failed (27,756 samples, 0.64%)</title><rect x="1112.6" y="357" width="7.6" height="15.0" fill="rgb(206,105,54)" rx="2" ry="2" />
+<text  x="1115.62" y="367.5" ></text>
+</g>
+<g >
+<title>__wake_up_common_lock (399 samples, 0.01%)</title><rect x="119.0" y="277" width="0.2" height="15.0" fill="rgb(246,13,54)" rx="2" ry="2" />
+<text  x="122.04" y="287.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (1,751,748 samples, 40.33%)</title><rect x="156.8" y="469" width="475.9" height="15.0" fill="rgb(244,184,11)" rx="2" ry="2" />
+<text  x="159.77" y="479.5" >do_syscall_64</text>
+</g>
+<g >
+<title>inode_permission (1,647 samples, 0.04%)</title><rect x="1146.9" y="389" width="0.4" height="15.0" fill="rgb(252,27,39)" rx="2" ry="2" />
+<text  x="1149.89" y="399.5" ></text>
+</g>
+<g >
+<title>ext4_mark_iloc_dirty (849 samples, 0.02%)</title><rect x="121.1" y="309" width="0.2" height="15.0" fill="rgb(241,18,23)" rx="2" ry="2" />
+<text  x="124.08" y="319.5" ></text>
+</g>
+<g >
+<title>apic_timer_interrupt (887 samples, 0.02%)</title><rect x="591.6" y="357" width="0.2" height="15.0" fill="rgb(239,41,16)" rx="2" ry="2" />
+<text  x="594.58" y="367.5" ></text>
+</g>
+<g >
+<title>unlazy_walk (6,377 samples, 0.15%)</title><rect x="1122.7" y="389" width="1.7" height="15.0" fill="rgb(235,190,19)" rx="2" ry="2" />
+<text  x="1125.72" y="399.5" ></text>
+</g>
+<g >
+<title>__f_unlock_pos (505 samples, 0.01%)</title><rect x="1181.1" y="453" width="0.1" height="15.0" fill="rgb(220,132,40)" rx="2" ry="2" />
+<text  x="1184.10" y="463.5" ></text>
+</g>
+<g >
+<title>__libc_read (187,416 samples, 4.31%)</title><rect x="34.5" y="501" width="50.9" height="15.0" fill="rgb(229,200,24)" rx="2" ry="2" />
+<text  x="37.53" y="511.5" >__lib..</text>
+</g>
+<g >
+<title>flowop_endop (4,233 samples, 0.10%)</title><rect x="1176.2" y="517" width="1.2" height="15.0" fill="rgb(235,225,48)" rx="2" ry="2" />
+<text  x="1179.24" y="527.5" ></text>
+</g>
+<g >
+<title>smp_call_function_many (819 samples, 0.02%)</title><rect x="97.9" y="37" width="0.3" height="15.0" fill="rgb(241,83,18)" rx="2" ry="2" />
+<text  x="100.95" y="47.5" ></text>
+</g>
+<g >
+<title>flowoplib_filesetup (1,869 samples, 0.04%)</title><rect x="1105.2" y="501" width="0.5" height="15.0" fill="rgb(234,216,9)" rx="2" ry="2" />
+<text  x="1108.20" y="511.5" ></text>
+</g>
+<g >
+<title>_find_next_bit (568 samples, 0.01%)</title><rect x="1156.8" y="405" width="0.2" height="15.0" fill="rgb(221,117,4)" rx="2" ry="2" />
+<text  x="1159.83" y="415.5" ></text>
+</g>
+<g >
+<title>__call_rcu.constprop.69 (2,256 samples, 0.05%)</title><rect x="23.0" y="373" width="0.6" height="15.0" fill="rgb(238,45,4)" rx="2" ry="2" />
+<text  x="26.03" y="383.5" ></text>
+</g>
+<g >
+<title>security_inode_permission (748 samples, 0.02%)</title><rect x="1138.7" y="357" width="0.2" height="15.0" fill="rgb(242,84,25)" rx="2" ry="2" />
+<text  x="1141.67" y="367.5" ></text>
+</g>
+<g >
+<title>drop_futex_key_refs.isra.15 (52,493 samples, 1.21%)</title><rect x="936.1" y="405" width="14.2" height="15.0" fill="rgb(239,94,25)" rx="2" ry="2" />
+<text  x="939.07" y="415.5" ></text>
+</g>
+<g >
+<title>__pthread_enable_asynccancel (575 samples, 0.01%)</title><rect x="1164.7" y="517" width="0.2" height="15.0" fill="rgb(236,131,52)" rx="2" ry="2" />
+<text  x="1167.70" y="527.5" ></text>
+</g>
+<g >
+<title>[unknown] (37,566 samples, 0.86%)</title><rect x="10.4" y="405" width="10.2" height="15.0" fill="rgb(242,22,42)" rx="2" ry="2" />
+<text  x="13.43" y="415.5" ></text>
+</g>
+<g >
+<title>__close_fd (22,411 samples, 0.52%)</title><rect x="27.9" y="437" width="6.1" height="15.0" fill="rgb(223,183,33)" rx="2" ry="2" />
+<text  x="30.92" y="447.5" ></text>
+</g>
+<g >
+<title>do_dentry_open (19,060 samples, 0.44%)</title><rect x="1148.0" y="389" width="5.2" height="15.0" fill="rgb(241,24,17)" rx="2" ry="2" />
+<text  x="1150.99" y="399.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock_irq (2,098 samples, 0.05%)</title><rect x="27.3" y="421" width="0.6" height="15.0" fill="rgb(228,145,0)" rx="2" ry="2" />
+<text  x="30.31" y="431.5" ></text>
+</g>
+<g >
+<title>fscrypt_file_open (5,394 samples, 0.12%)</title><rect x="1149.9" y="357" width="1.5" height="15.0" fill="rgb(247,14,44)" rx="2" ry="2" />
+<text  x="1152.89" y="367.5" ></text>
+</g>
+<g >
+<title>mntput (474 samples, 0.01%)</title><rect x="24.4" y="389" width="0.1" height="15.0" fill="rgb(225,71,13)" rx="2" ry="2" />
+<text  x="27.39" y="399.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (595 samples, 0.01%)</title><rect x="1077.0" y="469" width="0.2" height="15.0" fill="rgb(229,4,32)" rx="2" ry="2" />
+<text  x="1080.02" y="479.5" ></text>
+</g>
+<g >
+<title>call_rwsem_down_write_failed (83,396 samples, 1.92%)</title><rect x="121.7" y="357" width="22.7" height="15.0" fill="rgb(244,13,16)" rx="2" ry="2" />
+<text  x="124.75" y="367.5" >c..</text>
+</g>
+<g >
+<title>ext4_es_lookup_extent (29,556 samples, 0.68%)</title><rect x="68.3" y="309" width="8.0" height="15.0" fill="rgb(225,111,34)" rx="2" ry="2" />
+<text  x="71.30" y="319.5" ></text>
+</g>
+<g >
+<title>exit_to_usermode_loop (23,097 samples, 0.53%)</title><rect x="21.6" y="453" width="6.3" height="15.0" fill="rgb(210,101,4)" rx="2" ry="2" />
+<text  x="24.62" y="463.5" ></text>
+</g>
+<g >
+<title>start_this_handle (1,252 samples, 0.03%)</title><rect x="118.5" y="293" width="0.3" height="15.0" fill="rgb(246,46,19)" rx="2" ry="2" />
+<text  x="121.49" y="303.5" ></text>
+</g>
+<g >
+<title>dax_iomap_actor (86,391 samples, 1.99%)</title><rect x="42.5" y="341" width="23.5" height="15.0" fill="rgb(246,207,20)" rx="2" ry="2" />
+<text  x="45.50" y="351.5" >d..</text>
+</g>
+<g >
+<title>do_syscall_64 (12,650 samples, 0.29%)</title><rect x="1180.9" y="485" width="3.4" height="15.0" fill="rgb(212,71,3)" rx="2" ry="2" />
+<text  x="1183.85" y="495.5" ></text>
+</g>
+<g >
+<title>iomap_apply (131,446 samples, 3.03%)</title><rect x="86.0" y="357" width="35.7" height="15.0" fill="rgb(226,113,19)" rx="2" ry="2" />
+<text  x="88.98" y="367.5" >iom..</text>
+</g>
+<g >
+<title>fb_random64 (1,930 samples, 0.04%)</title><rect x="1165.6" y="517" width="0.6" height="15.0" fill="rgb(234,209,31)" rx="2" ry="2" />
+<text  x="1168.64" y="527.5" ></text>
+</g>
+<g >
+<title>kmem_cache_free (522 samples, 0.01%)</title><rect x="1162.9" y="421" width="0.2" height="15.0" fill="rgb(235,123,16)" rx="2" ry="2" />
+<text  x="1165.92" y="431.5" ></text>
+</g>
+<g >
+<title>syscall_return_via_sysret (3,613 samples, 0.08%)</title><rect x="1051.7" y="485" width="0.9" height="15.0" fill="rgb(247,214,1)" rx="2" ry="2" />
+<text  x="1054.65" y="495.5" ></text>
+</g>
+<g >
+<title>security_file_free (9,184 samples, 0.21%)</title><rect x="24.6" y="389" width="2.5" height="15.0" fill="rgb(248,217,49)" rx="2" ry="2" />
+<text  x="27.58" y="399.5" ></text>
+</g>
+<g >
+<title>walk_component (19,576 samples, 0.45%)</title><rect x="1139.1" y="389" width="5.3" height="15.0" fill="rgb(243,177,49)" rx="2" ry="2" />
+<text  x="1142.08" y="399.5" ></text>
+</g>
+<g >
+<title>hrtimer_nanosleep (403 samples, 0.01%)</title><rect x="1052.6" y="437" width="0.2" height="15.0" fill="rgb(246,165,42)" rx="2" ry="2" />
+<text  x="1055.64" y="447.5" ></text>
+</g>
+<g >
+<title>crc32c_pcl_intel_update (457 samples, 0.01%)</title><rect x="120.1" y="229" width="0.1" height="15.0" fill="rgb(250,42,24)" rx="2" ry="2" />
+<text  x="123.11" y="239.5" ></text>
+</g>
+<g >
+<title>rcu_process_callbacks (616 samples, 0.01%)</title><rect x="1040.4" y="293" width="0.1" height="15.0" fill="rgb(235,45,1)" rx="2" ry="2" />
+<text  x="1043.35" y="303.5" ></text>
+</g>
+<g >
+<title>apparmor_file_permission (432 samples, 0.01%)</title><rect x="144.9" y="389" width="0.1" height="15.0" fill="rgb(213,20,9)" rx="2" ry="2" />
+<text  x="147.90" y="399.5" ></text>
+</g>
+<g >
+<title>__fget_light (6,951 samples, 0.16%)</title><rect x="1181.4" y="437" width="1.8" height="15.0" fill="rgb(222,2,1)" rx="2" ry="2" />
+<text  x="1184.35" y="447.5" ></text>
+</g>
+<g >
+<title>jbd2_transaction_committed (683 samples, 0.02%)</title><rect x="117.8" y="325" width="0.2" height="15.0" fill="rgb(209,76,24)" rx="2" ry="2" />
+<text  x="120.82" y="335.5" ></text>
+</g>
+<g >
+<title>sys_openat (153,190 samples, 3.53%)</title><rect x="1121.7" y="469" width="41.6" height="15.0" fill="rgb(229,176,47)" rx="2" ry="2" />
+<text  x="1124.67" y="479.5" >sys..</text>
+</g>
+<g >
+<title>__getblk_gfp (779 samples, 0.02%)</title><rect x="120.3" y="277" width="0.2" height="15.0" fill="rgb(219,87,39)" rx="2" ry="2" />
+<text  x="123.33" y="287.5" ></text>
+</g>
+<g >
+<title>may_open (3,094 samples, 0.07%)</title><rect x="1146.5" y="405" width="0.8" height="15.0" fill="rgb(244,206,8)" rx="2" ry="2" />
+<text  x="1149.50" y="415.5" ></text>
+</g>
+<g >
+<title>gethrtime (3,032 samples, 0.07%)</title><rect x="1179.3" y="517" width="0.8" height="15.0" fill="rgb(234,148,35)" rx="2" ry="2" />
+<text  x="1182.30" y="527.5" ></text>
+</g>
+<g >
+<title>crc32c_pcl_intel_update (525 samples, 0.01%)</title><rect x="108.1" y="229" width="0.1" height="15.0" fill="rgb(230,86,20)" rx="2" ry="2" />
+<text  x="111.09" y="239.5" ></text>
+</g>
+<g >
+<title>call_rwsem_down_write_failed (27,813 samples, 0.64%)</title><rect x="1112.6" y="373" width="7.6" height="15.0" fill="rgb(227,88,12)" rx="2" ry="2" />
+<text  x="1115.62" y="383.5" ></text>
+</g>
+<g >
+<title>new_sync_write (31,480 samples, 0.72%)</title><rect x="1111.7" y="421" width="8.6" height="15.0" fill="rgb(216,117,33)" rx="2" ry="2" />
+<text  x="1114.70" y="431.5" ></text>
+</g>
+<g >
+<title>fb_strlcpy (8,927 samples, 0.21%)</title><rect x="1096.5" y="501" width="2.5" height="15.0" fill="rgb(248,93,25)" rx="2" ry="2" />
+<text  x="1099.53" y="511.5" ></text>
+</g>
+<g >
+<title>native_queued_spin_lock_slowpath (8,366 samples, 0.19%)</title><rect x="1034.0" y="341" width="2.3" height="15.0" fill="rgb(229,26,46)" rx="2" ry="2" />
+<text  x="1037.03" y="351.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (1,382 samples, 0.03%)</title><rect x="170.8" y="341" width="0.4" height="15.0" fill="rgb(231,219,49)" rx="2" ry="2" />
+<text  x="173.81" y="351.5" ></text>
+</g>
+<g >
+<title>sys_write (218,630 samples, 5.03%)</title><rect x="85.6" y="453" width="59.4" height="15.0" fill="rgb(222,36,26)" rx="2" ry="2" />
+<text  x="88.63" y="463.5" >sys_wr..</text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (581 samples, 0.01%)</title><rect x="526.0" y="373" width="0.1" height="15.0" fill="rgb(246,57,32)" rx="2" ry="2" />
+<text  x="528.95" y="383.5" ></text>
+</g>
+<g >
+<title>getname (8,909 samples, 0.21%)</title><rect x="1160.4" y="437" width="2.4" height="15.0" fill="rgb(249,70,10)" rx="2" ry="2" />
+<text  x="1163.40" y="447.5" ></text>
+</g>
+<g >
+<title>mutex_unlock (485 samples, 0.01%)</title><rect x="1181.1" y="437" width="0.1" height="15.0" fill="rgb(242,204,49)" rx="2" ry="2" />
+<text  x="1184.10" y="447.5" ></text>
+</g>
+<g >
+<title>rw_verify_area (496 samples, 0.01%)</title><rect x="144.9" y="421" width="0.1" height="15.0" fill="rgb(217,30,7)" rx="2" ry="2" />
+<text  x="147.89" y="431.5" ></text>
+</g>
+<g >
+<title>try_to_unmap_one (472 samples, 0.01%)</title><rect x="1112.1" y="117" width="0.1" height="15.0" fill="rgb(236,109,24)" rx="2" ry="2" />
+<text  x="1115.07" y="127.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (218,959 samples, 5.04%)</title><rect x="85.5" y="469" width="59.5" height="15.0" fill="rgb(229,67,0)" rx="2" ry="2" />
+<text  x="88.54" y="479.5" >do_sys..</text>
+</g>
+<g >
+<title>in_group_p (1,008 samples, 0.02%)</title><rect x="1138.3" y="341" width="0.3" height="15.0" fill="rgb(208,114,33)" rx="2" ry="2" />
+<text  x="1141.34" y="351.5" ></text>
+</g>
+</g>
+</svg>
