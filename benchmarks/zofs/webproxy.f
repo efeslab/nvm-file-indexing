@@ -27,7 +27,7 @@ set $dir=/mnt/pmem-fsdax0/takh
 set $nfiles=10000
 set $meandirwidth=1000000
 set $meanfilesize=16k
-set $nthreads=100
+set $nthreads=1
 set $meaniosize=16k
 set $iosize=1m
 
