@@ -11,7 +11,7 @@ rm -rf $pmem_dir/*
 cp -r $workload_dir/src $pmem_dir && sync
 cd $pmem_dir
 mkdir dest
-( time $rsync_dir/rsync -WIr ./src dest/ ) 2>&1 | tee $cur_dir/results_time.txt
+( time rsync -Wr ./src dest/ ) 2>&1 | tee $cur_dir/results_time.txt
 
 rm -rf $pmem_dir/*
 
