@@ -1,0 +1,4160 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1200" height="2134" onload="init(evt)" viewBox="0 0 1200 2134" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples. -->
+<!-- NOTES:  -->
+<defs>
+	<linearGradient id="background" y1="0" y2="1" x1="0" x2="0" >
+		<stop stop-color="#eeeeee" offset="5%" />
+		<stop stop-color="#eeeeb0" offset="95%" />
+	</linearGradient>
+</defs>
+<style type="text/css">
+	text { font-family:Verdana; font-size:12px; fill:rgb(0,0,0); }
+	#search, #ignorecase { opacity:0.1; cursor:pointer; }
+	#search:hover, #search.show, #ignorecase:hover, #ignorecase.show { opacity:1; }
+	#subtitle { text-anchor:middle; font-color:rgb(160,160,160); }
+	#title { text-anchor:middle; font-size:17px}
+	#unzoom { cursor:pointer; }
+	#frames > *:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+	.hide { display:none; }
+	.parent { opacity:0.5; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	"use strict";
+	var details, searchbtn, unzoombtn, matchedtxt, svg, searching, currentSearchTerm, ignorecase, ignorecaseBtn;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		ignorecaseBtn = document.getElementById("ignorecase");
+		unzoombtn = document.getElementById("unzoom");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+		currentSearchTerm = null;
+	}
+
+	window.addEventListener("click", function(e) {
+		var target = find_group(e.target);
+		if (target) {
+			if (target.nodeName == "a") {
+				if (e.ctrlKey === false) return;
+				e.preventDefault();
+			}
+			if (target.classList.contains("parent")) unzoom();
+			zoom(target);
+		}
+		else if (e.target.id == "unzoom") unzoom();
+		else if (e.target.id == "search") search_prompt();
+		else if (e.target.id == "ignorecase") toggle_ignorecase();
+	}, false)
+
+	// mouse-over for info
+	// show
+	window.addEventListener("mouseover", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = "Function: " + g_to_text(target);
+	}, false)
+
+	// clear
+	window.addEventListener("mouseout", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = ' ';
+	}, false)
+
+	// ctrl-F for search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+	}, false)
+
+	// ctrl-I to toggle case-sensitive search
+	window.addEventListener("keydown",function (e) {
+		if (e.ctrlKey && e.keyCode === 73) {
+			e.preventDefault();
+			toggle_ignorecase();
+		}
+	}, false)
+
+	// functions
+	function find_child(node, selector) {
+		var children = node.querySelectorAll(selector);
+		if (children.length) return children[0];
+		return;
+	}
+	function find_group(node) {
+		var parent = node.parentElement;
+		if (!parent) return;
+		if (parent.id == "frames") return node;
+		return find_group(parent);
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_" + attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_" + attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_" + attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		// if there's any manipulation we want to do to the function
+		// name before it's searched, do it here before returning.
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes.width.value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes.x.value = parseFloat(r.attributes.x.value) + 3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2 * 12 * 0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		// Fit in full text width
+		if (/^ *$/.test(txt) || t.getSubStringLength(0, txt.length) < w)
+			return;
+
+		for (var x = txt.length - 2; x > 0; x--) {
+			if (t.getSubStringLength(0, x + 2) <= w) {
+				t.textContent = txt.substring(0, x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = (parseFloat(e.attributes.x.value) - x - 10) * ratio + 10;
+				if (e.tagName == "text")
+					e.attributes.x.value = find_child(e.parentNode, "rect[x]").attributes.x.value + 3;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseFloat(e.attributes.width.value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_child(c[i], x - 10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = 10;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseInt(svg.width.baseVal.value) - (10 * 2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr.width.value);
+		var xmin = parseFloat(attr.x.value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr.y.value);
+		var ratio = (svg.width.baseVal.value - 2 * 10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		unzoombtn.classList.remove("hide");
+
+		var el = document.getElementById("frames").children;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a.x.value);
+			var ew = parseFloat(a.width.value);
+			var upstack;
+			// Is it an ancestor
+			if (0 == 0) {
+				upstack = parseFloat(a.y.value) > ymin;
+			} else {
+				upstack = parseFloat(a.y.value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.classList.add("parent");
+					zoom_parent(e);
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.classList.add("hide");
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.classList.add("hide");
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					update_text(e);
+				}
+			}
+		}
+		search();
+	}
+	function unzoom() {
+		unzoombtn.classList.add("hide");
+		var el = document.getElementById("frames").children;
+		for(var i = 0; i < el.length; i++) {
+			el[i].classList.remove("parent");
+			el[i].classList.remove("hide");
+			zoom_reset(el[i]);
+			update_text(el[i]);
+		}
+		search();
+	}
+
+	// search
+	function toggle_ignorecase() {
+		ignorecase = !ignorecase;
+		if (ignorecase) {
+			ignorecaseBtn.classList.add("show");
+		} else {
+			ignorecaseBtn.classList.remove("show");
+		}
+		reset_search();
+		search();
+	}
+	function reset_search() {
+		var el = document.querySelectorAll("#frames rect");
+		for (var i = 0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)"
+			    + (ignorecase ? ", ignoring case" : "")
+			    + "\nPress Ctrl-i to toggle case sensitivity", "");
+			if (term != null) {
+				currentSearchTerm = term;
+				search();
+			}
+		} else {
+			reset_search();
+			searching = 0;
+			currentSearchTerm = null;
+			searchbtn.classList.remove("show");
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.classList.add("hide");
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		if (currentSearchTerm === null) return;
+		var term = currentSearchTerm;
+
+		var re = new RegExp(term, ignorecase ? 'i' : '');
+		var el = document.getElementById("frames").children;
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes.width.value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes.x.value);
+				orig_save(rect, "fill");
+				rect.attributes.fill.value = "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+
+		searchbtn.classList.add("show");
+		searchbtn.firstChild.nodeValue = "Reset Search";
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+			return a - b;
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		var fudge = 0.0001;	// JavaScript floating point
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw - fudge) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.classList.remove("hide");
+		var pct = 100 * count / maxwidth;
+		if (pct != 100) pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+]]>
+</script>
+<rect x="0.0" y="0" width="1200.0" height="2134.0" fill="url(#background)"  />
+<text id="title" x="600.00" y="24" >Flame Graph</text>
+<text id="details" x="10.00" y="2117" > </text>
+<text id="unzoom" x="10.00" y="24" class="hide">Reset Zoom</text>
+<text id="search" x="1090.00" y="24" >Search</text>
+<text id="ignorecase" x="1174.00" y="24" >ic</text>
+<text id="matched" x="1090.00" y="2117" > </text>
+<g id="frames">
+<g >
+<title>_do_fork (2 samples, 0.01%)</title><rect x="20.2" y="1845" width="0.1" height="15.0" fill="rgb(217,75,11)" rx="2" ry="2" />
+<text  x="23.23" y="1855.5" ></text>
+</g>
+<g >
+<title>_raw_spin_unlock_irqrestore (15 samples, 0.06%)</title><rect x="514.1" y="1813" width="0.8" height="15.0" fill="rgb(249,92,20)" rx="2" ry="2" />
+<text  x="517.09" y="1823.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="917" width="1.7" height="15.0" fill="rgb(235,37,10)" rx="2" ry="2" />
+<text  x="14.01" y="927.5" ></text>
+</g>
+<g >
+<title>native_flush_tlb_one_user (2 samples, 0.01%)</title><rect x="18.4" y="1909" width="0.1" height="15.0" fill="rgb(226,90,29)" rx="2" ry="2" />
+<text  x="21.41" y="1919.5" ></text>
+</g>
+<g >
+<title>std::mersenne_twister_engine&lt;unsigned long, 64ul, 312ul, 156ul, 31ul, 13043109905998158313ul, 29ul, 6148914691236517205ul, 17ul, 8202884508482404352ul, 37ul, 18444473444759240704ul, 43ul, 6364136223846793005ul&gt;::operator (59 samples, 0.25%)</title><rect x="1183.8" y="2005" width="3.0" height="15.0" fill="rgb(237,177,34)" rx="2" ry="2" />
+<text  x="1186.82" y="2015.5" ></text>
+</g>
+<g >
+<title>acpi_os_read_memory (3 samples, 0.01%)</title><rect x="17.7" y="1909" width="0.2" height="15.0" fill="rgb(240,212,19)" rx="2" ry="2" />
+<text  x="20.75" y="1919.5" ></text>
+</g>
+<g >
+<title>memcpy@plt (3 samples, 0.01%)</title><rect x="762.6" y="1877" width="0.1" height="15.0" fill="rgb(247,119,26)" rx="2" ry="2" />
+<text  x="765.57" y="1887.5" ></text>
+</g>
+<g >
+<title>ext4_do_update_inode (6 samples, 0.03%)</title><rect x="614.6" y="1829" width="0.3" height="15.0" fill="rgb(226,26,23)" rx="2" ry="2" />
+<text  x="617.61" y="1839.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1493" width="1.7" height="15.0" fill="rgb(241,131,22)" rx="2" ry="2" />
+<text  x="14.01" y="1503.5" ></text>
+</g>
+<g >
+<title>rocksdb::MemTable::UpdateFlushState (55 samples, 0.24%)</title><rect x="1151.6" y="1861" width="2.8" height="15.0" fill="rgb(219,17,5)" rx="2" ry="2" />
+<text  x="1154.57" y="1871.5" ></text>
+</g>
+<g >
+<title>__pmem_direct_access (15 samples, 0.06%)</title><rect x="66.1" y="1829" width="0.8" height="15.0" fill="rgb(253,48,13)" rx="2" ry="2" />
+<text  x="69.11" y="1839.5" ></text>
+</g>
+<g >
+<title>_dl_map_object (3 samples, 0.01%)</title><rect x="643.1" y="2053" width="0.2" height="15.0" fill="rgb(230,100,27)" rx="2" ry="2" />
+<text  x="646.12" y="2063.5" ></text>
+</g>
+<g >
+<title>inherit_event.isra.97 (5 samples, 0.02%)</title><rect x="21.5" y="1733" width="0.2" height="15.0" fill="rgb(245,190,40)" rx="2" ry="2" />
+<text  x="24.49" y="1743.5" ></text>
+</g>
+<g >
+<title>seq_vprintf (10 samples, 0.04%)</title><rect x="638.5" y="1877" width="0.5" height="15.0" fill="rgb(214,79,51)" rx="2" ry="2" />
+<text  x="641.51" y="1887.5" ></text>
+</g>
+<g >
+<title>free (34 samples, 0.15%)</title><rect x="11.0" y="37" width="1.7" height="15.0" fill="rgb(210,50,31)" rx="2" ry="2" />
+<text  x="14.01" y="47.5" ></text>
+</g>
+<g >
+<title>[ld-2.27.so] (2 samples, 0.01%)</title><rect x="10.7" y="2037" width="0.1" height="15.0" fill="rgb(250,187,33)" rx="2" ry="2" />
+<text  x="13.71" y="2047.5" ></text>
+</g>
+<g >
+<title>__sb_end_write (8 samples, 0.03%)</title><rect x="45.3" y="1957" width="0.4" height="15.0" fill="rgb(208,23,35)" rx="2" ry="2" />
+<text  x="48.29" y="1967.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (4 samples, 0.02%)</title><rect x="761.4" y="1781" width="0.2" height="15.0" fill="rgb(209,172,23)" rx="2" ry="2" />
+<text  x="764.41" y="1791.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="309" width="1.7" height="15.0" fill="rgb(237,141,21)" rx="2" ry="2" />
+<text  x="14.01" y="319.5" ></text>
+</g>
+<g >
+<title>map_id_up (3 samples, 0.01%)</title><rect x="601.3" y="1797" width="0.2" height="15.0" fill="rgb(210,59,27)" rx="2" ry="2" />
+<text  x="604.34" y="1807.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1141" width="1.7" height="15.0" fill="rgb(237,27,38)" rx="2" ry="2" />
+<text  x="14.01" y="1151.5" ></text>
+</g>
+<g >
+<title>do_execveat_common.isra.34 (10 samples, 0.04%)</title><rect x="1187.8" y="1989" width="0.5" height="15.0" fill="rgb(206,183,20)" rx="2" ry="2" />
+<text  x="1190.82" y="1999.5" ></text>
+</g>
+<g >
+<title>sys_clone (4 samples, 0.02%)</title><rect x="20.6" y="1797" width="0.2" height="15.0" fill="rgb(209,77,26)" rx="2" ry="2" />
+<text  x="23.58" y="1807.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (12 samples, 0.05%)</title><rect x="16.9" y="2021" width="0.6" height="15.0" fill="rgb(216,204,52)" rx="2" ry="2" />
+<text  x="19.94" y="2031.5" ></text>
+</g>
+<g >
+<title>aperfmperf_get_khz (8 samples, 0.03%)</title><rect x="638.1" y="1893" width="0.4" height="15.0" fill="rgb(250,11,33)" rx="2" ry="2" />
+<text  x="641.05" y="1903.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="357" width="1.7" height="15.0" fill="rgb(223,181,6)" rx="2" ry="2" />
+<text  x="14.01" y="367.5" ></text>
+</g>
+<g >
+<title>rocksdb::ThreadPoolImpl::Impl::SetBackgroundThreadsInternal (3 samples, 0.01%)</title><rect x="20.2" y="1941" width="0.1" height="15.0" fill="rgb(233,101,17)" rx="2" ry="2" />
+<text  x="23.18" y="1951.5" ></text>
+</g>
+<g >
+<title>operator new@plt (6 samples, 0.03%)</title><rect x="685.1" y="1941" width="0.4" height="15.0" fill="rgb(211,87,8)" rx="2" ry="2" />
+<text  x="688.15" y="1951.5" ></text>
+</g>
+<g >
+<title>perf_event_alloc (3 samples, 0.01%)</title><rect x="20.6" y="1701" width="0.2" height="15.0" fill="rgb(214,213,39)" rx="2" ry="2" />
+<text  x="23.63" y="1711.5" ></text>
+</g>
+<g >
+<title>perf (10 samples, 0.04%)</title><rect x="1187.8" y="2069" width="0.5" height="15.0" fill="rgb(212,76,18)" rx="2" ry="2" />
+<text  x="1190.82" y="2079.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatch::Iterate (7,945 samples, 34.09%)</title><rect x="754.6" y="1925" width="402.3" height="15.0" fill="rgb(210,172,47)" rx="2" ry="2" />
+<text  x="757.57" y="1935.5" >rocksdb::WriteBatch::Iterate</text>
+</g>
+<g >
+<title>search_binary_handler (10 samples, 0.04%)</title><rect x="1187.8" y="1973" width="0.5" height="15.0" fill="rgb(236,11,4)" rx="2" ry="2" />
+<text  x="1190.82" y="1983.5" ></text>
+</g>
+<g >
+<title>ext4_do_update_inode (9 samples, 0.04%)</title><rect x="522.6" y="1765" width="0.4" height="15.0" fill="rgb(222,22,53)" rx="2" ry="2" />
+<text  x="525.55" y="1775.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::WriteStatusCheck (19 samples, 0.08%)</title><rect x="692.1" y="1941" width="0.9" height="15.0" fill="rgb(238,32,45)" rx="2" ry="2" />
+<text  x="695.08" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="469" width="1.7" height="15.0" fill="rgb(250,141,51)" rx="2" ry="2" />
+<text  x="14.01" y="479.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="677" width="1.7" height="15.0" fill="rgb(224,114,50)" rx="2" ry="2" />
+<text  x="14.01" y="687.5" ></text>
+</g>
+<g >
+<title>free_unref_page_list (8 samples, 0.03%)</title><rect x="641.6" y="1893" width="0.4" height="15.0" fill="rgb(215,91,50)" rx="2" ry="2" />
+<text  x="644.60" y="1903.5" ></text>
+</g>
+<g >
+<title>ext4_file_write_iter (11,321 samples, 48.58%)</title><rect x="48.5" y="1925" width="573.2" height="15.0" fill="rgb(212,75,22)" rx="2" ry="2" />
+<text  x="51.48" y="1935.5" >ext4_file_write_iter</text>
+</g>
+<g >
+<title>pmem_do_bvec (163 samples, 0.70%)</title><rect x="526.3" y="1749" width="8.3" height="15.0" fill="rgb(210,136,35)" rx="2" ry="2" />
+<text  x="529.30" y="1759.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::CreateMissingNewerLinks (3 samples, 0.01%)</title><rect x="1157.1" y="1941" width="0.2" height="15.0" fill="rgb(217,202,24)" rx="2" ry="2" />
+<text  x="1160.14" y="1951.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (25 samples, 0.11%)</title><rect x="582.0" y="1813" width="1.3" height="15.0" fill="rgb(233,121,33)" rx="2" ry="2" />
+<text  x="585.05" y="1823.5" ></text>
+</g>
+<g >
+<title>unmap_single_vma (7 samples, 0.03%)</title><rect x="642.1" y="1973" width="0.4" height="15.0" fill="rgb(243,74,21)" rx="2" ry="2" />
+<text  x="645.10" y="1983.5" ></text>
+</g>
+<g >
+<title>__clone (12 samples, 0.05%)</title><rect x="13.7" y="1989" width="0.7" height="15.0" fill="rgb(216,218,38)" rx="2" ry="2" />
+<text  x="16.75" y="1999.5" ></text>
+</g>
+<g >
+<title>__intel_pmu_enable_all.constprop.23 (2 samples, 0.01%)</title><rect x="1188.8" y="1861" width="0.1" height="15.0" fill="rgb(249,86,53)" rx="2" ry="2" />
+<text  x="1191.78" y="1871.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1381" width="1.7" height="15.0" fill="rgb(206,19,51)" rx="2" ry="2" />
+<text  x="14.01" y="1391.5" ></text>
+</g>
+<g >
+<title>free_pcppages_bulk (6 samples, 0.03%)</title><rect x="641.7" y="1861" width="0.3" height="15.0" fill="rgb(234,9,0)" rx="2" ry="2" />
+<text  x="644.70" y="1871.5" ></text>
+</g>
+<g >
+<title>rcu_all_qs (2 samples, 0.01%)</title><rect x="496.3" y="1813" width="0.1" height="15.0" fill="rgb(206,183,19)" rx="2" ry="2" />
+<text  x="499.27" y="1823.5" ></text>
+</g>
+<g >
+<title>[db_bench] (5 samples, 0.02%)</title><rect x="10.5" y="2037" width="0.2" height="15.0" fill="rgb(241,215,37)" rx="2" ry="2" />
+<text  x="13.46" y="2047.5" ></text>
+</g>
+<g >
+<title>vm_mmap_pgoff (3 samples, 0.01%)</title><rect x="651.1" y="1973" width="0.1" height="15.0" fill="rgb(249,174,13)" rx="2" ry="2" />
+<text  x="654.07" y="1983.5" ></text>
+</g>
+<g >
+<title>[unknown] (2 samples, 0.01%)</title><rect x="1188.8" y="1989" width="0.1" height="15.0" fill="rgb(221,162,47)" rx="2" ry="2" />
+<text  x="1191.78" y="1999.5" ></text>
+</g>
+<g >
+<title>finish_task_switch (2 samples, 0.01%)</title><rect x="1188.8" y="1925" width="0.1" height="15.0" fill="rgb(209,152,52)" rx="2" ry="2" />
+<text  x="1191.78" y="1935.5" ></text>
+</g>
+<g >
+<title>native_write_msr (10 samples, 0.04%)</title><rect x="14.7" y="1861" width="0.5" height="15.0" fill="rgb(240,134,53)" rx="2" ry="2" />
+<text  x="17.71" y="1871.5" ></text>
+</g>
+<g >
+<title>__ext4_handle_dirty_super (7 samples, 0.03%)</title><rect x="535.9" y="1845" width="0.4" height="15.0" fill="rgb(246,123,8)" rx="2" ry="2" />
+<text  x="538.92" y="1855.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::AwaitState (2 samples, 0.01%)</title><rect x="1157.0" y="1941" width="0.1" height="15.0" fill="rgb(241,101,13)" rx="2" ry="2" />
+<text  x="1160.04" y="1951.5" ></text>
+</g>
+<g >
+<title>operator delete (6 samples, 0.03%)</title><rect x="684.5" y="1941" width="0.3" height="15.0" fill="rgb(225,3,38)" rx="2" ry="2" />
+<text  x="687.49" y="1951.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum_set (3 samples, 0.01%)</title><rect x="602.6" y="1829" width="0.1" height="15.0" fill="rgb(219,103,12)" rx="2" ry="2" />
+<text  x="605.56" y="1839.5" ></text>
+</g>
+<g >
+<title>iov_iter_init (3 samples, 0.01%)</title><rect x="46.9" y="1941" width="0.2" height="15.0" fill="rgb(243,205,42)" rx="2" ry="2" />
+<text  x="49.91" y="1951.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum.isra.57 (2 samples, 0.01%)</title><rect x="614.8" y="1797" width="0.1" height="15.0" fill="rgb(237,189,18)" rx="2" ry="2" />
+<text  x="617.81" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::VersionSet::CreateColumnFamily (2 samples, 0.01%)</title><rect x="24.9" y="1893" width="0.1" height="15.0" fill="rgb(244,150,15)" rx="2" ry="2" />
+<text  x="27.89" y="1903.5" ></text>
+</g>
+<g >
+<title>__handle_mm_fault (12 samples, 0.05%)</title><rect x="770.6" y="1797" width="0.6" height="15.0" fill="rgb(245,116,49)" rx="2" ry="2" />
+<text  x="773.62" y="1807.5" ></text>
+</g>
+<g >
+<title>ret_from_fork (9 samples, 0.04%)</title><rect x="1189.3" y="1893" width="0.5" height="15.0" fill="rgb(244,108,51)" rx="2" ry="2" />
+<text  x="1192.34" y="1903.5" ></text>
+</g>
+<g >
+<title>mutex_unlock (13 samples, 0.06%)</title><rect x="42.9" y="1973" width="0.7" height="15.0" fill="rgb(237,14,36)" rx="2" ry="2" />
+<text  x="45.91" y="1983.5" ></text>
+</g>
+<g >
+<title>_dl_lookup_symbol_x (2 samples, 0.01%)</title><rect x="643.0" y="2053" width="0.1" height="15.0" fill="rgb(218,144,38)" rx="2" ry="2" />
+<text  x="646.02" y="2063.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::NewDB (2 samples, 0.01%)</title><rect x="20.5" y="1909" width="0.1" height="15.0" fill="rgb(232,147,13)" rx="2" ry="2" />
+<text  x="23.48" y="1919.5" ></text>
+</g>
+<g >
+<title>crc32c_pcl_intel_update (3 samples, 0.01%)</title><rect x="522.8" y="1717" width="0.1" height="15.0" fill="rgb(209,188,48)" rx="2" ry="2" />
+<text  x="525.75" y="1727.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (10 samples, 0.04%)</title><rect x="1187.8" y="2037" width="0.5" height="15.0" fill="rgb(211,112,1)" rx="2" ry="2" />
+<text  x="1190.82" y="2047.5" ></text>
+</g>
+<g >
+<title>rocksdb::MemTable::ShouldFlushNow (48 samples, 0.21%)</title><rect x="1151.9" y="1845" width="2.5" height="15.0" fill="rgb(209,18,17)" rx="2" ry="2" />
+<text  x="1154.92" y="1855.5" ></text>
+</g>
+<g >
+<title>__blkdev_issue_zero_pages (2 samples, 0.01%)</title><rect x="523.4" y="1813" width="0.1" height="15.0" fill="rgb(210,67,19)" rx="2" ry="2" />
+<text  x="526.41" y="1823.5" ></text>
+</g>
+<g >
+<title>rocksdb::(anonymous namespace)::StartThreadWrapper (10,574 samples, 45.38%)</title><rect x="651.4" y="2037" width="535.4" height="15.0" fill="rgb(245,93,51)" rx="2" ry="2" />
+<text  x="654.37" y="2047.5" >rocksdb::(anonymous namespace)::StartThreadWrapper</text>
+</g>
+<g >
+<title>ext4_orphan_del (11 samples, 0.05%)</title><rect x="614.5" y="1861" width="0.5" height="15.0" fill="rgb(206,35,12)" rx="2" ry="2" />
+<text  x="617.46" y="1871.5" ></text>
+</g>
+<g >
+<title>intel_pmu_enable_all (13 samples, 0.06%)</title><rect x="20.8" y="1749" width="0.6" height="15.0" fill="rgb(220,113,35)" rx="2" ry="2" />
+<text  x="23.79" y="1759.5" ></text>
+</g>
+<g >
+<title>ext4_reserve_inode_write (3 samples, 0.01%)</title><rect x="615.0" y="1861" width="0.2" height="15.0" fill="rgb(225,36,42)" rx="2" ry="2" />
+<text  x="618.01" y="1871.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (4 samples, 0.02%)</title><rect x="643.5" y="2037" width="0.2" height="15.0" fill="rgb(213,58,17)" rx="2" ry="2" />
+<text  x="646.52" y="2047.5" ></text>
+</g>
+<g >
+<title>[libjemalloc.so.1] (5 samples, 0.02%)</title><rect x="10.0" y="2053" width="0.3" height="15.0" fill="rgb(229,64,11)" rx="2" ry="2" />
+<text  x="13.00" y="2063.5" ></text>
+</g>
+<g >
+<title>prepare_exit_to_usermode (2 samples, 0.01%)</title><rect x="642.5" y="2021" width="0.1" height="15.0" fill="rgb(238,179,7)" rx="2" ry="2" />
+<text  x="645.46" y="2031.5" ></text>
+</g>
+<g >
+<title>intel_bts_enable_local (2 samples, 0.01%)</title><rect x="14.6" y="1861" width="0.1" height="15.0" fill="rgb(210,91,15)" rx="2" ry="2" />
+<text  x="17.61" y="1871.5" ></text>
+</g>
+<g >
+<title>__clone (2 samples, 0.01%)</title><rect x="25.0" y="1893" width="0.1" height="15.0" fill="rgb(241,145,43)" rx="2" ry="2" />
+<text  x="27.99" y="1903.5" ></text>
+</g>
+<g >
+<title>sys_clone (6 samples, 0.03%)</title><rect x="21.4" y="1813" width="0.3" height="15.0" fill="rgb(227,124,50)" rx="2" ry="2" />
+<text  x="24.44" y="1823.5" ></text>
+</g>
+<g >
+<title>rocksdb::db_bench_tool (9 samples, 0.04%)</title><rect x="1189.3" y="2021" width="0.5" height="15.0" fill="rgb(240,20,27)" rx="2" ry="2" />
+<text  x="1192.34" y="2031.5" ></text>
+</g>
+<g >
+<title>__memmove_avx_unaligned_erms (5 samples, 0.02%)</title><rect x="642.6" y="2053" width="0.2" height="15.0" fill="rgb(245,206,1)" rx="2" ry="2" />
+<text  x="645.56" y="2063.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (2 samples, 0.01%)</title><rect x="633.9" y="2021" width="0.1" height="15.0" fill="rgb(250,98,22)" rx="2" ry="2" />
+<text  x="636.85" y="2031.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (2 samples, 0.01%)</title><rect x="25.0" y="1861" width="0.1" height="15.0" fill="rgb(210,54,22)" rx="2" ry="2" />
+<text  x="27.99" y="1871.5" ></text>
+</g>
+<g >
+<title>rocksdb::InlineSkipList&lt;rocksdb::MemTableRep::KeyComparator const&amp;&gt;::AllocateNode (6 samples, 0.03%)</title><rect x="781.3" y="1861" width="0.3" height="15.0" fill="rgb(250,68,39)" rx="2" ry="2" />
+<text  x="784.31" y="1871.5" ></text>
+</g>
+<g >
+<title>__ext4_get_inode_loc (2 samples, 0.01%)</title><rect x="614.9" y="1829" width="0.1" height="15.0" fill="rgb(241,54,46)" rx="2" ry="2" />
+<text  x="617.91" y="1839.5" ></text>
+</g>
+<g >
+<title>swapgs_restore_regs_and_return_to_usermode (2 samples, 0.01%)</title><rect x="642.5" y="2037" width="0.1" height="15.0" fill="rgb(230,19,18)" rx="2" ry="2" />
+<text  x="645.46" y="2047.5" ></text>
+</g>
+<g >
+<title>pmem_copy_from_iter (15 samples, 0.06%)</title><rect x="485.1" y="1861" width="0.8" height="15.0" fill="rgb(252,104,20)" rx="2" ry="2" />
+<text  x="488.13" y="1871.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1989" width="1.7" height="15.0" fill="rgb(217,145,44)" rx="2" ry="2" />
+<text  x="14.01" y="1999.5" ></text>
+</g>
+<g >
+<title>rocksdb::ColumnFamilyMemTablesImpl::current (4 samples, 0.02%)</title><rect x="758.1" y="1893" width="0.2" height="15.0" fill="rgb(205,163,16)" rx="2" ry="2" />
+<text  x="761.11" y="1903.5" ></text>
+</g>
+<g >
+<title>__alloc_pages_nodemask (6 samples, 0.03%)</title><rect x="770.7" y="1765" width="0.3" height="15.0" fill="rgb(230,144,13)" rx="2" ry="2" />
+<text  x="773.67" y="1775.5" ></text>
+</g>
+<g >
+<title>security_file_permission (33 samples, 0.14%)</title><rect x="623.8" y="1941" width="1.7" height="15.0" fill="rgb(225,120,30)" rx="2" ry="2" />
+<text  x="626.82" y="1951.5" ></text>
+</g>
+<g >
+<title>mem_cgroup_try_charge (10 samples, 0.04%)</title><rect x="775.8" y="1749" width="0.5" height="15.0" fill="rgb(222,28,46)" rx="2" ry="2" />
+<text  x="778.79" y="1759.5" ></text>
+</g>
+<g >
+<title>_cond_resched (2 samples, 0.01%)</title><rect x="612.6" y="1813" width="0.1" height="15.0" fill="rgb(237,44,54)" rx="2" ry="2" />
+<text  x="615.63" y="1823.5" ></text>
+</g>
+<g >
+<title>kernel_fpu_end (2 samples, 0.01%)</title><rect x="614.5" y="1781" width="0.1" height="15.0" fill="rgb(226,35,46)" rx="2" ry="2" />
+<text  x="617.46" y="1791.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum_set (6 samples, 0.03%)</title><rect x="522.7" y="1749" width="0.3" height="15.0" fill="rgb(233,150,2)" rx="2" ry="2" />
+<text  x="525.70" y="1759.5" ></text>
+</g>
+<g >
+<title>malloc (43 samples, 0.18%)</title><rect x="682.1" y="1941" width="2.2" height="15.0" fill="rgb(250,139,17)" rx="2" ry="2" />
+<text  x="685.11" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::PosixWritableFile::use_direct_io (3 samples, 0.01%)</title><rect x="711.8" y="1877" width="0.2" height="15.0" fill="rgb(207,211,31)" rx="2" ry="2" />
+<text  x="714.83" y="1887.5" ></text>
+</g>
+<g >
+<title>rocksdb::Benchmark::Benchmark (5 samples, 0.02%)</title><rect x="20.1" y="2005" width="0.2" height="15.0" fill="rgb(249,84,47)" rx="2" ry="2" />
+<text  x="23.08" y="2015.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (37 samples, 0.16%)</title><rect x="640.6" y="2021" width="1.9" height="15.0" fill="rgb(245,67,36)" rx="2" ry="2" />
+<text  x="643.59" y="2031.5" ></text>
+</g>
+<g >
+<title>rocksdb::SyncPoint::Data::Process (2 samples, 0.01%)</title><rect x="1158.2" y="1925" width="0.1" height="15.0" fill="rgb(233,5,32)" rx="2" ry="2" />
+<text  x="1161.20" y="1935.5" ></text>
+</g>
+<g >
+<title>rocksdb::GetColumnFamilyID (2 samples, 0.01%)</title><rect x="1179.1" y="1989" width="0.1" height="15.0" fill="rgb(215,167,13)" rx="2" ry="2" />
+<text  x="1182.06" y="1999.5" ></text>
+</g>
+<g >
+<title>find_vma (2 samples, 0.01%)</title><rect x="640.6" y="1973" width="0.1" height="15.0" fill="rgb(218,148,17)" rx="2" ry="2" />
+<text  x="643.64" y="1983.5" ></text>
+</g>
+<g >
+<title>std::thread::_M_start_thread (9 samples, 0.04%)</title><rect x="1189.3" y="1925" width="0.5" height="15.0" fill="rgb(248,85,13)" rx="2" ry="2" />
+<text  x="1192.34" y="1935.5" ></text>
+</g>
+<g >
+<title>rocksdb::(anonymous namespace)::BytewiseComparatorImpl::Compare (31 samples, 0.13%)</title><rect x="805.6" y="1845" width="1.5" height="15.0" fill="rgb(209,33,41)" rx="2" ry="2" />
+<text  x="808.56" y="1855.5" ></text>
+</g>
+<g >
+<title>ext4_file_write_iter (7 samples, 0.03%)</title><rect x="46.6" y="1941" width="0.3" height="15.0" fill="rgb(217,104,35)" rx="2" ry="2" />
+<text  x="49.56" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1365" width="1.7" height="15.0" fill="rgb(237,214,9)" rx="2" ry="2" />
+<text  x="14.01" y="1375.5" ></text>
+</g>
+<g >
+<title>prefetch_freepointer (3 samples, 0.01%)</title><rect x="544.1" y="1813" width="0.2" height="15.0" fill="rgb(242,7,37)" rx="2" ry="2" />
+<text  x="547.12" y="1823.5" ></text>
+</g>
+<g >
+<title>ext4_mark_iloc_dirty (9 samples, 0.04%)</title><rect x="522.6" y="1781" width="0.4" height="15.0" fill="rgb(241,225,21)" rx="2" ry="2" />
+<text  x="525.55" y="1791.5" ></text>
+</g>
+<g >
+<title>x86_pmu_enable (9 samples, 0.04%)</title><rect x="25.1" y="1877" width="0.5" height="15.0" fill="rgb(218,181,6)" rx="2" ry="2" />
+<text  x="28.14" y="1887.5" ></text>
+</g>
+<g >
+<title>sys_write (17 samples, 0.07%)</title><rect x="625.5" y="2005" width="0.9" height="15.0" fill="rgb(243,209,36)" rx="2" ry="2" />
+<text  x="628.55" y="2015.5" ></text>
+</g>
+<g >
+<title>from_kuid (8 samples, 0.03%)</title><rect x="602.0" y="1813" width="0.4" height="15.0" fill="rgb(207,210,35)" rx="2" ry="2" />
+<text  x="605.00" y="1823.5" ></text>
+</g>
+<g >
+<title>crc32c_pcl_intel_update (3 samples, 0.01%)</title><rect x="535.9" y="1797" width="0.2" height="15.0" fill="rgb(223,77,33)" rx="2" ry="2" />
+<text  x="538.92" y="1807.5" ></text>
+</g>
+<g >
+<title>bio_alloc_bioset (2 samples, 0.01%)</title><rect x="523.4" y="1781" width="0.1" height="15.0" fill="rgb(218,139,31)" rx="2" ry="2" />
+<text  x="526.41" y="1791.5" ></text>
+</g>
+<g >
+<title>jbd2__journal_start (225 samples, 0.97%)</title><rect x="541.1" y="1845" width="11.4" height="15.0" fill="rgb(213,39,3)" rx="2" ry="2" />
+<text  x="544.08" y="1855.5" ></text>
+</g>
+<g >
+<title>__sb_end_write (2 samples, 0.01%)</title><rect x="41.0" y="1973" width="0.1" height="15.0" fill="rgb(212,110,46)" rx="2" ry="2" />
+<text  x="43.99" y="1983.5" ></text>
+</g>
+<g >
+<title>native_flush_tlb_one_user (6 samples, 0.03%)</title><rect x="22.4" y="1733" width="0.3" height="15.0" fill="rgb(246,146,34)" rx="2" ry="2" />
+<text  x="25.36" y="1743.5" ></text>
+</g>
+<g >
+<title>TLS init function for rocksdb::perf_context (6 samples, 0.03%)</title><rect x="677.8" y="1941" width="0.3" height="15.0" fill="rgb(215,206,20)" rx="2" ry="2" />
+<text  x="680.80" y="1951.5" ></text>
+</g>
+<g >
+<title>ext4_reserve_inode_write (2 samples, 0.01%)</title><rect x="523.0" y="1781" width="0.1" height="15.0" fill="rgb(246,203,3)" rx="2" ry="2" />
+<text  x="526.01" y="1791.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1269" width="1.7" height="15.0" fill="rgb(229,218,10)" rx="2" ry="2" />
+<text  x="14.01" y="1279.5" ></text>
+</g>
+<g >
+<title>load_elf_binary (2 samples, 0.01%)</title><rect x="633.9" y="1957" width="0.1" height="15.0" fill="rgb(226,133,31)" rx="2" ry="2" />
+<text  x="636.85" y="1967.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1077" width="1.7" height="15.0" fill="rgb(247,207,45)" rx="2" ry="2" />
+<text  x="14.01" y="1087.5" ></text>
+</g>
+<g >
+<title>perf_event_alloc.part.87 (2 samples, 0.01%)</title><rect x="25.0" y="1733" width="0.1" height="15.0" fill="rgb(240,153,16)" rx="2" ry="2" />
+<text  x="27.99" y="1743.5" ></text>
+</g>
+<g >
+<title>x86_pmu_enable (9 samples, 0.04%)</title><rect x="1187.9" y="1893" width="0.4" height="15.0" fill="rgb(215,71,21)" rx="2" ry="2" />
+<text  x="1190.87" y="1903.5" ></text>
+</g>
+<g >
+<title>rocksdb::(anonymous namespace)::BytewiseComparatorImpl::Compare (137 samples, 0.59%)</title><rect x="927.4" y="1813" width="6.9" height="15.0" fill="rgb(212,132,53)" rx="2" ry="2" />
+<text  x="930.40" y="1823.5" ></text>
+</g>
+<g >
+<title>crypto_shash_update (222 samples, 0.95%)</title><rect x="590.1" y="1781" width="11.2" height="15.0" fill="rgb(211,87,44)" rx="2" ry="2" />
+<text  x="593.10" y="1791.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="325" width="1.7" height="15.0" fill="rgb(231,222,9)" rx="2" ry="2" />
+<text  x="14.01" y="335.5" ></text>
+</g>
+<g >
+<title>file_remove_privs (5 samples, 0.02%)</title><rect x="618.8" y="1909" width="0.3" height="15.0" fill="rgb(250,32,13)" rx="2" ry="2" />
+<text  x="621.81" y="1919.5" ></text>
+</g>
+<g >
+<title>do_filp_open (12 samples, 0.05%)</title><rect x="16.9" y="1957" width="0.6" height="15.0" fill="rgb(236,154,3)" rx="2" ry="2" />
+<text  x="19.94" y="1967.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (2 samples, 0.01%)</title><rect x="20.2" y="1893" width="0.1" height="15.0" fill="rgb(246,124,23)" rx="2" ry="2" />
+<text  x="23.23" y="1903.5" ></text>
+</g>
+<g >
+<title>free_pages_and_swap_cache (16 samples, 0.07%)</title><rect x="641.3" y="1925" width="0.8" height="15.0" fill="rgb(226,5,41)" rx="2" ry="2" />
+<text  x="644.29" y="1935.5" ></text>
+</g>
+<g >
+<title>intel_pmu_enable_all (58 samples, 0.25%)</title><rect x="21.8" y="1765" width="3.0" height="15.0" fill="rgb(242,184,11)" rx="2" ry="2" />
+<text  x="24.85" y="1775.5" ></text>
+</g>
+<g >
+<title>__vfs_read (22 samples, 0.09%)</title><rect x="638.0" y="1957" width="1.1" height="15.0" fill="rgb(213,39,31)" rx="2" ry="2" />
+<text  x="640.95" y="1967.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::WriteImpl (10,229 samples, 43.90%)</title><rect x="660.8" y="1973" width="518.0" height="15.0" fill="rgb(222,44,45)" rx="2" ry="2" />
+<text  x="663.84" y="1983.5" >rocksdb::DBImpl::WriteImpl</text>
+</g>
+<g >
+<title>rocksdb::WriteBatchInternal::Iterate (7,935 samples, 34.05%)</title><rect x="755.1" y="1909" width="401.8" height="15.0" fill="rgb(244,177,49)" rx="2" ry="2" />
+<text  x="758.08" y="1919.5" >rocksdb::WriteBatchInternal::Iterate</text>
+</g>
+<g >
+<title>dax_iomap_actor (8,519 samples, 36.56%)</title><rect x="55.1" y="1877" width="431.3" height="15.0" fill="rgb(216,50,18)" rx="2" ry="2" />
+<text  x="58.07" y="1887.5" >dax_iomap_actor</text>
+</g>
+<g >
+<title>_cond_resched (3 samples, 0.01%)</title><rect x="565.7" y="1845" width="0.1" height="15.0" fill="rgb(210,46,11)" rx="2" ry="2" />
+<text  x="568.69" y="1855.5" ></text>
+</g>
+<g >
+<title>__alloc_pages_nodemask (4 samples, 0.02%)</title><rect x="761.6" y="1765" width="0.2" height="15.0" fill="rgb(240,215,54)" rx="2" ry="2" />
+<text  x="764.61" y="1775.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="949" width="1.7" height="15.0" fill="rgb(249,188,52)" rx="2" ry="2" />
+<text  x="14.01" y="959.5" ></text>
+</g>
+<g >
+<title>do_exit (3 samples, 0.01%)</title><rect x="651.2" y="1989" width="0.2" height="15.0" fill="rgb(225,7,33)" rx="2" ry="2" />
+<text  x="654.22" y="1999.5" ></text>
+</g>
+<g >
+<title>syscall_return_via_sysret (86 samples, 0.37%)</title><rect x="626.5" y="2021" width="4.3" height="15.0" fill="rgb(207,13,38)" rx="2" ry="2" />
+<text  x="629.46" y="2031.5" ></text>
+</g>
+<g >
+<title>schedule_tail (61 samples, 0.26%)</title><rect x="21.7" y="1829" width="3.1" height="15.0" fill="rgb(229,111,38)" rx="2" ry="2" />
+<text  x="24.75" y="1839.5" ></text>
+</g>
+<g >
+<title>rcu_all_qs (2 samples, 0.01%)</title><rect x="544.3" y="1813" width="0.1" height="15.0" fill="rgb(252,131,40)" rx="2" ry="2" />
+<text  x="547.27" y="1823.5" ></text>
+</g>
+<g >
+<title>from_kgid (3 samples, 0.01%)</title><rect x="601.3" y="1813" width="0.2" height="15.0" fill="rgb(219,54,5)" rx="2" ry="2" />
+<text  x="604.34" y="1823.5" ></text>
+</g>
+<g >
+<title>[unknown] (9 samples, 0.04%)</title><rect x="25.1" y="1973" width="0.5" height="15.0" fill="rgb(229,112,2)" rx="2" ry="2" />
+<text  x="28.14" y="1983.5" ></text>
+</g>
+<g >
+<title>handle_mm_fault (13 samples, 0.06%)</title><rect x="770.6" y="1813" width="0.6" height="15.0" fill="rgb(220,147,6)" rx="2" ry="2" />
+<text  x="773.57" y="1823.5" ></text>
+</g>
+<g >
+<title>native_irq_return_iret (2 samples, 0.01%)</title><rect x="775.0" y="1829" width="0.1" height="15.0" fill="rgb(254,139,26)" rx="2" ry="2" />
+<text  x="778.03" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatchInternal::SetSequence (2 samples, 0.01%)</title><rect x="1156.9" y="1941" width="0.1" height="15.0" fill="rgb(239,76,0)" rx="2" ry="2" />
+<text  x="1159.88" y="1951.5" ></text>
+</g>
+<g >
+<title>down_write_trylock (23 samples, 0.10%)</title><rect x="617.0" y="1909" width="1.2" height="15.0" fill="rgb(224,150,43)" rx="2" ry="2" />
+<text  x="619.99" y="1919.5" ></text>
+</g>
+<g >
+<title>from_kgid (5 samples, 0.02%)</title><rect x="602.7" y="1829" width="0.3" height="15.0" fill="rgb(217,144,48)" rx="2" ry="2" />
+<text  x="605.71" y="1839.5" ></text>
+</g>
+<g >
+<title>ext4_mark_iloc_dirty (6 samples, 0.03%)</title><rect x="614.6" y="1845" width="0.3" height="15.0" fill="rgb(234,139,16)" rx="2" ry="2" />
+<text  x="617.61" y="1855.5" ></text>
+</g>
+<g >
+<title>free (31 samples, 0.13%)</title><rect x="15.3" y="2021" width="1.5" height="15.0" fill="rgb(246,109,29)" rx="2" ry="2" />
+<text  x="18.27" y="2031.5" ></text>
+</g>
+<g >
+<title>ret_from_fork (61 samples, 0.26%)</title><rect x="21.7" y="1845" width="3.1" height="15.0" fill="rgb(206,228,41)" rx="2" ry="2" />
+<text  x="24.75" y="1855.5" ></text>
+</g>
+<g >
+<title>__intel_pmu_enable_all.constprop.23 (47 samples, 0.20%)</title><rect x="17.7" y="1925" width="2.4" height="15.0" fill="rgb(221,150,30)" rx="2" ry="2" />
+<text  x="20.70" y="1935.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="197" width="1.7" height="15.0" fill="rgb(249,180,11)" rx="2" ry="2" />
+<text  x="14.01" y="207.5" ></text>
+</g>
+<g >
+<title>copy_process.part.36 (2 samples, 0.01%)</title><rect x="20.2" y="1829" width="0.1" height="15.0" fill="rgb(210,58,27)" rx="2" ry="2" />
+<text  x="23.23" y="1839.5" ></text>
+</g>
+<g >
+<title>copy_process.part.36 (4 samples, 0.02%)</title><rect x="20.6" y="1765" width="0.2" height="15.0" fill="rgb(220,97,11)" rx="2" ry="2" />
+<text  x="23.58" y="1775.5" ></text>
+</g>
+<g >
+<title>__kmalloc (4 samples, 0.02%)</title><rect x="523.1" y="1813" width="0.2" height="15.0" fill="rgb(234,17,24)" rx="2" ry="2" />
+<text  x="526.11" y="1823.5" ></text>
+</g>
+<g >
+<title>perf_event_alloc.part.87 (3 samples, 0.01%)</title><rect x="20.6" y="1685" width="0.2" height="15.0" fill="rgb(225,183,29)" rx="2" ry="2" />
+<text  x="23.63" y="1695.5" ></text>
+</g>
+<g >
+<title>complete (45 samples, 0.19%)</title><rect x="523.7" y="1717" width="2.3" height="15.0" fill="rgb(242,75,40)" rx="2" ry="2" />
+<text  x="526.71" y="1727.5" ></text>
+</g>
+<g >
+<title>perf_event_alloc (5 samples, 0.02%)</title><rect x="21.5" y="1717" width="0.2" height="15.0" fill="rgb(249,175,36)" rx="2" ry="2" />
+<text  x="24.49" y="1727.5" ></text>
+</g>
+<g >
+<title>pthread_mutex_lock@plt (2 samples, 0.01%)</title><rect x="691.5" y="1925" width="0.1" height="15.0" fill="rgb(213,117,38)" rx="2" ry="2" />
+<text  x="694.53" y="1935.5" ></text>
+</g>
+<g >
+<title>ext4_iomap_end (1,532 samples, 6.57%)</title><rect x="539.2" y="1877" width="77.6" height="15.0" fill="rgb(241,80,32)" rx="2" ry="2" />
+<text  x="542.21" y="1887.5" >ext4_iom..</text>
+</g>
+<g >
+<title>schedule_tail (9 samples, 0.04%)</title><rect x="25.1" y="1925" width="0.5" height="15.0" fill="rgb(237,153,37)" rx="2" ry="2" />
+<text  x="28.14" y="1935.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_append (8 samples, 0.03%)</title><rect x="1186.8" y="2053" width="0.4" height="15.0" fill="rgb(205,178,22)" rx="2" ry="2" />
+<text  x="1189.81" y="2063.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum.isra.57 (6 samples, 0.03%)</title><rect x="522.7" y="1733" width="0.3" height="15.0" fill="rgb(227,98,37)" rx="2" ry="2" />
+<text  x="525.70" y="1743.5" ></text>
+</g>
+<g >
+<title>__alloc_pages_nodemask (5 samples, 0.02%)</title><rect x="775.5" y="1733" width="0.2" height="15.0" fill="rgb(249,30,40)" rx="2" ry="2" />
+<text  x="778.48" y="1743.5" ></text>
+</g>
+<g >
+<title>__wake_up (90 samples, 0.39%)</title><rect x="510.3" y="1829" width="4.6" height="15.0" fill="rgb(225,81,23)" rx="2" ry="2" />
+<text  x="513.30" y="1839.5" ></text>
+</g>
+<g >
+<title>write_pmem (163 samples, 0.70%)</title><rect x="526.3" y="1733" width="8.3" height="15.0" fill="rgb(215,30,3)" rx="2" ry="2" />
+<text  x="529.30" y="1743.5" ></text>
+</g>
+<g >
+<title>intel_pmu_enable_all (2 samples, 0.01%)</title><rect x="1188.8" y="1877" width="0.1" height="15.0" fill="rgb(225,15,5)" rx="2" ry="2" />
+<text  x="1191.78" y="1887.5" ></text>
+</g>
+<g >
+<title>schedule_tail (50 samples, 0.21%)</title><rect x="17.5" y="2005" width="2.6" height="15.0" fill="rgb(252,87,28)" rx="2" ry="2" />
+<text  x="20.54" y="2015.5" ></text>
+</g>
+<g >
+<title>rocksdb::(anonymous namespace)::BytewiseComparatorImpl::Compare (201 samples, 0.86%)</title><rect x="1137.0" y="1829" width="10.2" height="15.0" fill="rgb(253,71,5)" rx="2" ry="2" />
+<text  x="1140.03" y="1839.5" ></text>
+</g>
+<g >
+<title>jbd2_journal_stop (204 samples, 0.88%)</title><rect x="506.2" y="1845" width="10.4" height="15.0" fill="rgb(245,218,25)" rx="2" ry="2" />
+<text  x="509.25" y="1855.5" ></text>
+</g>
+<g >
+<title>dax_read_unlock (8,210 samples, 35.23%)</title><rect x="69.4" y="1861" width="415.7" height="15.0" fill="rgb(249,116,50)" rx="2" ry="2" />
+<text  x="72.40" y="1871.5" >dax_read_unlock</text>
+</g>
+<g >
+<title>finish_task_switch (13 samples, 0.06%)</title><rect x="20.8" y="1797" width="0.6" height="15.0" fill="rgb(234,173,26)" rx="2" ry="2" />
+<text  x="23.79" y="1807.5" ></text>
+</g>
+<g >
+<title>[unknown] (2 samples, 0.01%)</title><rect x="1188.8" y="2021" width="0.1" height="15.0" fill="rgb(252,173,18)" rx="2" ry="2" />
+<text  x="1191.78" y="2031.5" ></text>
+</g>
+<g >
+<title>free (9 samples, 0.04%)</title><rect x="681.6" y="1941" width="0.4" height="15.0" fill="rgb(209,111,18)" rx="2" ry="2" />
+<text  x="684.55" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::SanitizeOptions (9 samples, 0.04%)</title><rect x="1189.3" y="1957" width="0.5" height="15.0" fill="rgb(212,196,35)" rx="2" ry="2" />
+<text  x="1192.34" y="1967.5" ></text>
+</g>
+<g >
+<title>memcpy_flushcache (162 samples, 0.70%)</title><rect x="526.3" y="1717" width="8.3" height="15.0" fill="rgb(237,186,40)" rx="2" ry="2" />
+<text  x="529.35" y="1727.5" ></text>
+</g>
+<g >
+<title>schedule_tail (5 samples, 0.02%)</title><rect x="1188.9" y="1989" width="0.3" height="15.0" fill="rgb(213,164,2)" rx="2" ry="2" />
+<text  x="1191.94" y="1999.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1477" width="1.7" height="15.0" fill="rgb(208,9,51)" rx="2" ry="2" />
+<text  x="14.01" y="1487.5" ></text>
+</g>
+<g >
+<title>ext4_ext_index_trans_blocks (2 samples, 0.01%)</title><rect x="516.7" y="1861" width="0.1" height="15.0" fill="rgb(218,228,39)" rx="2" ry="2" />
+<text  x="519.73" y="1871.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="453" width="1.7" height="15.0" fill="rgb(230,23,33)" rx="2" ry="2" />
+<text  x="14.01" y="463.5" ></text>
+</g>
+<g >
+<title>pagevec_lru_move_fn (5 samples, 0.02%)</title><rect x="761.8" y="1749" width="0.3" height="15.0" fill="rgb(206,124,46)" rx="2" ry="2" />
+<text  x="764.81" y="1759.5" ></text>
+</g>
+<g >
+<title>rocksdb::FSWritableFile::PrepareWrite (8 samples, 0.03%)</title><rect x="726.8" y="1877" width="0.4" height="15.0" fill="rgb(239,89,7)" rx="2" ry="2" />
+<text  x="729.82" y="1887.5" ></text>
+</g>
+<g >
+<title>native_write_msr (9 samples, 0.04%)</title><rect x="20.9" y="1717" width="0.5" height="15.0" fill="rgb(217,31,5)" rx="2" ry="2" />
+<text  x="23.94" y="1727.5" ></text>
+</g>
+<g >
+<title>intel_pmu_enable_all (47 samples, 0.20%)</title><rect x="17.7" y="1941" width="2.4" height="15.0" fill="rgb(219,62,33)" rx="2" ry="2" />
+<text  x="20.70" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::ReadRecordFromWriteBatch (29 samples, 0.12%)</title><rect x="1155.0" y="1893" width="1.4" height="15.0" fill="rgb(222,57,40)" rx="2" ry="2" />
+<text  x="1157.96" y="1903.5" ></text>
+</g>
+<g >
+<title>__GI___libc_open (12 samples, 0.05%)</title><rect x="16.9" y="2037" width="0.6" height="15.0" fill="rgb(249,226,7)" rx="2" ry="2" />
+<text  x="19.94" y="2047.5" ></text>
+</g>
+<g >
+<title>__ext4_get_inode_loc (4 samples, 0.02%)</title><rect x="565.4" y="1845" width="0.2" height="15.0" fill="rgb(230,54,47)" rx="2" ry="2" />
+<text  x="568.44" y="1855.5" ></text>
+</g>
+<g >
+<title>alloc_pages_vma (4 samples, 0.02%)</title><rect x="761.6" y="1781" width="0.2" height="15.0" fill="rgb(250,101,34)" rx="2" ry="2" />
+<text  x="764.61" y="1791.5" ></text>
+</g>
+<g >
+<title>intel_pmu_enable_all (9 samples, 0.04%)</title><rect x="1187.9" y="1877" width="0.4" height="15.0" fill="rgb(217,228,24)" rx="2" ry="2" />
+<text  x="1190.87" y="1887.5" ></text>
+</g>
+<g >
+<title>rcu_all_qs (2 samples, 0.01%)</title><rect x="496.0" y="1797" width="0.1" height="15.0" fill="rgb(219,7,41)" rx="2" ry="2" />
+<text  x="498.97" y="1807.5" ></text>
+</g>
+<g >
+<title>__libc_write (3 samples, 0.01%)</title><rect x="717.7" y="1861" width="0.1" height="15.0" fill="rgb(235,116,38)" rx="2" ry="2" />
+<text  x="720.66" y="1871.5" ></text>
+</g>
+<g >
+<title>__clone (6 samples, 0.03%)</title><rect x="1188.9" y="2021" width="0.3" height="15.0" fill="rgb(241,0,43)" rx="2" ry="2" />
+<text  x="1191.89" y="2031.5" ></text>
+</g>
+<g >
+<title>native_irq_return_iret (2 samples, 0.01%)</title><rect x="761.3" y="1861" width="0.1" height="15.0" fill="rgb(224,190,18)" rx="2" ry="2" />
+<text  x="764.30" y="1871.5" ></text>
+</g>
+<g >
+<title>vsnprintf (8 samples, 0.03%)</title><rect x="638.6" y="1861" width="0.4" height="15.0" fill="rgb(206,220,11)" rx="2" ry="2" />
+<text  x="641.61" y="1871.5" ></text>
+</g>
+<g >
+<title>rocksdb::log::Writer::EmitPhysicalRecord (443 samples, 1.90%)</title><rect x="723.8" y="1893" width="22.4" height="15.0" fill="rgb(210,56,11)" rx="2" ry="2" />
+<text  x="726.78" y="1903.5" >r..</text>
+</g>
+<g >
+<title>ctx_resched (9 samples, 0.04%)</title><rect x="1187.9" y="1909" width="0.4" height="15.0" fill="rgb(205,10,22)" rx="2" ry="2" />
+<text  x="1190.87" y="1919.5" ></text>
+</g>
+<g >
+<title>kmem_cache_free (26 samples, 0.11%)</title><rect x="562.1" y="1829" width="1.3" height="15.0" fill="rgb(215,32,25)" rx="2" ry="2" />
+<text  x="565.10" y="1839.5" ></text>
+</g>
+<g >
+<title>__perf_event_task_sched_in (9 samples, 0.04%)</title><rect x="1189.3" y="1845" width="0.5" height="15.0" fill="rgb(235,69,49)" rx="2" ry="2" />
+<text  x="1192.34" y="1855.5" ></text>
+</g>
+<g >
+<title>do_sys_open (12 samples, 0.05%)</title><rect x="16.9" y="1973" width="0.6" height="15.0" fill="rgb(214,166,27)" rx="2" ry="2" />
+<text  x="19.94" y="1983.5" ></text>
+</g>
+<g >
+<title>page_fault (14 samples, 0.06%)</title><rect x="770.5" y="1861" width="0.7" height="15.0" fill="rgb(254,72,43)" rx="2" ry="2" />
+<text  x="773.52" y="1871.5" ></text>
+</g>
+<g >
+<title>rocksdb::InlineSkipList&lt;rocksdb::MemTableRep::KeyComparator const&amp;&gt;::KeyIsAfterNode (178 samples, 0.76%)</title><rect x="807.1" y="1845" width="9.0" height="15.0" fill="rgb(223,215,42)" rx="2" ry="2" />
+<text  x="810.13" y="1855.5" ></text>
+</g>
+<g >
+<title>mpol_misplaced (2 samples, 0.01%)</title><rect x="911.8" y="1749" width="0.2" height="15.0" fill="rgb(232,41,36)" rx="2" ry="2" />
+<text  x="914.85" y="1759.5" ></text>
+</g>
+<g >
+<title>rocksdb::crc32c::Extend (2 samples, 0.01%)</title><rect x="723.0" y="1893" width="0.1" height="15.0" fill="rgb(240,156,37)" rx="2" ry="2" />
+<text  x="726.02" y="1903.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1253" width="1.7" height="15.0" fill="rgb(209,152,42)" rx="2" ry="2" />
+<text  x="14.01" y="1263.5" ></text>
+</g>
+<g >
+<title>__wake_up_common (10 samples, 0.04%)</title><rect x="511.2" y="1797" width="0.5" height="15.0" fill="rgb(230,125,0)" rx="2" ry="2" />
+<text  x="514.21" y="1807.5" ></text>
+</g>
+<g >
+<title>rcu_all_qs (2 samples, 0.01%)</title><rect x="46.2" y="1925" width="0.1" height="15.0" fill="rgb(244,85,9)" rx="2" ry="2" />
+<text  x="49.21" y="1935.5" ></text>
+</g>
+<g >
+<title>ext4_superblock_csum_set (2 samples, 0.01%)</title><rect x="614.5" y="1829" width="0.1" height="15.0" fill="rgb(240,201,50)" rx="2" ry="2" />
+<text  x="617.46" y="1839.5" ></text>
+</g>
+<g >
+<title>__fget (54 samples, 0.23%)</title><rect x="36.1" y="1941" width="2.8" height="15.0" fill="rgb(253,225,51)" rx="2" ry="2" />
+<text  x="39.13" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="229" width="1.7" height="15.0" fill="rgb(245,102,17)" rx="2" ry="2" />
+<text  x="14.01" y="239.5" ></text>
+</g>
+<g >
+<title>intel_pmu_enable_all (9 samples, 0.04%)</title><rect x="1189.3" y="1813" width="0.5" height="15.0" fill="rgb(205,205,37)" rx="2" ry="2" />
+<text  x="1192.34" y="1823.5" ></text>
+</g>
+<g >
+<title>free (4 samples, 0.02%)</title><rect x="711.4" y="1877" width="0.2" height="15.0" fill="rgb(243,184,29)" rx="2" ry="2" />
+<text  x="714.43" y="1887.5" ></text>
+</g>
+<g >
+<title>string (4 samples, 0.02%)</title><rect x="638.8" y="1845" width="0.2" height="15.0" fill="rgb(205,51,43)" rx="2" ry="2" />
+<text  x="641.81" y="1855.5" ></text>
+</g>
+<g >
+<title>ext4_data_block_valid (3 samples, 0.01%)</title><rect x="519.1" y="1845" width="0.1" height="15.0" fill="rgb(232,226,31)" rx="2" ry="2" />
+<text  x="522.06" y="1855.5" ></text>
+</g>
+<g >
+<title>rocksdb::MemTable::Add (7,724 samples, 33.15%)</title><rect x="763.7" y="1877" width="391.1" height="15.0" fill="rgb(236,19,30)" rx="2" ry="2" />
+<text  x="766.68" y="1887.5" >rocksdb::MemTable::Add</text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="645" width="1.7" height="15.0" fill="rgb(240,131,49)" rx="2" ry="2" />
+<text  x="14.01" y="655.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatch::ComputeContentFlags (2 samples, 0.01%)</title><rect x="1159.5" y="1909" width="0.1" height="15.0" fill="rgb(252,159,34)" rx="2" ry="2" />
+<text  x="1162.52" y="1919.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1605" width="1.7" height="15.0" fill="rgb(234,32,22)" rx="2" ry="2" />
+<text  x="14.01" y="1615.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="245" width="1.7" height="15.0" fill="rgb(244,109,41)" rx="2" ry="2" />
+<text  x="14.01" y="255.5" ></text>
+</g>
+<g >
+<title>unmap_single_vma (3 samples, 0.01%)</title><rect x="643.6" y="1925" width="0.1" height="15.0" fill="rgb(250,144,15)" rx="2" ry="2" />
+<text  x="646.57" y="1935.5" ></text>
+</g>
+<g >
+<title>sys_execve (2 samples, 0.01%)</title><rect x="633.9" y="2005" width="0.1" height="15.0" fill="rgb(222,140,41)" rx="2" ry="2" />
+<text  x="636.85" y="2015.5" ></text>
+</g>
+<g >
+<title>__sb_start_write (13 samples, 0.06%)</title><rect x="45.7" y="1957" width="0.7" height="15.0" fill="rgb(230,72,32)" rx="2" ry="2" />
+<text  x="48.70" y="1967.5" ></text>
+</g>
+<g >
+<title>ext4_mark_iloc_dirty (6 samples, 0.03%)</title><rect x="536.3" y="1845" width="0.3" height="15.0" fill="rgb(224,176,37)" rx="2" ry="2" />
+<text  x="539.32" y="1855.5" ></text>
+</g>
+<g >
+<title>finish_task_switch (61 samples, 0.26%)</title><rect x="21.7" y="1813" width="3.1" height="15.0" fill="rgb(245,214,12)" rx="2" ry="2" />
+<text  x="24.75" y="1823.5" ></text>
+</g>
+<g >
+<title>ext4_ext_map_blocks (18 samples, 0.08%)</title><rect x="522.4" y="1845" width="1.0" height="15.0" fill="rgb(225,11,28)" rx="2" ry="2" />
+<text  x="525.45" y="1855.5" ></text>
+</g>
+<g >
+<title>ret_from_fork (2 samples, 0.01%)</title><rect x="1188.8" y="1957" width="0.1" height="15.0" fill="rgb(214,180,34)" rx="2" ry="2" />
+<text  x="1191.78" y="1967.5" ></text>
+</g>
+<g >
+<title>page_fault (24 samples, 0.10%)</title><rect x="775.1" y="1829" width="1.2" height="15.0" fill="rgb(233,142,4)" rx="2" ry="2" />
+<text  x="778.13" y="1839.5" ></text>
+</g>
+<g >
+<title>ext4_data_block_valid (11 samples, 0.05%)</title><rect x="518.1" y="1829" width="0.6" height="15.0" fill="rgb(225,141,21)" rx="2" ry="2" />
+<text  x="521.09" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::ExitAsBatchGroupLeader (17 samples, 0.07%)</title><rect x="1177.8" y="1957" width="0.9" height="15.0" fill="rgb(223,9,20)" rx="2" ry="2" />
+<text  x="1180.85" y="1967.5" ></text>
+</g>
+<g >
+<title>exit_to_usermode_loop (2 samples, 0.01%)</title><rect x="642.5" y="2005" width="0.1" height="15.0" fill="rgb(205,104,54)" rx="2" ry="2" />
+<text  x="645.46" y="2015.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (11,741 samples, 50.38%)</title><rect x="31.9" y="2021" width="594.5" height="15.0" fill="rgb(233,138,24)" rx="2" ry="2" />
+<text  x="34.88" y="2031.5" >entry_SYSCALL_64_after_hwframe</text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="853" width="1.7" height="15.0" fill="rgb(218,86,40)" rx="2" ry="2" />
+<text  x="14.01" y="863.5" ></text>
+</g>
+<g >
+<title>__do_page_fault (23 samples, 0.10%)</title><rect x="761.4" y="1829" width="1.2" height="15.0" fill="rgb(225,202,25)" rx="2" ry="2" />
+<text  x="764.41" y="1839.5" ></text>
+</g>
+<g >
+<title>__ext4_handle_dirty_metadata (2 samples, 0.01%)</title><rect x="522.6" y="1749" width="0.1" height="15.0" fill="rgb(246,56,16)" rx="2" ry="2" />
+<text  x="525.60" y="1759.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum.isra.57 (343 samples, 1.47%)</title><rect x="584.0" y="1797" width="17.3" height="15.0" fill="rgb(208,113,43)" rx="2" ry="2" />
+<text  x="586.97" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatchInternal::InsertInto (7,986 samples, 34.27%)</title><rect x="752.5" y="1941" width="404.4" height="15.0" fill="rgb(221,6,47)" rx="2" ry="2" />
+<text  x="755.49" y="1951.5" >rocksdb::WriteBatchInternal::InsertInto</text>
+</g>
+<g >
+<title>crc32c_pcl_intel_update (58 samples, 0.25%)</title><rect x="587.2" y="1781" width="2.9" height="15.0" fill="rgb(217,217,25)" rx="2" ry="2" />
+<text  x="590.16" y="1791.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="277" width="1.7" height="15.0" fill="rgb(232,17,14)" rx="2" ry="2" />
+<text  x="14.01" y="287.5" ></text>
+</g>
+<g >
+<title>rocksdb::PosixWritableFile::Flush (4 samples, 0.02%)</title><rect x="706.4" y="1893" width="0.2" height="15.0" fill="rgb(225,202,26)" rx="2" ry="2" />
+<text  x="709.41" y="1903.5" ></text>
+</g>
+<g >
+<title>schedule_tail (13 samples, 0.06%)</title><rect x="20.8" y="1813" width="0.6" height="15.0" fill="rgb(220,5,37)" rx="2" ry="2" />
+<text  x="23.79" y="1823.5" ></text>
+</g>
+<g >
+<title>flush_tlb_mm_range (10 samples, 0.04%)</title><rect x="640.7" y="1973" width="0.5" height="15.0" fill="rgb(240,66,0)" rx="2" ry="2" />
+<text  x="643.74" y="1983.5" ></text>
+</g>
+<g >
+<title>rocksdb:dump_st (5 samples, 0.02%)</title><rect x="1188.3" y="2069" width="0.3" height="15.0" fill="rgb(245,62,15)" rx="2" ry="2" />
+<text  x="1191.33" y="2079.5" ></text>
+</g>
+<g >
+<title>generic_make_request_checks (2 samples, 0.01%)</title><rect x="523.6" y="1765" width="0.1" height="15.0" fill="rgb(229,169,47)" rx="2" ry="2" />
+<text  x="526.61" y="1775.5" ></text>
+</g>
+<g >
+<title>seq_read (21 samples, 0.09%)</title><rect x="638.0" y="1925" width="1.0" height="15.0" fill="rgb(235,209,2)" rx="2" ry="2" />
+<text  x="640.95" y="1935.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="117" width="1.7" height="15.0" fill="rgb(208,80,12)" rx="2" ry="2" />
+<text  x="14.01" y="127.5" ></text>
+</g>
+<g >
+<title>db_bench (23,260 samples, 99.82%)</title><rect x="10.0" y="2069" width="1177.8" height="15.0" fill="rgb(219,140,50)" rx="2" ry="2" />
+<text  x="13.00" y="2079.5" >db_bench</text>
+</g>
+<g >
+<title>[unknown] (3 samples, 0.01%)</title><rect x="1188.4" y="2053" width="0.2" height="15.0" fill="rgb(248,206,13)" rx="2" ry="2" />
+<text  x="1191.43" y="2063.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1045" width="1.7" height="15.0" fill="rgb(243,108,38)" rx="2" ry="2" />
+<text  x="14.01" y="1055.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1797" width="1.7" height="15.0" fill="rgb(244,165,20)" rx="2" ry="2" />
+<text  x="14.01" y="1807.5" ></text>
+</g>
+<g >
+<title>try_charge (5 samples, 0.02%)</title><rect x="776.0" y="1733" width="0.3" height="15.0" fill="rgb(250,93,40)" rx="2" ry="2" />
+<text  x="779.04" y="1743.5" ></text>
+</g>
+<g >
+<title>rocksdb::db_bench_tool (111 samples, 0.48%)</title><rect x="20.1" y="2021" width="5.6" height="15.0" fill="rgb(220,28,30)" rx="2" ry="2" />
+<text  x="23.08" y="2031.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="933" width="1.7" height="15.0" fill="rgb(226,36,48)" rx="2" ry="2" />
+<text  x="14.01" y="943.5" ></text>
+</g>
+<g >
+<title>load_elf_binary (10 samples, 0.04%)</title><rect x="1187.8" y="1957" width="0.5" height="15.0" fill="rgb(222,128,40)" rx="2" ry="2" />
+<text  x="1190.82" y="1967.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::LinkOne (36 samples, 0.15%)</title><rect x="1170.8" y="1925" width="1.8" height="15.0" fill="rgb(209,224,38)" rx="2" ry="2" />
+<text  x="1173.76" y="1935.5" ></text>
+</g>
+<g >
+<title>unmap_page_range (6 samples, 0.03%)</title><rect x="642.2" y="1957" width="0.3" height="15.0" fill="rgb(246,100,3)" rx="2" ry="2" />
+<text  x="645.16" y="1967.5" ></text>
+</g>
+<g >
+<title>ext4_meta_trans_blocks (27 samples, 0.12%)</title><rect x="534.6" y="1861" width="1.3" height="15.0" fill="rgb(224,21,53)" rx="2" ry="2" />
+<text  x="537.55" y="1871.5" ></text>
+</g>
+<g >
+<title>fput (31 samples, 0.13%)</title><rect x="41.1" y="1973" width="1.6" height="15.0" fill="rgb(230,73,36)" rx="2" ry="2" />
+<text  x="44.14" y="1983.5" ></text>
+</g>
+<g >
+<title>pmem_copy_from_iter (138 samples, 0.59%)</title><rect x="57.6" y="1845" width="7.0" height="15.0" fill="rgb(213,167,48)" rx="2" ry="2" />
+<text  x="60.60" y="1855.5" ></text>
+</g>
+<g >
+<title>native_apic_msr_write (2 samples, 0.01%)</title><rect x="18.3" y="1909" width="0.1" height="15.0" fill="rgb(237,105,12)" rx="2" ry="2" />
+<text  x="21.30" y="1919.5" ></text>
+</g>
+<g >
+<title>generic_make_request (216 samples, 0.93%)</title><rect x="523.6" y="1781" width="11.0" height="15.0" fill="rgb(237,143,35)" rx="2" ry="2" />
+<text  x="526.61" y="1791.5" ></text>
+</g>
+<g >
+<title>__clone (50 samples, 0.21%)</title><rect x="17.5" y="2037" width="2.6" height="15.0" fill="rgb(232,115,33)" rx="2" ry="2" />
+<text  x="20.54" y="2047.5" ></text>
+</g>
+<g >
+<title>TLS init function for rocksdb::perf_context (5 samples, 0.02%)</title><rect x="662.0" y="1957" width="0.3" height="15.0" fill="rgb(206,135,0)" rx="2" ry="2" />
+<text  x="665.01" y="1967.5" ></text>
+</g>
+<g >
+<title>__indirect_thunk_start (5 samples, 0.02%)</title><rect x="56.5" y="1861" width="0.3" height="15.0" fill="rgb(215,19,1)" rx="2" ry="2" />
+<text  x="59.54" y="1871.5" ></text>
+</g>
+<g >
+<title>do_lookup_x (5 samples, 0.02%)</title><rect x="643.3" y="2053" width="0.2" height="15.0" fill="rgb(231,184,24)" rx="2" ry="2" />
+<text  x="646.27" y="2063.5" ></text>
+</g>
+<g >
+<title>__libc_write (11,950 samples, 51.28%)</title><rect x="25.7" y="2037" width="605.1" height="15.0" fill="rgb(235,40,32)" rx="2" ry="2" />
+<text  x="28.70" y="2047.5" >__libc_write</text>
+</g>
+<g >
+<title>ext4_es_lookup_extent (63 samples, 0.27%)</title><rect x="519.3" y="1845" width="3.1" height="15.0" fill="rgb(229,69,20)" rx="2" ry="2" />
+<text  x="522.26" y="1855.5" ></text>
+</g>
+<g >
+<title>inherit_task_group.isra.99.part.100 (5 samples, 0.02%)</title><rect x="21.5" y="1749" width="0.2" height="15.0" fill="rgb(233,92,15)" rx="2" ry="2" />
+<text  x="24.49" y="1759.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::ExitAsBatchGroupLeader (143 samples, 0.61%)</title><rect x="1159.6" y="1941" width="7.3" height="15.0" fill="rgb(241,93,47)" rx="2" ry="2" />
+<text  x="1162.62" y="1951.5" ></text>
+</g>
+<g >
+<title>rcu_all_qs (3 samples, 0.01%)</title><rect x="540.9" y="1813" width="0.1" height="15.0" fill="rgb(222,82,36)" rx="2" ry="2" />
+<text  x="543.88" y="1823.5" ></text>
+</g>
+<g >
+<title>inherit_task_group.isra.99.part.100 (3 samples, 0.01%)</title><rect x="20.6" y="1733" width="0.2" height="15.0" fill="rgb(240,53,53)" rx="2" ry="2" />
+<text  x="23.63" y="1743.5" ></text>
+</g>
+<g >
+<title>[unknown] (12,427 samples, 53.33%)</title><rect x="10.4" y="2053" width="629.3" height="15.0" fill="rgb(221,192,45)" rx="2" ry="2" />
+<text  x="13.41" y="2063.5" >[unknown]</text>
+</g>
+<g >
+<title>ext4_journal_check_start (3 samples, 0.01%)</title><rect x="516.8" y="1861" width="0.2" height="15.0" fill="rgb(246,33,9)" rx="2" ry="2" />
+<text  x="519.83" y="1871.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="485" width="1.7" height="15.0" fill="rgb(233,120,18)" rx="2" ry="2" />
+<text  x="14.01" y="495.5" ></text>
+</g>
+<g >
+<title>rocksdb::Status::operator= (4 samples, 0.02%)</title><rect x="754.9" y="1909" width="0.2" height="15.0" fill="rgb(234,116,51)" rx="2" ry="2" />
+<text  x="757.87" y="1919.5" ></text>
+</g>
+<g >
+<title>handle_mm_fault (10 samples, 0.04%)</title><rect x="911.5" y="1781" width="0.6" height="15.0" fill="rgb(240,94,31)" rx="2" ry="2" />
+<text  x="914.55" y="1791.5" ></text>
+</g>
+<g >
+<title>clear_page_erms (2 samples, 0.01%)</title><rect x="761.7" y="1749" width="0.1" height="15.0" fill="rgb(241,154,0)" rx="2" ry="2" />
+<text  x="764.66" y="1759.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatch::HasMerge (6 samples, 0.03%)</title><rect x="1159.3" y="1925" width="0.3" height="15.0" fill="rgb(225,5,13)" rx="2" ry="2" />
+<text  x="1162.31" y="1935.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1669" width="1.7" height="15.0" fill="rgb(214,163,42)" rx="2" ry="2" />
+<text  x="14.01" y="1679.5" ></text>
+</g>
+<g >
+<title>schedule_tail (2 samples, 0.01%)</title><rect x="1188.8" y="1941" width="0.1" height="15.0" fill="rgb(226,138,3)" rx="2" ry="2" />
+<text  x="1191.78" y="1951.5" ></text>
+</g>
+<g >
+<title>get_mem_cgroup_from_mm (5 samples, 0.02%)</title><rect x="775.8" y="1733" width="0.2" height="15.0" fill="rgb(248,36,3)" rx="2" ry="2" />
+<text  x="778.79" y="1743.5" ></text>
+</g>
+<g >
+<title>ext4_issue_zeroout (221 samples, 0.95%)</title><rect x="523.4" y="1845" width="11.2" height="15.0" fill="rgb(250,145,13)" rx="2" ry="2" />
+<text  x="526.36" y="1855.5" ></text>
+</g>
+<g >
+<title>memcmp@plt (21 samples, 0.09%)</title><rect x="1136.0" y="1829" width="1.0" height="15.0" fill="rgb(217,184,31)" rx="2" ry="2" />
+<text  x="1138.97" y="1839.5" ></text>
+</g>
+<g >
+<title>perf_event_init_task (3 samples, 0.01%)</title><rect x="20.6" y="1749" width="0.2" height="15.0" fill="rgb(211,12,36)" rx="2" ry="2" />
+<text  x="23.63" y="1759.5" ></text>
+</g>
+<g >
+<title>generic_write_checks (8 samples, 0.03%)</title><rect x="618.4" y="1893" width="0.4" height="15.0" fill="rgb(232,45,38)" rx="2" ry="2" />
+<text  x="621.41" y="1903.5" ></text>
+</g>
+<g >
+<title>__intel_pmu_enable_all.constprop.23 (9 samples, 0.04%)</title><rect x="1187.9" y="1861" width="0.4" height="15.0" fill="rgb(254,159,51)" rx="2" ry="2" />
+<text  x="1190.87" y="1871.5" ></text>
+</g>
+<g >
+<title>pagevec_lookup_range (4 samples, 0.02%)</title><rect x="518.9" y="1829" width="0.2" height="15.0" fill="rgb(236,104,38)" rx="2" ry="2" />
+<text  x="521.85" y="1839.5" ></text>
+</g>
+<g >
+<title>ext4_orphan_add (15 samples, 0.06%)</title><rect x="535.9" y="1861" width="0.8" height="15.0" fill="rgb(205,89,33)" rx="2" ry="2" />
+<text  x="538.92" y="1871.5" ></text>
+</g>
+<g >
+<title>__ext4_journal_start_sb (2 samples, 0.01%)</title><rect x="54.8" y="1877" width="0.1" height="15.0" fill="rgb(206,7,44)" rx="2" ry="2" />
+<text  x="57.76" y="1887.5" ></text>
+</g>
+<g >
+<title>do_lookup_x (3 samples, 0.01%)</title><rect x="633.7" y="2037" width="0.2" height="15.0" fill="rgb(237,34,9)" rx="2" ry="2" />
+<text  x="636.70" y="2047.5" ></text>
+</g>
+<g >
+<title>rocksdb::InlineSkipList&lt;rocksdb::MemTableRep::KeyComparator const&amp;&gt;::KeyIsAfterNode (3,244 samples, 13.92%)</title><rect x="912.1" y="1829" width="164.3" height="15.0" fill="rgb(236,17,23)" rx="2" ry="2" />
+<text  x="915.10" y="1839.5" >rocksdb::InlineSkipLi..</text>
+</g>
+<g >
+<title>do_page_fault (14 samples, 0.06%)</title><rect x="770.5" y="1845" width="0.7" height="15.0" fill="rgb(218,126,23)" rx="2" ry="2" />
+<text  x="773.52" y="1855.5" ></text>
+</g>
+<g >
+<title>next_bio (2 samples, 0.01%)</title><rect x="523.4" y="1797" width="0.1" height="15.0" fill="rgb(246,168,39)" rx="2" ry="2" />
+<text  x="526.41" y="1807.5" ></text>
+</g>
+<g >
+<title>_dl_relocate_object (3 samples, 0.01%)</title><rect x="633.5" y="2005" width="0.1" height="15.0" fill="rgb(217,57,12)" rx="2" ry="2" />
+<text  x="636.50" y="2015.5" ></text>
+</g>
+<g >
+<title>ret_from_fork (9 samples, 0.04%)</title><rect x="25.1" y="1941" width="0.5" height="15.0" fill="rgb(252,158,35)" rx="2" ry="2" />
+<text  x="28.14" y="1951.5" ></text>
+</g>
+<g >
+<title>write@plt (3 samples, 0.01%)</title><rect x="722.8" y="1861" width="0.1" height="15.0" fill="rgb(244,27,50)" rx="2" ry="2" />
+<text  x="725.77" y="1871.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::WriteToWAL (2 samples, 0.01%)</title><rect x="1177.3" y="1957" width="0.1" height="15.0" fill="rgb(236,189,11)" rx="2" ry="2" />
+<text  x="1180.29" y="1967.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatchInternal::Delete (23 samples, 0.10%)</title><rect x="1181.2" y="1973" width="1.2" height="15.0" fill="rgb(251,160,4)" rx="2" ry="2" />
+<text  x="1184.24" y="1983.5" ></text>
+</g>
+<g >
+<title>x86_pmu_enable (13 samples, 0.06%)</title><rect x="20.8" y="1765" width="0.6" height="15.0" fill="rgb(208,32,9)" rx="2" ry="2" />
+<text  x="23.79" y="1775.5" ></text>
+</g>
+<g >
+<title>get_page_from_freelist (3 samples, 0.01%)</title><rect x="775.6" y="1717" width="0.1" height="15.0" fill="rgb(212,54,39)" rx="2" ry="2" />
+<text  x="778.58" y="1727.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (11,710 samples, 50.25%)</title><rect x="32.6" y="2005" width="592.9" height="15.0" fill="rgb(248,194,33)" rx="2" ry="2" />
+<text  x="35.58" y="2015.5" >do_syscall_64</text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="757" width="1.7" height="15.0" fill="rgb(219,63,11)" rx="2" ry="2" />
+<text  x="14.01" y="767.5" ></text>
+</g>
+<g >
+<title>aperfmperf_snapshot_cpu (12 samples, 0.05%)</title><rect x="16.9" y="1845" width="0.6" height="15.0" fill="rgb(226,58,16)" rx="2" ry="2" />
+<text  x="19.94" y="1855.5" ></text>
+</g>
+<g >
+<title>dax_copy_from_iter (2 samples, 0.01%)</title><rect x="54.9" y="1877" width="0.1" height="15.0" fill="rgb(226,3,53)" rx="2" ry="2" />
+<text  x="57.92" y="1887.5" ></text>
+</g>
+<g >
+<title>memset_erms (20 samples, 0.09%)</title><rect x="544.5" y="1829" width="1.0" height="15.0" fill="rgb(209,194,15)" rx="2" ry="2" />
+<text  x="547.48" y="1839.5" ></text>
+</g>
+<g >
+<title>__perf_event_task_sched_in (48 samples, 0.21%)</title><rect x="17.6" y="1973" width="2.5" height="15.0" fill="rgb(215,213,9)" rx="2" ry="2" />
+<text  x="20.65" y="1983.5" ></text>
+</g>
+<g >
+<title>sync_regs (4 samples, 0.02%)</title><rect x="910.4" y="1813" width="0.2" height="15.0" fill="rgb(233,184,20)" rx="2" ry="2" />
+<text  x="913.38" y="1823.5" ></text>
+</g>
+<g >
+<title>ext4_do_update_inode (2 samples, 0.01%)</title><rect x="536.5" y="1829" width="0.1" height="15.0" fill="rgb(236,52,28)" rx="2" ry="2" />
+<text  x="539.53" y="1839.5" ></text>
+</g>
+<g >
+<title>release_pages (16 samples, 0.07%)</title><rect x="641.3" y="1909" width="0.8" height="15.0" fill="rgb(228,96,50)" rx="2" ry="2" />
+<text  x="644.29" y="1919.5" ></text>
+</g>
+<g >
+<title>ret_from_fork (18 samples, 0.08%)</title><rect x="14.4" y="1973" width="0.9" height="15.0" fill="rgb(236,79,18)" rx="2" ry="2" />
+<text  x="17.35" y="1983.5" ></text>
+</g>
+<g >
+<title>__kernel_fpu_end (3 samples, 0.01%)</title><rect x="535.9" y="1765" width="0.2" height="15.0" fill="rgb(216,194,47)" rx="2" ry="2" />
+<text  x="538.92" y="1775.5" ></text>
+</g>
+<g >
+<title>smp_call_function_single (8 samples, 0.03%)</title><rect x="638.1" y="1861" width="0.4" height="15.0" fill="rgb(240,148,1)" rx="2" ry="2" />
+<text  x="641.05" y="1871.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock_irqsave (42 samples, 0.18%)</title><rect x="511.7" y="1797" width="2.1" height="15.0" fill="rgb(242,29,28)" rx="2" ry="2" />
+<text  x="514.71" y="1807.5" ></text>
+</g>
+<g >
+<title>ext4_journal_check_start (11 samples, 0.05%)</title><rect x="540.5" y="1845" width="0.6" height="15.0" fill="rgb(251,206,35)" rx="2" ry="2" />
+<text  x="543.53" y="1855.5" ></text>
+</g>
+<g >
+<title>jbd2_journal_stop (199 samples, 0.85%)</title><rect x="553.3" y="1845" width="10.1" height="15.0" fill="rgb(247,122,5)" rx="2" ry="2" />
+<text  x="556.34" y="1855.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::EnterAsMemTableWriter (2 samples, 0.01%)</title><rect x="1177.7" y="1957" width="0.1" height="15.0" fill="rgb(243,84,23)" rx="2" ry="2" />
+<text  x="1180.75" y="1967.5" ></text>
+</g>
+<g >
+<title>__dynamic_cast@plt (2 samples, 0.01%)</title><rect x="679.9" y="1941" width="0.1" height="15.0" fill="rgb(223,73,48)" rx="2" ry="2" />
+<text  x="682.88" y="1951.5" ></text>
+</g>
+<g >
+<title>__memmove_avx_unaligned_erms (11 samples, 0.05%)</title><rect x="725.5" y="1877" width="0.5" height="15.0" fill="rgb(241,181,34)" rx="2" ry="2" />
+<text  x="728.45" y="1887.5" ></text>
+</g>
+<g >
+<title>ext4_write_checks (13 samples, 0.06%)</title><rect x="618.2" y="1909" width="0.6" height="15.0" fill="rgb(208,7,9)" rx="2" ry="2" />
+<text  x="621.15" y="1919.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="421" width="1.7" height="15.0" fill="rgb(206,158,34)" rx="2" ry="2" />
+<text  x="14.01" y="431.5" ></text>
+</g>
+<g >
+<title>rocksdb::log::Writer::AddRecord (871 samples, 3.74%)</title><rect x="702.1" y="1909" width="44.1" height="15.0" fill="rgb(221,126,41)" rx="2" ry="2" />
+<text  x="705.11" y="1919.5" >rock..</text>
+</g>
+<g >
+<title>__check_block_validity.constprop.80 (4 samples, 0.02%)</title><rect x="489.2" y="1861" width="0.2" height="15.0" fill="rgb(206,51,1)" rx="2" ry="2" />
+<text  x="492.23" y="1871.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (6 samples, 0.03%)</title><rect x="21.4" y="1845" width="0.3" height="15.0" fill="rgb(235,197,19)" rx="2" ry="2" />
+<text  x="24.44" y="1855.5" ></text>
+</g>
+<g >
+<title>blkdev_issue_zeroout (221 samples, 0.95%)</title><rect x="523.4" y="1829" width="11.2" height="15.0" fill="rgb(226,5,23)" rx="2" ry="2" />
+<text  x="526.36" y="1839.5" ></text>
+</g>
+<g >
+<title>__intel_pmu_enable_all.constprop.23 (5 samples, 0.02%)</title><rect x="1188.9" y="1909" width="0.3" height="15.0" fill="rgb(245,212,54)" rx="2" ry="2" />
+<text  x="1191.94" y="1919.5" ></text>
+</g>
+<g >
+<title>finish_task_switch (11 samples, 0.05%)</title><rect x="13.7" y="1941" width="0.6" height="15.0" fill="rgb(241,122,26)" rx="2" ry="2" />
+<text  x="16.75" y="1951.5" ></text>
+</g>
+<g >
+<title>x86_pmu_enable (5 samples, 0.02%)</title><rect x="1188.9" y="1941" width="0.3" height="15.0" fill="rgb(226,68,53)" rx="2" ry="2" />
+<text  x="1191.94" y="1951.5" ></text>
+</g>
+<g >
+<title>sys_write (11,686 samples, 50.15%)</title><rect x="33.7" y="1989" width="591.8" height="15.0" fill="rgb(211,128,34)" rx="2" ry="2" />
+<text  x="36.75" y="1999.5" >sys_write</text>
+</g>
+<g >
+<title>malloc@plt (4 samples, 0.02%)</title><rect x="684.3" y="1941" width="0.2" height="15.0" fill="rgb(209,137,49)" rx="2" ry="2" />
+<text  x="687.29" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1781" width="1.7" height="15.0" fill="rgb(214,184,51)" rx="2" ry="2" />
+<text  x="14.01" y="1791.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="213" width="1.7" height="15.0" fill="rgb(221,52,10)" rx="2" ry="2" />
+<text  x="14.01" y="223.5" ></text>
+</g>
+<g >
+<title>native_irq_return_iret (11 samples, 0.05%)</title><rect x="910.6" y="1829" width="0.5" height="15.0" fill="rgb(225,26,19)" rx="2" ry="2" />
+<text  x="913.58" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::(anonymous namespace)::BytewiseComparatorImpl::Compare (5 samples, 0.02%)</title><rect x="815.9" y="1813" width="0.2" height="15.0" fill="rgb(217,35,1)" rx="2" ry="2" />
+<text  x="818.89" y="1823.5" ></text>
+</g>
+<g >
+<title>sys_execve (10 samples, 0.04%)</title><rect x="1187.8" y="2005" width="0.5" height="15.0" fill="rgb(217,101,6)" rx="2" ry="2" />
+<text  x="1190.82" y="2015.5" ></text>
+</g>
+<g >
+<title>copy_process.part.36 (2 samples, 0.01%)</title><rect x="25.0" y="1813" width="0.1" height="15.0" fill="rgb(254,38,34)" rx="2" ry="2" />
+<text  x="27.99" y="1823.5" ></text>
+</g>
+<g >
+<title>intel_bts_enable_local (4 samples, 0.02%)</title><rect x="22.0" y="1733" width="0.2" height="15.0" fill="rgb(252,195,45)" rx="2" ry="2" />
+<text  x="25.00" y="1743.5" ></text>
+</g>
+<g >
+<title>seq_printf (11 samples, 0.05%)</title><rect x="638.5" y="1893" width="0.5" height="15.0" fill="rgb(240,145,48)" rx="2" ry="2" />
+<text  x="641.46" y="1903.5" ></text>
+</g>
+<g >
+<title>jbd2__journal_start (5 samples, 0.02%)</title><rect x="536.7" y="1861" width="0.2" height="15.0" fill="rgb(237,186,28)" rx="2" ry="2" />
+<text  x="539.68" y="1871.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="69" width="1.7" height="15.0" fill="rgb(251,127,43)" rx="2" ry="2" />
+<text  x="14.01" y="79.5" ></text>
+</g>
+<g >
+<title>__srcu_read_lock (48 samples, 0.21%)</title><rect x="67.0" y="1845" width="2.4" height="15.0" fill="rgb(249,0,47)" rx="2" ry="2" />
+<text  x="69.97" y="1855.5" ></text>
+</g>
+<g >
+<title>setup_new_exec (10 samples, 0.04%)</title><rect x="1187.8" y="1941" width="0.5" height="15.0" fill="rgb(221,143,42)" rx="2" ry="2" />
+<text  x="1190.82" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::AwaitState (13 samples, 0.06%)</title><rect x="1165.1" y="1925" width="0.7" height="15.0" fill="rgb(252,105,21)" rx="2" ry="2" />
+<text  x="1168.14" y="1935.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1733" width="1.7" height="15.0" fill="rgb(207,108,4)" rx="2" ry="2" />
+<text  x="14.01" y="1743.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1637" width="1.7" height="15.0" fill="rgb(240,151,52)" rx="2" ry="2" />
+<text  x="14.01" y="1647.5" ></text>
+</g>
+<g >
+<title>mutex_unlock (13 samples, 0.06%)</title><rect x="34.4" y="1957" width="0.7" height="15.0" fill="rgb(226,144,45)" rx="2" ry="2" />
+<text  x="37.41" y="1967.5" ></text>
+</g>
+<g >
+<title>__copy_user_nocache (71 samples, 0.30%)</title><rect x="61.0" y="1813" width="3.6" height="15.0" fill="rgb(241,83,25)" rx="2" ry="2" />
+<text  x="63.99" y="1823.5" ></text>
+</g>
+<g >
+<title>sys_clone (2 samples, 0.01%)</title><rect x="20.2" y="1861" width="0.1" height="15.0" fill="rgb(253,99,52)" rx="2" ry="2" />
+<text  x="23.23" y="1871.5" ></text>
+</g>
+<g >
+<title>_raw_read_lock (29 samples, 0.12%)</title><rect x="521.0" y="1829" width="1.4" height="15.0" fill="rgb(232,204,10)" rx="2" ry="2" />
+<text  x="523.98" y="1839.5" ></text>
+</g>
+<g >
+<title>__handle_mm_fault (23 samples, 0.10%)</title><rect x="761.4" y="1797" width="1.2" height="15.0" fill="rgb(231,23,5)" rx="2" ry="2" />
+<text  x="764.41" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::EncodeVarint32 (7 samples, 0.03%)</title><rect x="763.3" y="1877" width="0.4" height="15.0" fill="rgb(239,49,45)" rx="2" ry="2" />
+<text  x="766.33" y="1887.5" ></text>
+</g>
+<g >
+<title>finish_task_switch (5 samples, 0.02%)</title><rect x="1188.9" y="1973" width="0.3" height="15.0" fill="rgb(205,220,30)" rx="2" ry="2" />
+<text  x="1191.94" y="1983.5" ></text>
+</g>
+<g >
+<title>task_numa_work (2 samples, 0.01%)</title><rect x="642.5" y="1973" width="0.1" height="15.0" fill="rgb(218,142,51)" rx="2" ry="2" />
+<text  x="645.46" y="1983.5" ></text>
+</g>
+<g >
+<title>rocksdb::MemTable::KeyComparator::operator (77 samples, 0.33%)</title><rect x="1076.4" y="1829" width="3.9" height="15.0" fill="rgb(208,198,38)" rx="2" ry="2" />
+<text  x="1079.37" y="1839.5" ></text>
+</g>
+<g >
+<title>finish_task_switch (18 samples, 0.08%)</title><rect x="14.4" y="1941" width="0.9" height="15.0" fill="rgb(237,186,26)" rx="2" ry="2" />
+<text  x="17.35" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::DestroyDB (4 samples, 0.02%)</title><rect x="20.1" y="1989" width="0.2" height="15.0" fill="rgb(220,117,41)" rx="2" ry="2" />
+<text  x="23.13" y="1999.5" ></text>
+</g>
+<g >
+<title>handle_mm_fault (24 samples, 0.10%)</title><rect x="775.1" y="1781" width="1.2" height="15.0" fill="rgb(211,71,41)" rx="2" ry="2" />
+<text  x="778.13" y="1791.5" ></text>
+</g>
+<g >
+<title>__memmove_avx_unaligned_erms (2 samples, 0.01%)</title><rect x="706.3" y="1893" width="0.1" height="15.0" fill="rgb(221,39,30)" rx="2" ry="2" />
+<text  x="709.31" y="1903.5" ></text>
+</g>
+<g >
+<title>mmap64 (3 samples, 0.01%)</title><rect x="651.1" y="2053" width="0.1" height="15.0" fill="rgb(234,222,39)" rx="2" ry="2" />
+<text  x="654.07" y="2063.5" ></text>
+</g>
+<g >
+<title>start_this_handle (6 samples, 0.03%)</title><rect x="552.5" y="1845" width="0.3" height="15.0" fill="rgb(219,99,31)" rx="2" ry="2" />
+<text  x="555.48" y="1855.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="341" width="1.7" height="15.0" fill="rgb(232,103,52)" rx="2" ry="2" />
+<text  x="14.01" y="351.5" ></text>
+</g>
+<g >
+<title>page_cpupid_xchg_last (2 samples, 0.01%)</title><rect x="911.8" y="1717" width="0.2" height="15.0" fill="rgb(223,210,38)" rx="2" ry="2" />
+<text  x="914.85" y="1727.5" ></text>
+</g>
+<g >
+<title>memset@plt (4 samples, 0.02%)</title><rect x="650.9" y="2053" width="0.2" height="15.0" fill="rgb(223,126,21)" rx="2" ry="2" />
+<text  x="653.87" y="2063.5" ></text>
+</g>
+<g >
+<title>_copy_from_iter_flushcache (135 samples, 0.58%)</title><rect x="57.8" y="1829" width="6.8" height="15.0" fill="rgb(234,160,23)" rx="2" ry="2" />
+<text  x="60.75" y="1839.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1157" width="1.7" height="15.0" fill="rgb(224,92,21)" rx="2" ry="2" />
+<text  x="14.01" y="1167.5" ></text>
+</g>
+<g >
+<title>__perf_event_task_sched_in (9 samples, 0.04%)</title><rect x="25.1" y="1893" width="0.5" height="15.0" fill="rgb(236,44,11)" rx="2" ry="2" />
+<text  x="28.14" y="1903.5" ></text>
+</g>
+<g >
+<title>finish_task_switch (9 samples, 0.04%)</title><rect x="25.1" y="1909" width="0.5" height="15.0" fill="rgb(228,128,9)" rx="2" ry="2" />
+<text  x="28.14" y="1919.5" ></text>
+</g>
+<g >
+<title>rocksdb::Stats::FinishedOps (29 samples, 0.12%)</title><rect x="1179.2" y="1989" width="1.4" height="15.0" fill="rgb(228,18,0)" rx="2" ry="2" />
+<text  x="1182.16" y="1999.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="565" width="1.7" height="15.0" fill="rgb(236,130,27)" rx="2" ry="2" />
+<text  x="14.01" y="575.5" ></text>
+</g>
+<g >
+<title>rocksdb::DestroyDB (9 samples, 0.04%)</title><rect x="1189.3" y="1989" width="0.5" height="15.0" fill="rgb(207,111,52)" rx="2" ry="2" />
+<text  x="1192.34" y="1999.5" ></text>
+</g>
+<g >
+<title>_do_fork (4 samples, 0.02%)</title><rect x="20.6" y="1781" width="0.2" height="15.0" fill="rgb(254,82,5)" rx="2" ry="2" />
+<text  x="23.58" y="1791.5" ></text>
+</g>
+<g >
+<title>__brelse (24 samples, 0.10%)</title><rect x="577.1" y="1813" width="1.3" height="15.0" fill="rgb(248,101,34)" rx="2" ry="2" />
+<text  x="580.14" y="1823.5" ></text>
+</g>
+<g >
+<title>schedule_tail (18 samples, 0.08%)</title><rect x="14.4" y="1957" width="0.9" height="15.0" fill="rgb(251,99,23)" rx="2" ry="2" />
+<text  x="17.35" y="1967.5" ></text>
+</g>
+<g >
+<title>[unknown] (12 samples, 0.05%)</title><rect x="1189.2" y="2053" width="0.6" height="15.0" fill="rgb(213,16,22)" rx="2" ry="2" />
+<text  x="1192.24" y="2063.5" ></text>
+</g>
+<g >
+<title>ext4_inode_table (2 samples, 0.01%)</title><rect x="614.4" y="1829" width="0.1" height="15.0" fill="rgb(238,180,31)" rx="2" ry="2" />
+<text  x="617.36" y="1839.5" ></text>
+</g>
+<g >
+<title>memcpy@plt (2 samples, 0.01%)</title><rect x="739.2" y="1861" width="0.1" height="15.0" fill="rgb(247,199,16)" rx="2" ry="2" />
+<text  x="742.18" y="1871.5" ></text>
+</g>
+<g >
+<title>sys_exit (3 samples, 0.01%)</title><rect x="651.2" y="2005" width="0.2" height="15.0" fill="rgb(230,52,8)" rx="2" ry="2" />
+<text  x="654.22" y="2015.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="261" width="1.7" height="15.0" fill="rgb(228,14,43)" rx="2" ry="2" />
+<text  x="14.01" y="271.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1301" width="1.7" height="15.0" fill="rgb(253,134,2)" rx="2" ry="2" />
+<text  x="14.01" y="1311.5" ></text>
+</g>
+<g >
+<title>operator new (7 samples, 0.03%)</title><rect x="739.3" y="1861" width="0.3" height="15.0" fill="rgb(235,140,12)" rx="2" ry="2" />
+<text  x="742.28" y="1871.5" ></text>
+</g>
+<g >
+<title>crypto_shash_update (2 samples, 0.01%)</title><rect x="614.5" y="1813" width="0.1" height="15.0" fill="rgb(210,41,33)" rx="2" ry="2" />
+<text  x="617.46" y="1823.5" ></text>
+</g>
+<g >
+<title>rocksdb::ColumnFamilySet::CreateColumnFamily (2 samples, 0.01%)</title><rect x="24.9" y="1877" width="0.1" height="15.0" fill="rgb(247,70,24)" rx="2" ry="2" />
+<text  x="27.89" y="1887.5" ></text>
+</g>
+<g >
+<title>native_write_msr (8 samples, 0.03%)</title><rect x="13.8" y="1861" width="0.5" height="15.0" fill="rgb(250,170,3)" rx="2" ry="2" />
+<text  x="16.85" y="1871.5" ></text>
+</g>
+<g >
+<title>__clone (2 samples, 0.01%)</title><rect x="1188.8" y="1973" width="0.1" height="15.0" fill="rgb(231,77,39)" rx="2" ry="2" />
+<text  x="1191.78" y="1983.5" ></text>
+</g>
+<g >
+<title>format_decode (2 samples, 0.01%)</title><rect x="638.7" y="1845" width="0.1" height="15.0" fill="rgb(211,70,20)" rx="2" ry="2" />
+<text  x="641.71" y="1855.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatch::Delete (39 samples, 0.17%)</title><rect x="1180.9" y="1989" width="2.0" height="15.0" fill="rgb(216,97,32)" rx="2" ry="2" />
+<text  x="1183.89" y="1999.5" ></text>
+</g>
+<g >
+<title>find_vma_prev (2 samples, 0.01%)</title><rect x="640.6" y="1989" width="0.1" height="15.0" fill="rgb(208,11,1)" rx="2" ry="2" />
+<text  x="643.64" y="1999.5" ></text>
+</g>
+<g >
+<title>rocksdb:low0 (12 samples, 0.05%)</title><rect x="1189.2" y="2069" width="0.6" height="15.0" fill="rgb(242,120,33)" rx="2" ry="2" />
+<text  x="1192.24" y="2079.5" ></text>
+</g>
+<g >
+<title>[libjemalloc.so.1] (4 samples, 0.02%)</title><rect x="10.8" y="2037" width="0.2" height="15.0" fill="rgb(210,108,36)" rx="2" ry="2" />
+<text  x="13.81" y="2047.5" ></text>
+</g>
+<g >
+<title>up_write (16 samples, 0.07%)</title><rect x="620.9" y="1909" width="0.8" height="15.0" fill="rgb(238,176,47)" rx="2" ry="2" />
+<text  x="623.94" y="1919.5" ></text>
+</g>
+<g >
+<title>crc32c_pcl_intel_update (144 samples, 0.62%)</title><rect x="594.1" y="1765" width="7.2" height="15.0" fill="rgb(205,200,35)" rx="2" ry="2" />
+<text  x="597.05" y="1775.5" ></text>
+</g>
+<g >
+<title>__clone (67 samples, 0.29%)</title><rect x="21.4" y="1861" width="3.4" height="15.0" fill="rgb(229,169,22)" rx="2" ry="2" />
+<text  x="24.44" y="1871.5" ></text>
+</g>
+<g >
+<title>all (23,303 samples, 100%)</title><rect x="10.0" y="2085" width="1180.0" height="15.0" fill="rgb(244,169,1)" rx="2" ry="2" />
+<text  x="13.00" y="2095.5" ></text>
+</g>
+<g >
+<title>rocksdb::InstrumentedMutex::Lock (80 samples, 0.34%)</title><rect x="746.9" y="1941" width="4.0" height="15.0" fill="rgb(247,15,28)" rx="2" ry="2" />
+<text  x="749.87" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::MergeBatch (11 samples, 0.05%)</title><rect x="696.5" y="1925" width="0.6" height="15.0" fill="rgb(205,81,0)" rx="2" ry="2" />
+<text  x="699.54" y="1935.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1125" width="1.7" height="15.0" fill="rgb(251,198,14)" rx="2" ry="2" />
+<text  x="14.01" y="1135.5" ></text>
+</g>
+<g >
+<title>ext4_iomap_begin (1,038 samples, 4.45%)</title><rect x="486.6" y="1877" width="52.6" height="15.0" fill="rgb(238,22,36)" rx="2" ry="2" />
+<text  x="489.65" y="1887.5" >ext4_..</text>
+</g>
+<g >
+<title>__memcmp_avx2_movbe (487 samples, 2.09%)</title><rect x="1111.3" y="1829" width="24.7" height="15.0" fill="rgb(246,94,47)" rx="2" ry="2" />
+<text  x="1114.31" y="1839.5" >_..</text>
+</g>
+<g >
+<title>release_pages (2 samples, 0.01%)</title><rect x="762.0" y="1733" width="0.1" height="15.0" fill="rgb(236,40,18)" rx="2" ry="2" />
+<text  x="764.96" y="1743.5" ></text>
+</g>
+<g >
+<title>__perf_event_task_sched_in (2 samples, 0.01%)</title><rect x="1188.8" y="1909" width="0.1" height="15.0" fill="rgb(253,2,36)" rx="2" ry="2" />
+<text  x="1191.78" y="1919.5" ></text>
+</g>
+<g >
+<title>do_dentry_open (12 samples, 0.05%)</title><rect x="16.9" y="1909" width="0.6" height="15.0" fill="rgb(250,46,42)" rx="2" ry="2" />
+<text  x="19.94" y="1919.5" ></text>
+</g>
+<g >
+<title>pmem_dax_direct_access (11 samples, 0.05%)</title><rect x="485.9" y="1861" width="0.5" height="15.0" fill="rgb(240,71,49)" rx="2" ry="2" />
+<text  x="488.89" y="1871.5" ></text>
+</g>
+<g >
+<title>rocksdb::SyncPoint::GetInstance (6 samples, 0.03%)</title><rect x="729.2" y="1877" width="0.3" height="15.0" fill="rgb(218,53,36)" rx="2" ry="2" />
+<text  x="732.20" y="1887.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="405" width="1.7" height="15.0" fill="rgb(212,130,12)" rx="2" ry="2" />
+<text  x="14.01" y="415.5" ></text>
+</g>
+<g >
+<title>search_binary_handler (2 samples, 0.01%)</title><rect x="633.9" y="1973" width="0.1" height="15.0" fill="rgb(211,57,29)" rx="2" ry="2" />
+<text  x="636.85" y="1983.5" ></text>
+</g>
+<g >
+<title>kmem_cache_free (33 samples, 0.14%)</title><rect x="514.9" y="1829" width="1.7" height="15.0" fill="rgb(212,162,7)" rx="2" ry="2" />
+<text  x="517.90" y="1839.5" ></text>
+</g>
+<g >
+<title>__libc_start_main (111 samples, 0.48%)</title><rect x="20.1" y="2037" width="5.6" height="15.0" fill="rgb(224,89,32)" rx="2" ry="2" />
+<text  x="23.08" y="2047.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1445" width="1.7" height="15.0" fill="rgb(253,204,4)" rx="2" ry="2" />
+<text  x="14.01" y="1455.5" ></text>
+</g>
+<g >
+<title>mark_page_accessed (5 samples, 0.02%)</title><rect x="610.0" y="1781" width="0.3" height="15.0" fill="rgb(237,94,16)" rx="2" ry="2" />
+<text  x="613.00" y="1791.5" ></text>
+</g>
+<g >
+<title>_raw_read_lock (20 samples, 0.09%)</title><rect x="538.2" y="1845" width="1.0" height="15.0" fill="rgb(213,154,3)" rx="2" ry="2" />
+<text  x="541.20" y="1855.5" ></text>
+</g>
+<g >
+<title>page_fault (19 samples, 0.08%)</title><rect x="911.1" y="1829" width="1.0" height="15.0" fill="rgb(209,172,43)" rx="2" ry="2" />
+<text  x="914.14" y="1839.5" ></text>
+</g>
+<g >
+<title>__fdget_pos (115 samples, 0.49%)</title><rect x="35.1" y="1973" width="5.8" height="15.0" fill="rgb(237,36,1)" rx="2" ry="2" />
+<text  x="38.07" y="1983.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (4 samples, 0.02%)</title><rect x="20.6" y="1813" width="0.2" height="15.0" fill="rgb(216,52,54)" rx="2" ry="2" />
+<text  x="23.58" y="1823.5" ></text>
+</g>
+<g >
+<title>arch_freq_prepare_all (12 samples, 0.05%)</title><rect x="16.9" y="1861" width="0.6" height="15.0" fill="rgb(254,22,11)" rx="2" ry="2" />
+<text  x="19.94" y="1871.5" ></text>
+</g>
+<g >
+<title>perf_event_alloc (2 samples, 0.01%)</title><rect x="25.0" y="1749" width="0.1" height="15.0" fill="rgb(237,85,41)" rx="2" ry="2" />
+<text  x="27.99" y="1759.5" ></text>
+</g>
+<g >
+<title>smp_call_function_single (2 samples, 0.01%)</title><rect x="641.1" y="1925" width="0.1" height="15.0" fill="rgb(221,39,24)" rx="2" ry="2" />
+<text  x="644.14" y="1935.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="133" width="1.7" height="15.0" fill="rgb(231,225,31)" rx="2" ry="2" />
+<text  x="14.01" y="143.5" ></text>
+</g>
+<g >
+<title>__pmem_direct_access (3 samples, 0.01%)</title><rect x="65.0" y="1845" width="0.2" height="15.0" fill="rgb(222,96,44)" rx="2" ry="2" />
+<text  x="68.04" y="1855.5" ></text>
+</g>
+<g >
+<title>zap_page_range (34 samples, 0.15%)</title><rect x="640.7" y="1989" width="1.8" height="15.0" fill="rgb(235,161,28)" rx="2" ry="2" />
+<text  x="643.74" y="1999.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="725" width="1.7" height="15.0" fill="rgb(212,111,2)" rx="2" ry="2" />
+<text  x="14.01" y="735.5" ></text>
+</g>
+<g >
+<title>clear_page_erms (2 samples, 0.01%)</title><rect x="770.7" y="1749" width="0.1" height="15.0" fill="rgb(236,27,11)" rx="2" ry="2" />
+<text  x="773.72" y="1759.5" ></text>
+</g>
+<g >
+<title>jbd2__journal_start (305 samples, 1.31%)</title><rect x="490.1" y="1845" width="15.5" height="15.0" fill="rgb(212,229,6)" rx="2" ry="2" />
+<text  x="493.14" y="1855.5" ></text>
+</g>
+<g >
+<title>[libjemalloc.so.1] (2 samples, 0.01%)</title><rect x="1188.4" y="2037" width="0.1" height="15.0" fill="rgb(228,132,34)" rx="2" ry="2" />
+<text  x="1191.43" y="2047.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (2 samples, 0.01%)</title><rect x="20.2" y="1877" width="0.1" height="15.0" fill="rgb(237,47,17)" rx="2" ry="2" />
+<text  x="23.23" y="1887.5" ></text>
+</g>
+<g >
+<title>dl_main (5 samples, 0.02%)</title><rect x="633.4" y="2021" width="0.3" height="15.0" fill="rgb(232,115,5)" rx="2" ry="2" />
+<text  x="636.45" y="2031.5" ></text>
+</g>
+<g >
+<title>__madvise (38 samples, 0.16%)</title><rect x="640.5" y="2053" width="2.0" height="15.0" fill="rgb(236,165,13)" rx="2" ry="2" />
+<text  x="643.54" y="2063.5" ></text>
+</g>
+<g >
+<title>fsnotify (29 samples, 0.12%)</title><rect x="622.2" y="1957" width="1.4" height="15.0" fill="rgb(237,15,18)" rx="2" ry="2" />
+<text  x="625.15" y="1967.5" ></text>
+</g>
+<g >
+<title>pthread_mutex_lock@plt (2 samples, 0.01%)</title><rect x="750.1" y="1925" width="0.1" height="15.0" fill="rgb(233,98,19)" rx="2" ry="2" />
+<text  x="753.11" y="1935.5" ></text>
+</g>
+<g >
+<title>ext4_ext_index_trans_blocks (2 samples, 0.01%)</title><rect x="535.8" y="1845" width="0.1" height="15.0" fill="rgb(242,163,5)" rx="2" ry="2" />
+<text  x="538.82" y="1855.5" ></text>
+</g>
+<g >
+<title>rocksdb::ColumnFamilyData::ColumnFamilyData (2 samples, 0.01%)</title><rect x="24.9" y="1861" width="0.1" height="15.0" fill="rgb(241,18,26)" rx="2" ry="2" />
+<text  x="27.89" y="1871.5" ></text>
+</g>
+<g >
+<title>map_id_up (9 samples, 0.04%)</title><rect x="601.5" y="1797" width="0.5" height="15.0" fill="rgb(218,83,27)" rx="2" ry="2" />
+<text  x="604.54" y="1807.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="181" width="1.7" height="15.0" fill="rgb(246,132,10)" rx="2" ry="2" />
+<text  x="14.01" y="191.5" ></text>
+</g>
+<g >
+<title>_cond_resched (5 samples, 0.02%)</title><rect x="46.1" y="1941" width="0.2" height="15.0" fill="rgb(232,229,35)" rx="2" ry="2" />
+<text  x="49.05" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="613" width="1.7" height="15.0" fill="rgb(212,192,24)" rx="2" ry="2" />
+<text  x="14.01" y="623.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="965" width="1.7" height="15.0" fill="rgb(239,82,21)" rx="2" ry="2" />
+<text  x="14.01" y="975.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1317" width="1.7" height="15.0" fill="rgb(244,177,27)" rx="2" ry="2" />
+<text  x="14.01" y="1327.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatch::Clear (5 samples, 0.02%)</title><rect x="1180.6" y="1989" width="0.3" height="15.0" fill="rgb(210,176,54)" rx="2" ry="2" />
+<text  x="1183.63" y="1999.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1845" width="1.7" height="15.0" fill="rgb(247,119,52)" rx="2" ry="2" />
+<text  x="14.01" y="1855.5" ></text>
+</g>
+<g >
+<title>__pthread_mutex_lock (30 samples, 0.13%)</title><rect x="688.6" y="1925" width="1.5" height="15.0" fill="rgb(246,7,13)" rx="2" ry="2" />
+<text  x="691.59" y="1935.5" ></text>
+</g>
+<g >
+<title>free (8 samples, 0.03%)</title><rect x="643.7" y="2053" width="0.4" height="15.0" fill="rgb(239,9,51)" rx="2" ry="2" />
+<text  x="646.73" y="2063.5" ></text>
+</g>
+<g >
+<title>rocksdb::Benchmark::RunBenchmark (10 samples, 0.04%)</title><rect x="25.1" y="1989" width="0.5" height="15.0" fill="rgb(240,131,28)" rx="2" ry="2" />
+<text  x="28.14" y="1999.5" ></text>
+</g>
+<g >
+<title>blk_status_to_errno (6 samples, 0.03%)</title><rect x="526.0" y="1749" width="0.3" height="15.0" fill="rgb(224,2,37)" rx="2" ry="2" />
+<text  x="528.99" y="1759.5" ></text>
+</g>
+<g >
+<title>new_sync_write (11,356 samples, 48.73%)</title><rect x="47.1" y="1941" width="575.0" height="15.0" fill="rgb(216,164,17)" rx="2" ry="2" />
+<text  x="50.07" y="1951.5" >new_sync_write</text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="821" width="1.7" height="15.0" fill="rgb(245,73,44)" rx="2" ry="2" />
+<text  x="14.01" y="831.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (22 samples, 0.09%)</title><rect x="638.0" y="2005" width="1.1" height="15.0" fill="rgb(225,75,14)" rx="2" ry="2" />
+<text  x="640.95" y="2015.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1909" width="1.7" height="15.0" fill="rgb(246,163,24)" rx="2" ry="2" />
+<text  x="14.01" y="1919.5" ></text>
+</g>
+<g >
+<title>operator delete@plt (2 samples, 0.01%)</title><rect x="684.8" y="1941" width="0.1" height="15.0" fill="rgb(245,171,36)" rx="2" ry="2" />
+<text  x="687.79" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1893" width="1.7" height="15.0" fill="rgb(214,34,6)" rx="2" ry="2" />
+<text  x="14.01" y="1903.5" ></text>
+</g>
+<g >
+<title>__memcmp_avx2_movbe (15 samples, 0.06%)</title><rect x="815.1" y="1813" width="0.7" height="15.0" fill="rgb(226,99,35)" rx="2" ry="2" />
+<text  x="818.08" y="1823.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1573" width="1.7" height="15.0" fill="rgb(241,94,34)" rx="2" ry="2" />
+<text  x="14.01" y="1583.5" ></text>
+</g>
+<g >
+<title>tlb_finish_mmu (16 samples, 0.07%)</title><rect x="641.3" y="1973" width="0.8" height="15.0" fill="rgb(214,203,5)" rx="2" ry="2" />
+<text  x="644.29" y="1983.5" ></text>
+</g>
+<g >
+<title>x86_pmu_enable (11 samples, 0.05%)</title><rect x="13.7" y="1909" width="0.6" height="15.0" fill="rgb(240,0,21)" rx="2" ry="2" />
+<text  x="16.75" y="1919.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum_set (354 samples, 1.52%)</title><rect x="583.4" y="1813" width="17.9" height="15.0" fill="rgb(248,96,28)" rx="2" ry="2" />
+<text  x="586.42" y="1823.5" ></text>
+</g>
+<g >
+<title>__intel_pmu_enable_all.constprop.23 (9 samples, 0.04%)</title><rect x="25.1" y="1845" width="0.5" height="15.0" fill="rgb(225,152,5)" rx="2" ry="2" />
+<text  x="28.14" y="1855.5" ></text>
+</g>
+<g >
+<title>__cxxabiv1::__si_class_type_info::__do_dyncast (10 samples, 0.04%)</title><rect x="639.1" y="2005" width="0.5" height="15.0" fill="rgb(254,22,18)" rx="2" ry="2" />
+<text  x="642.07" y="2015.5" ></text>
+</g>
+<g >
+<title>rocksdb::(anonymous namespace)::BytewiseComparatorImpl::Compare (470 samples, 2.02%)</title><rect x="1052.6" y="1797" width="23.8" height="15.0" fill="rgb(235,227,50)" rx="2" ry="2" />
+<text  x="1055.57" y="1807.5" >r..</text>
+</g>
+<g >
+<title>do_page_fault (23 samples, 0.10%)</title><rect x="761.4" y="1845" width="1.2" height="15.0" fill="rgb(211,48,23)" rx="2" ry="2" />
+<text  x="764.41" y="1855.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1237" width="1.7" height="15.0" fill="rgb(235,78,15)" rx="2" ry="2" />
+<text  x="14.01" y="1247.5" ></text>
+</g>
+<g >
+<title>__indirect_thunk_start (2 samples, 0.01%)</title><rect x="32.5" y="2005" width="0.1" height="15.0" fill="rgb(254,195,42)" rx="2" ry="2" />
+<text  x="35.48" y="2015.5" ></text>
+</g>
+<g >
+<title>kmem_cache_free (2 samples, 0.01%)</title><rect x="516.6" y="1845" width="0.1" height="15.0" fill="rgb(253,229,21)" rx="2" ry="2" />
+<text  x="519.58" y="1855.5" ></text>
+</g>
+<g >
+<title>intel_bts_enable_local (5 samples, 0.02%)</title><rect x="18.0" y="1909" width="0.3" height="15.0" fill="rgb(240,11,27)" rx="2" ry="2" />
+<text  x="21.00" y="1919.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1765" width="1.7" height="15.0" fill="rgb(221,178,51)" rx="2" ry="2" />
+<text  x="14.01" y="1775.5" ></text>
+</g>
+<g >
+<title>__find_get_block (45 samples, 0.19%)</title><rect x="608.0" y="1797" width="2.3" height="15.0" fill="rgb(248,161,47)" rx="2" ry="2" />
+<text  x="610.98" y="1807.5" ></text>
+</g>
+<g >
+<title>bdev_dax_pgoff (6 samples, 0.03%)</title><rect x="57.0" y="1861" width="0.3" height="15.0" fill="rgb(205,37,46)" rx="2" ry="2" />
+<text  x="60.04" y="1871.5" ></text>
+</g>
+<g >
+<title>rcu_all_qs (3 samples, 0.01%)</title><rect x="40.7" y="1925" width="0.2" height="15.0" fill="rgb(208,168,17)" rx="2" ry="2" />
+<text  x="43.74" y="1935.5" ></text>
+</g>
+<g >
+<title>mem_cgroup_try_charge (5 samples, 0.02%)</title><rect x="771.0" y="1781" width="0.2" height="15.0" fill="rgb(244,87,52)" rx="2" ry="2" />
+<text  x="773.98" y="1791.5" ></text>
+</g>
+<g >
+<title>__clone (17 samples, 0.07%)</title><rect x="20.6" y="1845" width="0.8" height="15.0" fill="rgb(211,112,37)" rx="2" ry="2" />
+<text  x="23.58" y="1855.5" ></text>
+</g>
+<g >
+<title>do_execveat_common.isra.34 (2 samples, 0.01%)</title><rect x="633.9" y="1989" width="0.1" height="15.0" fill="rgb(211,124,17)" rx="2" ry="2" />
+<text  x="636.85" y="1999.5" ></text>
+</g>
+<g >
+<title>new_sync_write (2 samples, 0.01%)</title><rect x="623.6" y="1957" width="0.1" height="15.0" fill="rgb(211,48,44)" rx="2" ry="2" />
+<text  x="626.62" y="1967.5" ></text>
+</g>
+<g >
+<title>_raw_read_lock (17 samples, 0.07%)</title><rect x="502.6" y="1813" width="0.9" height="15.0" fill="rgb(213,13,46)" rx="2" ry="2" />
+<text  x="505.60" y="1823.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1285" width="1.7" height="15.0" fill="rgb(229,93,28)" rx="2" ry="2" />
+<text  x="14.01" y="1295.5" ></text>
+</g>
+<g >
+<title>__libc_csu_init (4 samples, 0.02%)</title><rect x="640.3" y="2053" width="0.2" height="15.0" fill="rgb(246,81,31)" rx="2" ry="2" />
+<text  x="643.33" y="2063.5" ></text>
+</g>
+<g >
+<title>_raw_spin_unlock_irqrestore (2 samples, 0.01%)</title><rect x="525.9" y="1701" width="0.1" height="15.0" fill="rgb(239,213,19)" rx="2" ry="2" />
+<text  x="528.89" y="1711.5" ></text>
+</g>
+<g >
+<title>memcpy@plt (5 samples, 0.02%)</title><rect x="726.4" y="1877" width="0.2" height="15.0" fill="rgb(210,154,34)" rx="2" ry="2" />
+<text  x="729.37" y="1887.5" ></text>
+</g>
+<g >
+<title>ext4_get_group_desc (33 samples, 0.14%)</title><rect x="610.6" y="1813" width="1.7" height="15.0" fill="rgb(225,152,20)" rx="2" ry="2" />
+<text  x="613.61" y="1823.5" ></text>
+</g>
+<g >
+<title>__fget_light (62 samples, 0.27%)</title><rect x="35.7" y="1957" width="3.2" height="15.0" fill="rgb(209,152,10)" rx="2" ry="2" />
+<text  x="38.72" y="1967.5" ></text>
+</g>
+<g >
+<title>ext4_superblock_csum_set (6 samples, 0.03%)</title><rect x="535.9" y="1829" width="0.3" height="15.0" fill="rgb(236,161,48)" rx="2" ry="2" />
+<text  x="538.92" y="1839.5" ></text>
+</g>
+<g >
+<title>free (20 samples, 0.09%)</title><rect x="12.7" y="2005" width="1.0" height="15.0" fill="rgb(246,18,17)" rx="2" ry="2" />
+<text  x="15.73" y="2015.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (22 samples, 0.09%)</title><rect x="638.0" y="2021" width="1.1" height="15.0" fill="rgb(230,136,45)" rx="2" ry="2" />
+<text  x="640.95" y="2031.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1221" width="1.7" height="15.0" fill="rgb(244,129,23)" rx="2" ry="2" />
+<text  x="14.01" y="1231.5" ></text>
+</g>
+<g >
+<title>free (78 samples, 0.33%)</title><rect x="634.0" y="2037" width="3.9" height="15.0" fill="rgb(215,8,53)" rx="2" ry="2" />
+<text  x="636.95" y="2047.5" ></text>
+</g>
+<g >
+<title>crypto_shash_update (2 samples, 0.01%)</title><rect x="522.9" y="1717" width="0.1" height="15.0" fill="rgb(248,145,53)" rx="2" ry="2" />
+<text  x="525.90" y="1727.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (12 samples, 0.05%)</title><rect x="16.9" y="2005" width="0.6" height="15.0" fill="rgb(230,69,18)" rx="2" ry="2" />
+<text  x="19.94" y="2015.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1621" width="1.7" height="15.0" fill="rgb(209,226,28)" rx="2" ry="2" />
+<text  x="14.01" y="1631.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (4 samples, 0.02%)</title><rect x="643.5" y="2053" width="0.2" height="15.0" fill="rgb(230,149,24)" rx="2" ry="2" />
+<text  x="646.52" y="2063.5" ></text>
+</g>
+<g >
+<title>std::thread::_M_start_thread (3 samples, 0.01%)</title><rect x="20.2" y="1925" width="0.1" height="15.0" fill="rgb(215,218,51)" rx="2" ry="2" />
+<text  x="23.18" y="1935.5" ></text>
+</g>
+<g >
+<title>__ext4_ext_dirty (11 samples, 0.05%)</title><rect x="522.6" y="1813" width="0.5" height="15.0" fill="rgb(236,179,14)" rx="2" ry="2" />
+<text  x="525.55" y="1823.5" ></text>
+</g>
+<g >
+<title>rocksdb::ThreadPoolImpl::Impl::SetBackgroundThreadsInternal (9 samples, 0.04%)</title><rect x="1189.3" y="1941" width="0.5" height="15.0" fill="rgb(220,165,2)" rx="2" ry="2" />
+<text  x="1192.34" y="1951.5" ></text>
+</g>
+<g >
+<title>malloc (13 samples, 0.06%)</title><rect x="718.4" y="1861" width="0.7" height="15.0" fill="rgb(228,116,41)" rx="2" ry="2" />
+<text  x="721.42" y="1871.5" ></text>
+</g>
+<g >
+<title>native_write_msr (6 samples, 0.03%)</title><rect x="1188.0" y="1845" width="0.3" height="15.0" fill="rgb(209,148,0)" rx="2" ry="2" />
+<text  x="1191.03" y="1855.5" ></text>
+</g>
+<g >
+<title>get_mem_cgroup_from_mm (4 samples, 0.02%)</title><rect x="762.1" y="1765" width="0.2" height="15.0" fill="rgb(213,109,49)" rx="2" ry="2" />
+<text  x="765.06" y="1775.5" ></text>
+</g>
+<g >
+<title>pmem_dax_direct_access (31 samples, 0.13%)</title><rect x="65.3" y="1845" width="1.6" height="15.0" fill="rgb(248,75,49)" rx="2" ry="2" />
+<text  x="68.30" y="1855.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (3 samples, 0.01%)</title><rect x="651.1" y="2021" width="0.1" height="15.0" fill="rgb(253,120,7)" rx="2" ry="2" />
+<text  x="654.07" y="2031.5" ></text>
+</g>
+<g >
+<title>rocksdb::MemTable::UpdateFlushState (3 samples, 0.01%)</title><rect x="1154.8" y="1877" width="0.2" height="15.0" fill="rgb(251,129,32)" rx="2" ry="2" />
+<text  x="1157.81" y="1887.5" ></text>
+</g>
+<g >
+<title>rocksdb::ThreadStatusUtil::TEST_StateDelay (11 samples, 0.05%)</title><rect x="751.6" y="1941" width="0.6" height="15.0" fill="rgb(247,14,47)" rx="2" ry="2" />
+<text  x="754.63" y="1951.5" ></text>
+</g>
+<g >
+<title>perf_event_alloc.part.87 (5 samples, 0.02%)</title><rect x="21.5" y="1701" width="0.2" height="15.0" fill="rgb(228,12,22)" rx="2" ry="2" />
+<text  x="24.49" y="1711.5" ></text>
+</g>
+<g >
+<title>ext4_mark_inode_dirty (985 samples, 4.23%)</title><rect x="564.6" y="1861" width="49.9" height="15.0" fill="rgb(244,90,12)" rx="2" ry="2" />
+<text  x="567.58" y="1871.5" >ext4_..</text>
+</g>
+<g >
+<title>[libstdc++.so.6.0.25] (3 samples, 0.01%)</title><rect x="10.3" y="2053" width="0.1" height="15.0" fill="rgb(215,14,14)" rx="2" ry="2" />
+<text  x="13.25" y="2063.5" ></text>
+</g>
+<g >
+<title>rocksdb::InlineSkipList&lt;rocksdb::MemTableRep::KeyComparator const&amp;&gt;::Insert&lt;false&gt; (7,220 samples, 30.98%)</title><rect x="781.6" y="1861" width="365.6" height="15.0" fill="rgb(245,223,49)" rx="2" ry="2" />
+<text  x="784.61" y="1871.5" >rocksdb::InlineSkipList&lt;rocksdb::MemTableRep::Key..</text>
+</g>
+<g >
+<title>map_id_up (7 samples, 0.03%)</title><rect x="602.1" y="1797" width="0.3" height="15.0" fill="rgb(216,9,34)" rx="2" ry="2" />
+<text  x="605.05" y="1807.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="501" width="1.7" height="15.0" fill="rgb(237,94,10)" rx="2" ry="2" />
+<text  x="14.01" y="511.5" ></text>
+</g>
+<g >
+<title>inherit_event.isra.97 (3 samples, 0.01%)</title><rect x="20.6" y="1717" width="0.2" height="15.0" fill="rgb(232,13,43)" rx="2" ry="2" />
+<text  x="23.63" y="1727.5" ></text>
+</g>
+<g >
+<title>up_write (2 samples, 0.01%)</title><rect x="622.0" y="1925" width="0.1" height="15.0" fill="rgb(250,7,2)" rx="2" ry="2" />
+<text  x="625.00" y="1935.5" ></text>
+</g>
+<g >
+<title>__intel_pmu_enable_all.constprop.23 (15 samples, 0.06%)</title><rect x="14.5" y="1877" width="0.7" height="15.0" fill="rgb(226,135,29)" rx="2" ry="2" />
+<text  x="17.46" y="1887.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (6 samples, 0.03%)</title><rect x="21.4" y="1829" width="0.3" height="15.0" fill="rgb(244,95,10)" rx="2" ry="2" />
+<text  x="24.44" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::DB::Open (95 samples, 0.41%)</title><rect x="20.3" y="1957" width="4.8" height="15.0" fill="rgb(233,194,52)" rx="2" ry="2" />
+<text  x="23.33" y="1967.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1397" width="1.7" height="15.0" fill="rgb(244,199,3)" rx="2" ry="2" />
+<text  x="14.01" y="1407.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_create (7 samples, 0.03%)</title><rect x="744.7" y="1861" width="0.4" height="15.0" fill="rgb(210,181,39)" rx="2" ry="2" />
+<text  x="747.70" y="1871.5" ></text>
+</g>
+<g >
+<title>__lru_cache_add (5 samples, 0.02%)</title><rect x="761.8" y="1765" width="0.3" height="15.0" fill="rgb(251,71,29)" rx="2" ry="2" />
+<text  x="764.81" y="1775.5" ></text>
+</g>
+<g >
+<title>rocksdb::InstrumentedMutex::Lock (2 samples, 0.01%)</title><rect x="1177.4" y="1957" width="0.1" height="15.0" fill="rgb(218,224,1)" rx="2" ry="2" />
+<text  x="1180.39" y="1967.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="389" width="1.7" height="15.0" fill="rgb(231,161,28)" rx="2" ry="2" />
+<text  x="14.01" y="399.5" ></text>
+</g>
+<g >
+<title>proc_reg_read (21 samples, 0.09%)</title><rect x="638.0" y="1941" width="1.0" height="15.0" fill="rgb(205,222,22)" rx="2" ry="2" />
+<text  x="640.95" y="1951.5" ></text>
+</g>
+<g >
+<title>__clone (9 samples, 0.04%)</title><rect x="25.1" y="1957" width="0.5" height="15.0" fill="rgb(207,228,40)" rx="2" ry="2" />
+<text  x="28.14" y="1967.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="53" width="1.7" height="15.0" fill="rgb(247,107,26)" rx="2" ry="2" />
+<text  x="14.01" y="63.5" ></text>
+</g>
+<g >
+<title>rocksdb::SyncPoint::Data::Process (2 samples, 0.01%)</title><rect x="751.3" y="1941" width="0.1" height="15.0" fill="rgb(254,109,0)" rx="2" ry="2" />
+<text  x="754.28" y="1951.5" ></text>
+</g>
+<g >
+<title>jbd2_journal_dirty_metadata (12 samples, 0.05%)</title><rect x="581.2" y="1797" width="0.6" height="15.0" fill="rgb(219,190,2)" rx="2" ry="2" />
+<text  x="584.19" y="1807.5" ></text>
+</g>
+<g >
+<title>mark_page_accessed (3 samples, 0.01%)</title><rect x="610.4" y="1797" width="0.2" height="15.0" fill="rgb(242,206,1)" rx="2" ry="2" />
+<text  x="613.41" y="1807.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1653" width="1.7" height="15.0" fill="rgb(224,33,11)" rx="2" ry="2" />
+<text  x="14.01" y="1663.5" ></text>
+</g>
+<g >
+<title>fsnotify (4 samples, 0.02%)</title><rect x="42.7" y="1973" width="0.2" height="15.0" fill="rgb(242,82,41)" rx="2" ry="2" />
+<text  x="45.71" y="1983.5" ></text>
+</g>
+<g >
+<title>alloc_pages_vma (6 samples, 0.03%)</title><rect x="770.7" y="1781" width="0.3" height="15.0" fill="rgb(242,219,34)" rx="2" ry="2" />
+<text  x="773.67" y="1791.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_create@plt (4 samples, 0.02%)</title><rect x="1177.0" y="1941" width="0.2" height="15.0" fill="rgb(225,222,53)" rx="2" ry="2" />
+<text  x="1180.04" y="1951.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64 (59 samples, 0.25%)</title><rect x="28.9" y="2021" width="3.0" height="15.0" fill="rgb(237,136,28)" rx="2" ry="2" />
+<text  x="31.89" y="2031.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatch::Iterate (2 samples, 0.01%)</title><rect x="752.3" y="1941" width="0.1" height="15.0" fill="rgb(238,104,5)" rx="2" ry="2" />
+<text  x="755.29" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1877" width="1.7" height="15.0" fill="rgb(220,190,42)" rx="2" ry="2" />
+<text  x="14.01" y="1887.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1509" width="1.7" height="15.0" fill="rgb(228,79,33)" rx="2" ry="2" />
+<text  x="14.01" y="1519.5" ></text>
+</g>
+<g >
+<title>vfs_open (12 samples, 0.05%)</title><rect x="16.9" y="1925" width="0.6" height="15.0" fill="rgb(231,92,54)" rx="2" ry="2" />
+<text  x="19.94" y="1935.5" ></text>
+</g>
+<g >
+<title>__ext4_journal_start_sb (321 samples, 1.38%)</title><rect x="489.4" y="1861" width="16.3" height="15.0" fill="rgb(223,158,33)" rx="2" ry="2" />
+<text  x="492.43" y="1871.5" ></text>
+</g>
+<g >
+<title>iomap_apply (11,153 samples, 47.86%)</title><rect x="52.2" y="1893" width="564.8" height="15.0" fill="rgb(243,218,13)" rx="2" ry="2" />
+<text  x="55.23" y="1903.5" >iomap_apply</text>
+</g>
+<g >
+<title>path_openat (12 samples, 0.05%)</title><rect x="16.9" y="1941" width="0.6" height="15.0" fill="rgb(235,182,33)" rx="2" ry="2" />
+<text  x="19.94" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::PipelinedWriteImpl (10,170 samples, 43.64%)</title><rect x="662.3" y="1957" width="514.9" height="15.0" fill="rgb(254,210,46)" rx="2" ry="2" />
+<text  x="665.26" y="1967.5" >rocksdb::DBImpl::PipelinedWriteImpl</text>
+</g>
+<g >
+<title>do_syscall_64 (3 samples, 0.01%)</title><rect x="28.7" y="2021" width="0.2" height="15.0" fill="rgb(223,68,40)" rx="2" ry="2" />
+<text  x="31.74" y="2031.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatchInternal::Count (2 samples, 0.01%)</title><rect x="752.4" y="1941" width="0.1" height="15.0" fill="rgb(227,189,27)" rx="2" ry="2" />
+<text  x="755.39" y="1951.5" ></text>
+</g>
+<g >
+<title>__ext4_journal_get_write_access (39 samples, 0.17%)</title><rect x="612.3" y="1829" width="2.0" height="15.0" fill="rgb(250,74,1)" rx="2" ry="2" />
+<text  x="615.28" y="1839.5" ></text>
+</g>
+<g >
+<title>[unknown] (2 samples, 0.01%)</title><rect x="10.7" y="2005" width="0.1" height="15.0" fill="rgb(247,137,50)" rx="2" ry="2" />
+<text  x="13.71" y="2015.5" ></text>
+</g>
+<g >
+<title>std::thread::_State_impl&lt;std::thread::_Invoker&lt;std::tuple&lt;std::function&lt;void  (2 samples, 0.01%)</title><rect x="10.3" y="2037" width="0.1" height="15.0" fill="rgb(239,82,52)" rx="2" ry="2" />
+<text  x="13.30" y="2047.5" ></text>
+</g>
+<g >
+<title>rocksdb::PosixWritableFile::GetFileSize (2 samples, 0.01%)</title><rect x="711.7" y="1877" width="0.1" height="15.0" fill="rgb(220,58,4)" rx="2" ry="2" />
+<text  x="714.73" y="1887.5" ></text>
+</g>
+<g >
+<title>rocksdb::WritableFileWriter::WriteBuffered (214 samples, 0.92%)</title><rect x="712.1" y="1877" width="10.8" height="15.0" fill="rgb(251,69,26)" rx="2" ry="2" />
+<text  x="715.09" y="1887.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="549" width="1.7" height="15.0" fill="rgb(218,28,51)" rx="2" ry="2" />
+<text  x="14.01" y="559.5" ></text>
+</g>
+<g >
+<title>rocksdb::log::Writer::AddRecord (7 samples, 0.03%)</title><rect x="746.4" y="1925" width="0.3" height="15.0" fill="rgb(215,19,53)" rx="2" ry="2" />
+<text  x="749.37" y="1935.5" ></text>
+</g>
+<g >
+<title>__pthread_disable_asynccancel (18 samples, 0.08%)</title><rect x="630.8" y="2037" width="0.9" height="15.0" fill="rgb(249,5,4)" rx="2" ry="2" />
+<text  x="633.81" y="2047.5" ></text>
+</g>
+<g >
+<title>_dl_map_object_from_fd (2 samples, 0.01%)</title><rect x="643.1" y="2037" width="0.1" height="15.0" fill="rgb(210,83,35)" rx="2" ry="2" />
+<text  x="646.12" y="2047.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::DBImpl (2 samples, 0.01%)</title><rect x="20.4" y="1925" width="0.1" height="15.0" fill="rgb(219,15,48)" rx="2" ry="2" />
+<text  x="23.38" y="1935.5" ></text>
+</g>
+<g >
+<title>generic_write_checks (4 samples, 0.02%)</title><rect x="620.6" y="1909" width="0.2" height="15.0" fill="rgb(211,0,41)" rx="2" ry="2" />
+<text  x="623.58" y="1919.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::Open (95 samples, 0.41%)</title><rect x="20.3" y="1941" width="4.8" height="15.0" fill="rgb(217,229,16)" rx="2" ry="2" />
+<text  x="23.33" y="1951.5" ></text>
+</g>
+<g >
+<title>ext4_iomap_begin (3 samples, 0.01%)</title><rect x="52.1" y="1893" width="0.1" height="15.0" fill="rgb(212,39,46)" rx="2" ry="2" />
+<text  x="55.08" y="1903.5" ></text>
+</g>
+<g >
+<title>page_remove_rmap (2 samples, 0.01%)</title><rect x="642.4" y="1941" width="0.1" height="15.0" fill="rgb(247,131,26)" rx="2" ry="2" />
+<text  x="645.36" y="1951.5" ></text>
+</g>
+<g >
+<title>native_flush_tlb_others (9 samples, 0.04%)</title><rect x="640.8" y="1957" width="0.4" height="15.0" fill="rgb(254,98,11)" rx="2" ry="2" />
+<text  x="643.79" y="1967.5" ></text>
+</g>
+<g >
+<title>error_entry (4 samples, 0.02%)</title><rect x="910.4" y="1829" width="0.2" height="15.0" fill="rgb(208,221,37)" rx="2" ry="2" />
+<text  x="913.38" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::PackSequenceAndType (7 samples, 0.03%)</title><rect x="1154.4" y="1861" width="0.4" height="15.0" fill="rgb(241,60,34)" rx="2" ry="2" />
+<text  x="1157.40" y="1871.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::LinkOne (3 samples, 0.01%)</title><rect x="1175.0" y="1941" width="0.2" height="15.0" fill="rgb(214,160,1)" rx="2" ry="2" />
+<text  x="1178.01" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::Benchmark::OpenDb (95 samples, 0.41%)</title><rect x="20.3" y="1973" width="4.8" height="15.0" fill="rgb(224,214,47)" rx="2" ry="2" />
+<text  x="23.33" y="1983.5" ></text>
+</g>
+<g >
+<title>rocksdb::(anonymous namespace)::PosixEnv::~PosixEnv (2 samples, 0.01%)</title><rect x="1188.8" y="2037" width="0.1" height="15.0" fill="rgb(228,33,3)" rx="2" ry="2" />
+<text  x="1191.78" y="2047.5" ></text>
+</g>
+<g >
+<title>intel_pmu_enable_all (11 samples, 0.05%)</title><rect x="13.7" y="1893" width="0.6" height="15.0" fill="rgb(223,105,16)" rx="2" ry="2" />
+<text  x="16.75" y="1903.5" ></text>
+</g>
+<g >
+<title>sys_mmap (3 samples, 0.01%)</title><rect x="651.1" y="2005" width="0.1" height="15.0" fill="rgb(240,96,4)" rx="2" ry="2" />
+<text  x="654.07" y="2015.5" ></text>
+</g>
+<g >
+<title>malloc (22 samples, 0.09%)</title><rect x="738.1" y="1861" width="1.1" height="15.0" fill="rgb(227,124,30)" rx="2" ry="2" />
+<text  x="741.06" y="1871.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1829" width="1.7" height="15.0" fill="rgb(231,187,53)" rx="2" ry="2" />
+<text  x="14.01" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::JoinBatchGroup (112 samples, 0.48%)</title><rect x="1167.9" y="1941" width="5.7" height="15.0" fill="rgb(252,52,34)" rx="2" ry="2" />
+<text  x="1170.92" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::Benchmark::Benchmark (9 samples, 0.04%)</title><rect x="1189.3" y="2005" width="0.5" height="15.0" fill="rgb(218,66,53)" rx="2" ry="2" />
+<text  x="1192.34" y="2015.5" ></text>
+</g>
+<g >
+<title>[unknown] (10 samples, 0.04%)</title><rect x="639.1" y="2021" width="0.5" height="15.0" fill="rgb(207,21,42)" rx="2" ry="2" />
+<text  x="642.07" y="2031.5" ></text>
+</g>
+<g >
+<title>__ext4_handle_dirty_metadata (70 samples, 0.30%)</title><rect x="578.4" y="1813" width="3.5" height="15.0" fill="rgb(237,105,48)" rx="2" ry="2" />
+<text  x="581.35" y="1823.5" ></text>
+</g>
+<g >
+<title>x86_pmu_enable (2 samples, 0.01%)</title><rect x="1188.8" y="1893" width="0.1" height="15.0" fill="rgb(221,127,52)" rx="2" ry="2" />
+<text  x="1191.78" y="1903.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1557" width="1.7" height="15.0" fill="rgb(229,90,33)" rx="2" ry="2" />
+<text  x="14.01" y="1567.5" ></text>
+</g>
+<g >
+<title>mmput (4 samples, 0.02%)</title><rect x="643.5" y="1973" width="0.2" height="15.0" fill="rgb(208,193,19)" rx="2" ry="2" />
+<text  x="646.52" y="1983.5" ></text>
+</g>
+<g >
+<title>sys_read (22 samples, 0.09%)</title><rect x="638.0" y="1989" width="1.1" height="15.0" fill="rgb(223,137,51)" rx="2" ry="2" />
+<text  x="640.95" y="1999.5" ></text>
+</g>
+<g >
+<title>_raw_spin_unlock_irqrestore (7 samples, 0.03%)</title><rect x="561.7" y="1813" width="0.3" height="15.0" fill="rgb(239,199,39)" rx="2" ry="2" />
+<text  x="564.69" y="1823.5" ></text>
+</g>
+<g >
+<title>rocksdb::log::Writer::EmitPhysicalRecord (2 samples, 0.01%)</title><rect x="746.2" y="1909" width="0.1" height="15.0" fill="rgb(232,103,18)" rx="2" ry="2" />
+<text  x="749.22" y="1919.5" ></text>
+</g>
+<g >
+<title>_cond_resched (5 samples, 0.02%)</title><rect x="540.8" y="1829" width="0.2" height="15.0" fill="rgb(213,116,7)" rx="2" ry="2" />
+<text  x="543.78" y="1839.5" ></text>
+</g>
+<g >
+<title>__intel_pmu_enable_all.constprop.23 (9 samples, 0.04%)</title><rect x="1189.3" y="1797" width="0.5" height="15.0" fill="rgb(243,215,10)" rx="2" ry="2" />
+<text  x="1192.34" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::PosixWritableFile::Append (2 samples, 0.01%)</title><rect x="10.6" y="2021" width="0.1" height="15.0" fill="rgb(229,15,25)" rx="2" ry="2" />
+<text  x="13.61" y="2031.5" ></text>
+</g>
+<g >
+<title>__ext4_journal_stop (217 samples, 0.93%)</title><rect x="505.7" y="1861" width="11.0" height="15.0" fill="rgb(226,27,53)" rx="2" ry="2" />
+<text  x="508.69" y="1871.5" ></text>
+</g>
+<g >
+<title>inherit_event.isra.97 (2 samples, 0.01%)</title><rect x="25.0" y="1765" width="0.1" height="15.0" fill="rgb(232,8,36)" rx="2" ry="2" />
+<text  x="27.99" y="1775.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="901" width="1.7" height="15.0" fill="rgb(227,136,7)" rx="2" ry="2" />
+<text  x="14.01" y="911.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1413" width="1.7" height="15.0" fill="rgb(222,15,36)" rx="2" ry="2" />
+<text  x="14.01" y="1423.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::SetState (20 samples, 0.09%)</title><rect x="1172.6" y="1925" width="1.0" height="15.0" fill="rgb(250,113,37)" rx="2" ry="2" />
+<text  x="1175.58" y="1935.5" ></text>
+</g>
+<g >
+<title>__srcu_read_lock (5 samples, 0.02%)</title><rect x="56.8" y="1861" width="0.2" height="15.0" fill="rgb(240,32,47)" rx="2" ry="2" />
+<text  x="59.79" y="1871.5" ></text>
+</g>
+<g >
+<title>dax_read_unlock (3 samples, 0.01%)</title><rect x="486.5" y="1877" width="0.1" height="15.0" fill="rgb(229,206,40)" rx="2" ry="2" />
+<text  x="489.50" y="1887.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::WriteToWAL (972 samples, 4.17%)</title><rect x="697.1" y="1925" width="49.2" height="15.0" fill="rgb(254,24,24)" rx="2" ry="2" />
+<text  x="700.10" y="1935.5" >rock..</text>
+</g>
+<g >
+<title>std::thread::_M_start_thread (2 samples, 0.01%)</title><rect x="25.0" y="1909" width="0.1" height="15.0" fill="rgb(238,37,27)" rx="2" ry="2" />
+<text  x="27.99" y="1919.5" ></text>
+</g>
+<g >
+<title>__wake_up (2 samples, 0.01%)</title><rect x="506.1" y="1845" width="0.1" height="15.0" fill="rgb(243,92,5)" rx="2" ry="2" />
+<text  x="509.14" y="1855.5" ></text>
+</g>
+<g >
+<title>change_protection (2 samples, 0.01%)</title><rect x="642.5" y="1941" width="0.1" height="15.0" fill="rgb(254,66,33)" rx="2" ry="2" />
+<text  x="645.46" y="1951.5" ></text>
+</g>
+<g >
+<title>map_id_up (2 samples, 0.01%)</title><rect x="602.5" y="1813" width="0.1" height="15.0" fill="rgb(215,51,43)" rx="2" ry="2" />
+<text  x="605.46" y="1823.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1861" width="1.7" height="15.0" fill="rgb(234,30,18)" rx="2" ry="2" />
+<text  x="14.01" y="1871.5" ></text>
+</g>
+<g >
+<title>x86_pmu_enable (47 samples, 0.20%)</title><rect x="17.7" y="1957" width="2.4" height="15.0" fill="rgb(228,87,34)" rx="2" ry="2" />
+<text  x="20.70" y="1967.5" ></text>
+</g>
+<g >
+<title>finish_task_switch (9 samples, 0.04%)</title><rect x="1189.3" y="1861" width="0.5" height="15.0" fill="rgb(248,163,8)" rx="2" ry="2" />
+<text  x="1192.34" y="1871.5" ></text>
+</g>
+<g >
+<title>copy_process.part.36 (6 samples, 0.03%)</title><rect x="21.4" y="1781" width="0.3" height="15.0" fill="rgb(213,100,45)" rx="2" ry="2" />
+<text  x="24.44" y="1791.5" ></text>
+</g>
+<g >
+<title>dax_copy_from_iter (143 samples, 0.61%)</title><rect x="57.3" y="1861" width="7.3" height="15.0" fill="rgb(220,44,12)" rx="2" ry="2" />
+<text  x="60.35" y="1871.5" ></text>
+</g>
+<g >
+<title>mutex_lock (40 samples, 0.17%)</title><rect x="38.9" y="1957" width="2.0" height="15.0" fill="rgb(232,19,27)" rx="2" ry="2" />
+<text  x="41.86" y="1967.5" ></text>
+</g>
+<g >
+<title>alloc_pages_vma (5 samples, 0.02%)</title><rect x="775.5" y="1749" width="0.2" height="15.0" fill="rgb(240,5,49)" rx="2" ry="2" />
+<text  x="778.48" y="1759.5" ></text>
+</g>
+<g >
+<title>x86_pmu_enable (59 samples, 0.25%)</title><rect x="21.8" y="1781" width="3.0" height="15.0" fill="rgb(232,9,6)" rx="2" ry="2" />
+<text  x="24.80" y="1791.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_create@plt (6 samples, 0.03%)</title><rect x="745.1" y="1861" width="0.3" height="15.0" fill="rgb(206,142,22)" rx="2" ry="2" />
+<text  x="748.05" y="1871.5" ></text>
+</g>
+<g >
+<title>ext4_mark_inode_dirty (11 samples, 0.05%)</title><rect x="522.6" y="1797" width="0.5" height="15.0" fill="rgb(221,52,12)" rx="2" ry="2" />
+<text  x="525.55" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatch::Delete (6 samples, 0.03%)</title><rect x="1183.5" y="2005" width="0.3" height="15.0" fill="rgb(247,10,42)" rx="2" ry="2" />
+<text  x="1186.52" y="2015.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::WriteToWAL (1,060 samples, 4.55%)</title><rect x="693.0" y="1941" width="53.7" height="15.0" fill="rgb(248,225,4)" rx="2" ry="2" />
+<text  x="696.05" y="1951.5" >rocks..</text>
+</g>
+<g >
+<title>rocksdb::WritableFileWriter::Append (312 samples, 1.34%)</title><rect x="729.6" y="1877" width="15.8" height="15.0" fill="rgb(219,184,49)" rx="2" ry="2" />
+<text  x="732.56" y="1887.5" ></text>
+</g>
+<g >
+<title>__ext4_handle_dirty_metadata (2 samples, 0.01%)</title><rect x="614.7" y="1813" width="0.1" height="15.0" fill="rgb(225,87,9)" rx="2" ry="2" />
+<text  x="617.71" y="1823.5" ></text>
+</g>
+<g >
+<title>rocksdb::PosixWritableFile::use_direct_io (7 samples, 0.03%)</title><rect x="706.6" y="1893" width="0.4" height="15.0" fill="rgb(253,159,21)" rx="2" ry="2" />
+<text  x="709.62" y="1903.5" ></text>
+</g>
+<g >
+<title>__static_initialization_and_destruction_0 (3 samples, 0.01%)</title><rect x="640.3" y="2037" width="0.2" height="15.0" fill="rgb(215,138,38)" rx="2" ry="2" />
+<text  x="643.33" y="2047.5" ></text>
+</g>
+<g >
+<title>_cond_resched (2 samples, 0.01%)</title><rect x="544.0" y="1813" width="0.1" height="15.0" fill="rgb(237,215,51)" rx="2" ry="2" />
+<text  x="547.02" y="1823.5" ></text>
+</g>
+<g >
+<title>ret_from_fork (50 samples, 0.21%)</title><rect x="17.5" y="2021" width="2.6" height="15.0" fill="rgb(251,43,50)" rx="2" ry="2" />
+<text  x="20.54" y="2031.5" ></text>
+</g>
+<g >
+<title>tlb_flush_mmu_free (16 samples, 0.07%)</title><rect x="641.3" y="1941" width="0.8" height="15.0" fill="rgb(253,103,49)" rx="2" ry="2" />
+<text  x="644.29" y="1951.5" ></text>
+</g>
+<g >
+<title>radix_tree_next_chunk (4 samples, 0.02%)</title><rect x="518.9" y="1797" width="0.2" height="15.0" fill="rgb(206,12,29)" rx="2" ry="2" />
+<text  x="521.85" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::Benchmark::DoDelete (10,501 samples, 45.06%)</title><rect x="651.5" y="2005" width="531.7" height="15.0" fill="rgb(224,80,21)" rx="2" ry="2" />
+<text  x="654.47" y="2015.5" >rocksdb::Benchmark::DoDelete</text>
+</g>
+<g >
+<title>_raw_read_lock (17 samples, 0.07%)</title><rect x="549.5" y="1813" width="0.9" height="15.0" fill="rgb(240,119,53)" rx="2" ry="2" />
+<text  x="552.54" y="1823.5" ></text>
+</g>
+<g >
+<title>__wake_up (2 samples, 0.01%)</title><rect x="553.2" y="1845" width="0.1" height="15.0" fill="rgb(250,195,25)" rx="2" ry="2" />
+<text  x="556.24" y="1855.5" ></text>
+</g>
+<g >
+<title>ext4_map_blocks (347 samples, 1.49%)</title><rect x="517.0" y="1861" width="17.6" height="15.0" fill="rgb(247,8,14)" rx="2" ry="2" />
+<text  x="519.98" y="1871.5" ></text>
+</g>
+<g >
+<title>ret_from_fork (11 samples, 0.05%)</title><rect x="13.7" y="1973" width="0.6" height="15.0" fill="rgb(250,90,17)" rx="2" ry="2" />
+<text  x="16.75" y="1983.5" ></text>
+</g>
+<g >
+<title>do_exit (4 samples, 0.02%)</title><rect x="643.5" y="1989" width="0.2" height="15.0" fill="rgb(238,30,31)" rx="2" ry="2" />
+<text  x="646.52" y="1999.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1061" width="1.7" height="15.0" fill="rgb(224,51,51)" rx="2" ry="2" />
+<text  x="14.01" y="1071.5" ></text>
+</g>
+<g >
+<title>[unknown] (2 samples, 0.01%)</title><rect x="10.7" y="1989" width="0.1" height="15.0" fill="rgb(222,148,46)" rx="2" ry="2" />
+<text  x="13.71" y="1999.5" ></text>
+</g>
+<g >
+<title>proc_reg_open (12 samples, 0.05%)</title><rect x="16.9" y="1893" width="0.6" height="15.0" fill="rgb(227,218,42)" rx="2" ry="2" />
+<text  x="19.94" y="1903.5" ></text>
+</g>
+<g >
+<title>crc32c_pcl_intel_update (2 samples, 0.01%)</title><rect x="522.9" y="1701" width="0.1" height="15.0" fill="rgb(241,5,51)" rx="2" ry="2" />
+<text  x="525.90" y="1711.5" ></text>
+</g>
+<g >
+<title>add_transaction_credits (42 samples, 0.18%)</title><rect x="503.5" y="1813" width="2.1" height="15.0" fill="rgb(253,227,50)" rx="2" ry="2" />
+<text  x="506.46" y="1823.5" ></text>
+</g>
+<g >
+<title>__do_page_fault (13 samples, 0.06%)</title><rect x="770.6" y="1829" width="0.6" height="15.0" fill="rgb(242,115,35)" rx="2" ry="2" />
+<text  x="773.57" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::LinkGroup (28 samples, 0.12%)</title><rect x="1173.6" y="1941" width="1.4" height="15.0" fill="rgb(214,73,20)" rx="2" ry="2" />
+<text  x="1176.59" y="1951.5" ></text>
+</g>
+<g >
+<title>inherit_task_group.isra.99.part.100 (2 samples, 0.01%)</title><rect x="25.0" y="1781" width="0.1" height="15.0" fill="rgb(253,157,16)" rx="2" ry="2" />
+<text  x="27.99" y="1791.5" ></text>
+</g>
+<g >
+<title>malloc (132 samples, 0.57%)</title><rect x="644.1" y="2053" width="6.7" height="15.0" fill="rgb(206,149,24)" rx="2" ry="2" />
+<text  x="647.13" y="2063.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1429" width="1.7" height="15.0" fill="rgb(219,186,21)" rx="2" ry="2" />
+<text  x="14.01" y="1439.5" ></text>
+</g>
+<g >
+<title>rocksdb::crc32c::crc32c_3way (13 samples, 0.06%)</title><rect x="723.1" y="1893" width="0.7" height="15.0" fill="rgb(230,90,16)" rx="2" ry="2" />
+<text  x="726.12" y="1903.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_construct&lt;char const*&gt; (14 samples, 0.06%)</title><rect x="721.9" y="1861" width="0.7" height="15.0" fill="rgb(208,176,54)" rx="2" ry="2" />
+<text  x="724.91" y="1871.5" ></text>
+</g>
+<g >
+<title>__libc_start_main (9 samples, 0.04%)</title><rect x="1189.3" y="2037" width="0.5" height="15.0" fill="rgb(242,203,53)" rx="2" ry="2" />
+<text  x="1192.34" y="2047.5" ></text>
+</g>
+<g >
+<title>ext4_journal_check_start (10 samples, 0.04%)</title><rect x="489.6" y="1845" width="0.5" height="15.0" fill="rgb(230,202,49)" rx="2" ry="2" />
+<text  x="492.64" y="1855.5" ></text>
+</g>
+<g >
+<title>clean_bdev_aliases (5 samples, 0.02%)</title><rect x="518.8" y="1845" width="0.3" height="15.0" fill="rgb(213,58,22)" rx="2" ry="2" />
+<text  x="521.80" y="1855.5" ></text>
+</g>
+<g >
+<title>rocksdb::SanitizeOptions (9 samples, 0.04%)</title><rect x="1189.3" y="1973" width="0.5" height="15.0" fill="rgb(249,112,50)" rx="2" ry="2" />
+<text  x="1192.34" y="1983.5" ></text>
+</g>
+<g >
+<title>__clone (18 samples, 0.08%)</title><rect x="14.4" y="1989" width="0.9" height="15.0" fill="rgb(248,205,35)" rx="2" ry="2" />
+<text  x="17.35" y="1999.5" ></text>
+</g>
+<g >
+<title>smp_call_function_single (12 samples, 0.05%)</title><rect x="16.9" y="1829" width="0.6" height="15.0" fill="rgb(250,79,11)" rx="2" ry="2" />
+<text  x="19.94" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatchInternal::Count (2 samples, 0.01%)</title><rect x="1177.6" y="1957" width="0.1" height="15.0" fill="rgb(238,34,16)" rx="2" ry="2" />
+<text  x="1180.64" y="1967.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="165" width="1.7" height="15.0" fill="rgb(249,189,24)" rx="2" ry="2" />
+<text  x="14.01" y="175.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1957" width="1.7" height="15.0" fill="rgb(214,139,12)" rx="2" ry="2" />
+<text  x="14.01" y="1967.5" ></text>
+</g>
+<g >
+<title>do_group_exit (4 samples, 0.02%)</title><rect x="643.5" y="2005" width="0.2" height="15.0" fill="rgb(207,172,5)" rx="2" ry="2" />
+<text  x="646.52" y="2015.5" ></text>
+</g>
+<g >
+<title>__wake_up_common (11 samples, 0.05%)</title><rect x="558.9" y="1797" width="0.5" height="15.0" fill="rgb(247,222,4)" rx="2" ry="2" />
+<text  x="561.86" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::Write (5 samples, 0.02%)</title><rect x="1183.2" y="2005" width="0.3" height="15.0" fill="rgb(245,83,13)" rx="2" ry="2" />
+<text  x="1186.21" y="2015.5" ></text>
+</g>
+<g >
+<title>start_this_handle (155 samples, 0.67%)</title><rect x="497.7" y="1829" width="7.9" height="15.0" fill="rgb(236,70,48)" rx="2" ry="2" />
+<text  x="500.74" y="1839.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock_irqsave (29 samples, 0.12%)</title><rect x="559.4" y="1797" width="1.5" height="15.0" fill="rgb(211,92,16)" rx="2" ry="2" />
+<text  x="562.41" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::VersionBuilder::Rep::LoadTableHandlers (17 samples, 0.07%)</title><rect x="20.6" y="1877" width="0.8" height="15.0" fill="rgb(232,210,51)" rx="2" ry="2" />
+<text  x="23.58" y="1887.5" ></text>
+</g>
+<g >
+<title>rocksdb::Status::operator= (9 samples, 0.04%)</title><rect x="1156.4" y="1893" width="0.5" height="15.0" fill="rgb(218,145,34)" rx="2" ry="2" />
+<text  x="1159.43" y="1903.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="149" width="1.7" height="15.0" fill="rgb(226,222,47)" rx="2" ry="2" />
+<text  x="14.01" y="159.5" ></text>
+</g>
+<g >
+<title>__copy_user_flushcache (44 samples, 0.19%)</title><rect x="58.8" y="1813" width="2.2" height="15.0" fill="rgb(220,217,11)" rx="2" ry="2" />
+<text  x="61.76" y="1823.5" ></text>
+</g>
+<g >
+<title>memset_erms (20 samples, 0.09%)</title><rect x="496.7" y="1829" width="1.0" height="15.0" fill="rgb(226,209,41)" rx="2" ry="2" />
+<text  x="499.67" y="1839.5" ></text>
+</g>
+<g >
+<title>ext4_get_group_desc (2 samples, 0.01%)</title><rect x="614.3" y="1829" width="0.1" height="15.0" fill="rgb(218,132,6)" rx="2" ry="2" />
+<text  x="617.25" y="1839.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="981" width="1.7" height="15.0" fill="rgb(254,62,7)" rx="2" ry="2" />
+<text  x="14.01" y="991.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (10 samples, 0.04%)</title><rect x="1187.8" y="2021" width="0.5" height="15.0" fill="rgb(227,166,3)" rx="2" ry="2" />
+<text  x="1190.82" y="2031.5" ></text>
+</g>
+<g >
+<title>smp_call_function_many (9 samples, 0.04%)</title><rect x="640.8" y="1941" width="0.4" height="15.0" fill="rgb(218,61,2)" rx="2" ry="2" />
+<text  x="643.79" y="1951.5" ></text>
+</g>
+<g >
+<title>native_write_msr (2 samples, 0.01%)</title><rect x="1189.1" y="1893" width="0.1" height="15.0" fill="rgb(225,111,44)" rx="2" ry="2" />
+<text  x="1192.09" y="1903.5" ></text>
+</g>
+<g >
+<title>rocksdb::ConcurrentArena::AllocateAligned (36 samples, 0.15%)</title><rect x="772.1" y="1845" width="1.9" height="15.0" fill="rgb(215,48,1)" rx="2" ry="2" />
+<text  x="775.14" y="1855.5" ></text>
+</g>
+<g >
+<title>file_remove_privs (3 samples, 0.01%)</title><rect x="621.8" y="1925" width="0.2" height="15.0" fill="rgb(209,21,15)" rx="2" ry="2" />
+<text  x="624.80" y="1935.5" ></text>
+</g>
+<g >
+<title>unmap_page_range (3 samples, 0.01%)</title><rect x="643.6" y="1909" width="0.1" height="15.0" fill="rgb(211,127,14)" rx="2" ry="2" />
+<text  x="646.57" y="1919.5" ></text>
+</g>
+<g >
+<title>__pthread_mutex_unlock (31 samples, 0.13%)</title><rect x="680.0" y="1941" width="1.6" height="15.0" fill="rgb(215,160,51)" rx="2" ry="2" />
+<text  x="682.98" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1973" width="1.7" height="15.0" fill="rgb(236,50,4)" rx="2" ry="2" />
+<text  x="14.01" y="1983.5" ></text>
+</g>
+<g >
+<title>_raw_read_lock (3 samples, 0.01%)</title><rect x="492.1" y="1829" width="0.1" height="15.0" fill="rgb(222,186,43)" rx="2" ry="2" />
+<text  x="495.07" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::MemTable::KeyComparator::operator (1,321 samples, 5.67%)</title><rect x="1080.3" y="1845" width="66.9" height="15.0" fill="rgb(209,18,35)" rx="2" ry="2" />
+<text  x="1083.32" y="1855.5" >rocksdb..</text>
+</g>
+<g >
+<title>up_write (25 samples, 0.11%)</title><rect x="615.5" y="1861" width="1.3" height="15.0" fill="rgb(233,44,45)" rx="2" ry="2" />
+<text  x="618.52" y="1871.5" ></text>
+</g>
+<g >
+<title>__dynamic_cast (35 samples, 0.15%)</title><rect x="678.1" y="1941" width="1.8" height="15.0" fill="rgb(244,6,44)" rx="2" ry="2" />
+<text  x="681.11" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::VersionBuilder::LoadTableHandlers (85 samples, 0.36%)</title><rect x="20.6" y="1893" width="4.3" height="15.0" fill="rgb(223,36,2)" rx="2" ry="2" />
+<text  x="23.58" y="1903.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="997" width="1.7" height="15.0" fill="rgb(224,193,54)" rx="2" ry="2" />
+<text  x="14.01" y="1007.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (4 samples, 0.02%)</title><rect x="20.6" y="1829" width="0.2" height="15.0" fill="rgb(238,226,34)" rx="2" ry="2" />
+<text  x="23.58" y="1839.5" ></text>
+</g>
+<g >
+<title>operator delete@plt (3 samples, 0.01%)</title><rect x="726.7" y="1877" width="0.1" height="15.0" fill="rgb(251,46,50)" rx="2" ry="2" />
+<text  x="729.67" y="1887.5" ></text>
+</g>
+<g >
+<title>ext4_do_update_inode (665 samples, 2.85%)</title><rect x="568.9" y="1829" width="33.7" height="15.0" fill="rgb(228,16,23)" rx="2" ry="2" />
+<text  x="571.88" y="1839.5" >ex..</text>
+</g>
+<g >
+<title>ext4_find_extent (5 samples, 0.02%)</title><rect x="523.1" y="1829" width="0.3" height="15.0" fill="rgb(236,204,32)" rx="2" ry="2" />
+<text  x="526.11" y="1839.5" ></text>
+</g>
+<g >
+<title>ret_from_fork (5 samples, 0.02%)</title><rect x="1188.9" y="2005" width="0.3" height="15.0" fill="rgb(212,159,29)" rx="2" ry="2" />
+<text  x="1191.94" y="2015.5" ></text>
+</g>
+<g >
+<title>x86_pmu_enable (16 samples, 0.07%)</title><rect x="14.5" y="1909" width="0.8" height="15.0" fill="rgb(233,44,45)" rx="2" ry="2" />
+<text  x="17.46" y="1919.5" ></text>
+</g>
+<g >
+<title>do_page_fault (18 samples, 0.08%)</title><rect x="911.2" y="1813" width="0.9" height="15.0" fill="rgb(218,7,2)" rx="2" ry="2" />
+<text  x="914.19" y="1823.5" ></text>
+</g>
+<g >
+<title>__perf_event_task_sched_in (13 samples, 0.06%)</title><rect x="20.8" y="1781" width="0.6" height="15.0" fill="rgb(233,135,16)" rx="2" ry="2" />
+<text  x="23.79" y="1791.5" ></text>
+</g>
+<g >
+<title>dax_iomap_rw (11,177 samples, 47.96%)</title><rect x="51.0" y="1909" width="566.0" height="15.0" fill="rgb(246,220,1)" rx="2" ry="2" />
+<text  x="54.02" y="1919.5" >dax_iomap_rw</text>
+</g>
+<g >
+<title>native_write_msr (31 samples, 0.13%)</title><rect x="18.5" y="1909" width="1.6" height="15.0" fill="rgb(227,227,10)" rx="2" ry="2" />
+<text  x="21.51" y="1919.5" ></text>
+</g>
+<g >
+<title>_do_fork (2 samples, 0.01%)</title><rect x="25.0" y="1829" width="0.1" height="15.0" fill="rgb(212,168,14)" rx="2" ry="2" />
+<text  x="27.99" y="1839.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="2005" width="1.7" height="15.0" fill="rgb(206,103,18)" rx="2" ry="2" />
+<text  x="14.01" y="2015.5" ></text>
+</g>
+<g >
+<title>__kernel_fpu_end (2 samples, 0.01%)</title><rect x="614.5" y="1765" width="0.1" height="15.0" fill="rgb(238,138,46)" rx="2" ry="2" />
+<text  x="617.46" y="1775.5" ></text>
+</g>
+<g >
+<title>vfs_write (11,488 samples, 49.30%)</title><rect x="43.8" y="1973" width="581.7" height="15.0" fill="rgb(237,146,7)" rx="2" ry="2" />
+<text  x="46.78" y="1983.5" >vfs_write</text>
+</g>
+<g >
+<title>kmem_cache_alloc (36 samples, 0.15%)</title><rect x="542.6" y="1829" width="1.8" height="15.0" fill="rgb(244,201,15)" rx="2" ry="2" />
+<text  x="545.55" y="1839.5" ></text>
+</g>
+<g >
+<title>exit_mmap (4 samples, 0.02%)</title><rect x="643.5" y="1957" width="0.2" height="15.0" fill="rgb(244,41,5)" rx="2" ry="2" />
+<text  x="646.52" y="1967.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (2 samples, 0.01%)</title><rect x="568.8" y="1829" width="0.1" height="15.0" fill="rgb(243,202,50)" rx="2" ry="2" />
+<text  x="571.78" y="1839.5" ></text>
+</g>
+<g >
+<title>__intel_pmu_enable_all.constprop.23 (11 samples, 0.05%)</title><rect x="13.7" y="1877" width="0.6" height="15.0" fill="rgb(228,146,49)" rx="2" ry="2" />
+<text  x="16.75" y="1887.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1013" width="1.7" height="15.0" fill="rgb(248,191,38)" rx="2" ry="2" />
+<text  x="14.01" y="1023.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::SetState (21 samples, 0.09%)</title><rect x="1165.8" y="1925" width="1.1" height="15.0" fill="rgb(254,190,29)" rx="2" ry="2" />
+<text  x="1168.80" y="1935.5" ></text>
+</g>
+<g >
+<title>[unknown] (115 samples, 0.49%)</title><rect x="11.0" y="2037" width="5.8" height="15.0" fill="rgb(247,45,30)" rx="2" ry="2" />
+<text  x="14.01" y="2047.5" ></text>
+</g>
+<g >
+<title>ret_from_fork (13 samples, 0.06%)</title><rect x="20.8" y="1829" width="0.6" height="15.0" fill="rgb(205,32,19)" rx="2" ry="2" />
+<text  x="23.79" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatchInternal::AppendedByteSize (3 samples, 0.01%)</title><rect x="1177.5" y="1957" width="0.1" height="15.0" fill="rgb(206,187,24)" rx="2" ry="2" />
+<text  x="1180.49" y="1967.5" ></text>
+</g>
+<g >
+<title>rocksdb::ConcurrentArena::AllocateAligned (95 samples, 0.41%)</title><rect x="776.3" y="1829" width="4.9" height="15.0" fill="rgb(222,12,36)" rx="2" ry="2" />
+<text  x="779.34" y="1839.5" ></text>
+</g>
+<g >
+<title>file_update_time (30 samples, 0.13%)</title><rect x="619.1" y="1909" width="1.5" height="15.0" fill="rgb(246,191,50)" rx="2" ry="2" />
+<text  x="622.06" y="1919.5" ></text>
+</g>
+<g >
+<title>submit_bio_wait (216 samples, 0.93%)</title><rect x="523.6" y="1813" width="11.0" height="15.0" fill="rgb(214,44,7)" rx="2" ry="2" />
+<text  x="526.61" y="1823.5" ></text>
+</g>
+<g >
+<title>__intel_pmu_enable_all.constprop.23 (58 samples, 0.25%)</title><rect x="21.8" y="1749" width="3.0" height="15.0" fill="rgb(254,88,31)" rx="2" ry="2" />
+<text  x="24.85" y="1759.5" ></text>
+</g>
+<g >
+<title>rocksdb::SyncPoint::Data::Process (6 samples, 0.03%)</title><rect x="721.6" y="1861" width="0.3" height="15.0" fill="rgb(245,3,24)" rx="2" ry="2" />
+<text  x="724.61" y="1871.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1541" width="1.7" height="15.0" fill="rgb(245,192,54)" rx="2" ry="2" />
+<text  x="14.01" y="1551.5" ></text>
+</g>
+<g >
+<title>dax_read_lock (49 samples, 0.21%)</title><rect x="66.9" y="1861" width="2.5" height="15.0" fill="rgb(248,129,35)" rx="2" ry="2" />
+<text  x="69.92" y="1871.5" ></text>
+</g>
+<g >
+<title>x86_pmu_enable (9 samples, 0.04%)</title><rect x="1189.3" y="1829" width="0.5" height="15.0" fill="rgb(211,21,43)" rx="2" ry="2" />
+<text  x="1192.34" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::MemTableInserter::DeleteCF (7,832 samples, 33.61%)</title><rect x="758.4" y="1893" width="396.6" height="15.0" fill="rgb(239,191,23)" rx="2" ry="2" />
+<text  x="761.37" y="1903.5" >rocksdb::MemTableInserter::DeleteCF</text>
+</g>
+<g >
+<title>memcg_kmem_put_cache (2 samples, 0.01%)</title><rect x="544.4" y="1829" width="0.1" height="15.0" fill="rgb(205,148,49)" rx="2" ry="2" />
+<text  x="547.37" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::PreprocessWrite (113 samples, 0.48%)</title><rect x="686.4" y="1941" width="5.7" height="15.0" fill="rgb(253,106,49)" rx="2" ry="2" />
+<text  x="689.36" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="597" width="1.7" height="15.0" fill="rgb(249,65,15)" rx="2" ry="2" />
+<text  x="14.01" y="607.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1717" width="1.7" height="15.0" fill="rgb(254,14,16)" rx="2" ry="2" />
+<text  x="14.01" y="1727.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1173" width="1.7" height="15.0" fill="rgb(217,191,51)" rx="2" ry="2" />
+<text  x="14.01" y="1183.5" ></text>
+</g>
+<g >
+<title>rocksdb::Benchmark::InitializeOptionsGeneral (95 samples, 0.41%)</title><rect x="20.3" y="1989" width="4.8" height="15.0" fill="rgb(228,229,41)" rx="2" ry="2" />
+<text  x="23.33" y="1999.5" ></text>
+</g>
+<g >
+<title>kmem_cache_alloc (80 samples, 0.34%)</title><rect x="492.3" y="1829" width="4.1" height="15.0" fill="rgb(233,193,15)" rx="2" ry="2" />
+<text  x="495.32" y="1839.5" ></text>
+</g>
+<g >
+<title>__memmove_avx_unaligned_erms (22 samples, 0.09%)</title><rect x="736.9" y="1861" width="1.2" height="15.0" fill="rgb(206,164,32)" rx="2" ry="2" />
+<text  x="739.95" y="1871.5" ></text>
+</g>
+<g >
+<title>_cond_resched (3 samples, 0.01%)</title><rect x="581.9" y="1813" width="0.1" height="15.0" fill="rgb(241,90,12)" rx="2" ry="2" />
+<text  x="584.90" y="1823.5" ></text>
+</g>
+<g >
+<title>_cond_resched (2 samples, 0.01%)</title><rect x="65.2" y="1845" width="0.1" height="15.0" fill="rgb(234,129,16)" rx="2" ry="2" />
+<text  x="68.19" y="1855.5" ></text>
+</g>
+<g >
+<title>rocksdb::Benchmark::ThreadBody (10,574 samples, 45.38%)</title><rect x="651.4" y="2021" width="535.4" height="15.0" fill="rgb(217,25,54)" rx="2" ry="2" />
+<text  x="654.37" y="2031.5" >rocksdb::Benchmark::ThreadBody</text>
+</g>
+<g >
+<title>_raw_spin_unlock_irqrestore (5 samples, 0.02%)</title><rect x="513.8" y="1797" width="0.3" height="15.0" fill="rgb(254,204,21)" rx="2" ry="2" />
+<text  x="516.84" y="1807.5" ></text>
+</g>
+<g >
+<title>__clone (9 samples, 0.04%)</title><rect x="1189.3" y="1909" width="0.5" height="15.0" fill="rgb(215,170,2)" rx="2" ry="2" />
+<text  x="1192.34" y="1919.5" ></text>
+</g>
+<g >
+<title>current_kernel_time64 (5 samples, 0.02%)</title><rect x="620.2" y="1877" width="0.3" height="15.0" fill="rgb(252,69,54)" rx="2" ry="2" />
+<text  x="623.23" y="1887.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="629" width="1.7" height="15.0" fill="rgb(205,202,34)" rx="2" ry="2" />
+<text  x="14.01" y="639.5" ></text>
+</g>
+<g >
+<title>perf_event_mmap (2 samples, 0.01%)</title><rect x="651.1" y="1925" width="0.1" height="15.0" fill="rgb(241,174,8)" rx="2" ry="2" />
+<text  x="654.07" y="1935.5" ></text>
+</g>
+<g >
+<title>__wake_up_common_lock (73 samples, 0.31%)</title><rect x="558.0" y="1813" width="3.7" height="15.0" fill="rgb(221,20,10)" rx="2" ry="2" />
+<text  x="561.00" y="1823.5" ></text>
+</g>
+<g >
+<title>intel_pmu_enable_all (9 samples, 0.04%)</title><rect x="25.1" y="1861" width="0.5" height="15.0" fill="rgb(231,123,46)" rx="2" ry="2" />
+<text  x="28.14" y="1871.5" ></text>
+</g>
+<g >
+<title>_cond_resched (3 samples, 0.01%)</title><rect x="610.3" y="1797" width="0.1" height="15.0" fill="rgb(226,126,30)" rx="2" ry="2" />
+<text  x="613.25" y="1807.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="85" width="1.7" height="15.0" fill="rgb(205,147,9)" rx="2" ry="2" />
+<text  x="14.01" y="95.5" ></text>
+</g>
+<g >
+<title>rocksdb::ColumnFamilyMemTablesImpl::GetMemTable (10 samples, 0.04%)</title><rect x="757.6" y="1893" width="0.5" height="15.0" fill="rgb(230,102,26)" rx="2" ry="2" />
+<text  x="760.61" y="1903.5" ></text>
+</g>
+<g >
+<title>[ld-2.27.so] (2 samples, 0.01%)</title><rect x="10.7" y="2021" width="0.1" height="15.0" fill="rgb(236,219,39)" rx="2" ry="2" />
+<text  x="13.71" y="2031.5" ></text>
+</g>
+<g >
+<title>__ext4_journal_stop (211 samples, 0.91%)</title><rect x="552.8" y="1861" width="10.7" height="15.0" fill="rgb(239,219,19)" rx="2" ry="2" />
+<text  x="555.78" y="1871.5" ></text>
+</g>
+<g >
+<title>__ext4_get_inode_loc (168 samples, 0.72%)</title><rect x="603.8" y="1829" width="8.5" height="15.0" fill="rgb(212,50,43)" rx="2" ry="2" />
+<text  x="606.77" y="1839.5" ></text>
+</g>
+<g >
+<title>ext4_ext_handle_unwritten_extents (11 samples, 0.05%)</title><rect x="522.6" y="1829" width="0.5" height="15.0" fill="rgb(205,35,52)" rx="2" ry="2" />
+<text  x="525.55" y="1839.5" ></text>
+</g>
+<g >
+<title>__memmove_avx_unaligned_erms (32 samples, 0.14%)</title><rect x="761.0" y="1877" width="1.6" height="15.0" fill="rgb(224,44,24)" rx="2" ry="2" />
+<text  x="763.95" y="1887.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_replace_aux (11 samples, 0.05%)</title><rect x="1187.2" y="2053" width="0.6" height="15.0" fill="rgb(248,139,48)" rx="2" ry="2" />
+<text  x="1190.21" y="2063.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::SetState (26 samples, 0.11%)</title><rect x="1175.2" y="1941" width="1.3" height="15.0" fill="rgb(251,92,54)" rx="2" ry="2" />
+<text  x="1178.16" y="1951.5" ></text>
+</g>
+<g >
+<title>cpuinfo_open (12 samples, 0.05%)</title><rect x="16.9" y="1877" width="0.6" height="15.0" fill="rgb(251,199,18)" rx="2" ry="2" />
+<text  x="19.94" y="1887.5" ></text>
+</g>
+<g >
+<title>read (22 samples, 0.09%)</title><rect x="638.0" y="2037" width="1.1" height="15.0" fill="rgb(217,138,23)" rx="2" ry="2" />
+<text  x="640.95" y="2047.5" ></text>
+</g>
+<g >
+<title>rocksdb::PosixWritableFile::Append (47 samples, 0.20%)</title><rect x="719.1" y="1861" width="2.4" height="15.0" fill="rgb(248,42,47)" rx="2" ry="2" />
+<text  x="722.12" y="1871.5" ></text>
+</g>
+<g >
+<title>memcg_kmem_put_cache (4 samples, 0.02%)</title><rect x="496.4" y="1829" width="0.2" height="15.0" fill="rgb(231,167,49)" rx="2" ry="2" />
+<text  x="499.37" y="1839.5" ></text>
+</g>
+<g >
+<title>__pthread_enable_asynccancel (33 samples, 0.14%)</title><rect x="631.7" y="2037" width="1.7" height="15.0" fill="rgb(218,135,46)" rx="2" ry="2" />
+<text  x="634.72" y="2047.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1589" width="1.7" height="15.0" fill="rgb(247,32,43)" rx="2" ry="2" />
+<text  x="14.01" y="1599.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="373" width="1.7" height="15.0" fill="rgb(240,65,43)" rx="2" ry="2" />
+<text  x="14.01" y="383.5" ></text>
+</g>
+<g >
+<title>_cond_resched (2 samples, 0.01%)</title><rect x="489.9" y="1829" width="0.1" height="15.0" fill="rgb(211,93,35)" rx="2" ry="2" />
+<text  x="492.94" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::InlineSkipList&lt;rocksdb::MemTableRep::KeyComparator const&amp;&gt;::KeyIsAfterNode (5 samples, 0.02%)</title><rect x="1147.2" y="1861" width="0.3" height="15.0" fill="rgb(225,202,51)" rx="2" ry="2" />
+<text  x="1150.21" y="1871.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1701" width="1.7" height="15.0" fill="rgb(214,47,16)" rx="2" ry="2" />
+<text  x="14.01" y="1711.5" ></text>
+</g>
+<g >
+<title>try_charge (5 samples, 0.02%)</title><rect x="762.3" y="1765" width="0.2" height="15.0" fill="rgb(239,59,23)" rx="2" ry="2" />
+<text  x="765.27" y="1775.5" ></text>
+</g>
+<g >
+<title>submit_bio (216 samples, 0.93%)</title><rect x="523.6" y="1797" width="11.0" height="15.0" fill="rgb(217,88,0)" rx="2" ry="2" />
+<text  x="526.61" y="1807.5" ></text>
+</g>
+<g >
+<title>std::thread::_M_start_thread (17 samples, 0.07%)</title><rect x="20.6" y="1861" width="0.8" height="15.0" fill="rgb(210,37,2)" rx="2" ry="2" />
+<text  x="23.58" y="1871.5" ></text>
+</g>
+<g >
+<title>finish_task_switch (50 samples, 0.21%)</title><rect x="17.5" y="1989" width="2.6" height="15.0" fill="rgb(208,19,21)" rx="2" ry="2" />
+<text  x="20.54" y="1999.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1109" width="1.7" height="15.0" fill="rgb(216,181,9)" rx="2" ry="2" />
+<text  x="14.01" y="1119.5" ></text>
+</g>
+<g >
+<title>intel_pmu_enable_all (5 samples, 0.02%)</title><rect x="1188.9" y="1925" width="0.3" height="15.0" fill="rgb(245,112,9)" rx="2" ry="2" />
+<text  x="1191.94" y="1935.5" ></text>
+</g>
+<g >
+<title>submit_bio_wait_endio (45 samples, 0.19%)</title><rect x="523.7" y="1733" width="2.3" height="15.0" fill="rgb(229,228,38)" rx="2" ry="2" />
+<text  x="526.71" y="1743.5" ></text>
+</g>
+<g >
+<title>handle_mm_fault (23 samples, 0.10%)</title><rect x="761.4" y="1813" width="1.2" height="15.0" fill="rgb(213,83,11)" rx="2" ry="2" />
+<text  x="764.41" y="1823.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_construct&lt;char const*&gt; (25 samples, 0.11%)</title><rect x="743.4" y="1861" width="1.3" height="15.0" fill="rgb(212,51,25)" rx="2" ry="2" />
+<text  x="746.43" y="1871.5" ></text>
+</g>
+<g >
+<title>memset (2 samples, 0.01%)</title><rect x="496.6" y="1829" width="0.1" height="15.0" fill="rgb(206,13,1)" rx="2" ry="2" />
+<text  x="499.57" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::ColumnFamilyMemTablesImpl::Seek (11 samples, 0.05%)</title><rect x="762.8" y="1877" width="0.5" height="15.0" fill="rgb(218,165,16)" rx="2" ry="2" />
+<text  x="765.77" y="1887.5" ></text>
+</g>
+<g >
+<title>exit_mm_release (2 samples, 0.01%)</title><rect x="651.3" y="1973" width="0.1" height="15.0" fill="rgb(252,60,11)" rx="2" ry="2" />
+<text  x="654.27" y="1983.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="805" width="1.7" height="15.0" fill="rgb(205,182,25)" rx="2" ry="2" />
+<text  x="14.01" y="815.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock (2 samples, 0.01%)</title><rect x="775.4" y="1749" width="0.1" height="15.0" fill="rgb(216,142,50)" rx="2" ry="2" />
+<text  x="778.38" y="1759.5" ></text>
+</g>
+<g >
+<title>aperfmperf_snapshot_cpu (8 samples, 0.03%)</title><rect x="638.1" y="1877" width="0.4" height="15.0" fill="rgb(241,118,12)" rx="2" ry="2" />
+<text  x="641.05" y="1887.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1461" width="1.7" height="15.0" fill="rgb(218,33,6)" rx="2" ry="2" />
+<text  x="14.01" y="1471.5" ></text>
+</g>
+<g >
+<title>native_write_msr (6 samples, 0.03%)</title><rect x="1189.5" y="1781" width="0.3" height="15.0" fill="rgb(247,122,43)" rx="2" ry="2" />
+<text  x="1192.49" y="1791.5" ></text>
+</g>
+<g >
+<title>sys_openat (12 samples, 0.05%)</title><rect x="16.9" y="1989" width="0.6" height="15.0" fill="rgb(249,70,12)" rx="2" ry="2" />
+<text  x="19.94" y="1999.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1093" width="1.7" height="15.0" fill="rgb(226,101,44)" rx="2" ry="2" />
+<text  x="14.01" y="1103.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_construct&lt;char const*&gt; (17 samples, 0.07%)</title><rect x="745.4" y="1877" width="0.8" height="15.0" fill="rgb(241,127,1)" rx="2" ry="2" />
+<text  x="748.35" y="1887.5" ></text>
+</g>
+<g >
+<title>rocksdb::SyncPoint::GetInstance (4 samples, 0.02%)</title><rect x="751.4" y="1941" width="0.2" height="15.0" fill="rgb(213,136,3)" rx="2" ry="2" />
+<text  x="754.38" y="1951.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (38 samples, 0.16%)</title><rect x="640.5" y="2037" width="2.0" height="15.0" fill="rgb(229,138,38)" rx="2" ry="2" />
+<text  x="643.54" y="2047.5" ></text>
+</g>
+<g >
+<title>_raw_spin_unlock_irqrestore (16 samples, 0.07%)</title><rect x="560.9" y="1797" width="0.8" height="15.0" fill="rgb(206,72,35)" rx="2" ry="2" />
+<text  x="563.88" y="1807.5" ></text>
+</g>
+<g >
+<title>show_cpuinfo (21 samples, 0.09%)</title><rect x="638.0" y="1909" width="1.0" height="15.0" fill="rgb(247,125,4)" rx="2" ry="2" />
+<text  x="640.95" y="1919.5" ></text>
+</g>
+<g >
+<title>_dl_sysdep_start (5 samples, 0.02%)</title><rect x="633.4" y="2037" width="0.3" height="15.0" fill="rgb(222,37,29)" rx="2" ry="2" />
+<text  x="636.45" y="2047.5" ></text>
+</g>
+<g >
+<title>rocksdb::MemTable::KeyComparator::operator (79 samples, 0.34%)</title><rect x="1147.5" y="1861" width="4.0" height="15.0" fill="rgb(205,13,50)" rx="2" ry="2" />
+<text  x="1150.52" y="1871.5" ></text>
+</g>
+<g >
+<title>schedule_tail (11 samples, 0.05%)</title><rect x="13.7" y="1957" width="0.6" height="15.0" fill="rgb(238,76,11)" rx="2" ry="2" />
+<text  x="16.75" y="1967.5" ></text>
+</g>
+<g >
+<title>std::thread::_M_start_thread (68 samples, 0.29%)</title><rect x="21.4" y="1877" width="3.5" height="15.0" fill="rgb(229,75,36)" rx="2" ry="2" />
+<text  x="24.44" y="1887.5" ></text>
+</g>
+<g >
+<title>_do_fork (6 samples, 0.03%)</title><rect x="21.4" y="1797" width="0.3" height="15.0" fill="rgb(210,89,32)" rx="2" ry="2" />
+<text  x="24.44" y="1807.5" ></text>
+</g>
+<g >
+<title>free (7 samples, 0.03%)</title><rect x="726.0" y="1877" width="0.4" height="15.0" fill="rgb(236,182,4)" rx="2" ry="2" />
+<text  x="729.01" y="1887.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_create (3 samples, 0.01%)</title><rect x="722.6" y="1861" width="0.2" height="15.0" fill="rgb(242,216,8)" rx="2" ry="2" />
+<text  x="725.62" y="1871.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="517" width="1.7" height="15.0" fill="rgb(246,160,16)" rx="2" ry="2" />
+<text  x="14.01" y="527.5" ></text>
+</g>
+<g >
+<title>__perf_event_task_sched_in (60 samples, 0.26%)</title><rect x="21.7" y="1797" width="3.1" height="15.0" fill="rgb(239,87,19)" rx="2" ry="2" />
+<text  x="24.75" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::Close (10 samples, 0.04%)</title><rect x="639.1" y="2037" width="0.5" height="15.0" fill="rgb(216,38,41)" rx="2" ry="2" />
+<text  x="642.07" y="2047.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1749" width="1.7" height="15.0" fill="rgb(233,44,41)" rx="2" ry="2" />
+<text  x="14.01" y="1759.5" ></text>
+</g>
+<g >
+<title>_IO_setb (30 samples, 0.13%)</title><rect x="13.7" y="2021" width="1.6" height="15.0" fill="rgb(224,73,46)" rx="2" ry="2" />
+<text  x="16.75" y="2031.5" ></text>
+</g>
+<g >
+<title>from_kprojid (10 samples, 0.04%)</title><rect x="601.5" y="1813" width="0.5" height="15.0" fill="rgb(234,45,1)" rx="2" ry="2" />
+<text  x="604.49" y="1823.5" ></text>
+</g>
+<g >
+<title>jbd2_journal_stop (2 samples, 0.01%)</title><rect x="536.9" y="1861" width="0.1" height="15.0" fill="rgb(238,144,49)" rx="2" ry="2" />
+<text  x="539.93" y="1871.5" ></text>
+</g>
+<g >
+<title>__ext4_handle_dirty_super (2 samples, 0.01%)</title><rect x="614.5" y="1845" width="0.1" height="15.0" fill="rgb(242,144,15)" rx="2" ry="2" />
+<text  x="617.46" y="1855.5" ></text>
+</g>
+<g >
+<title>page_fault (23 samples, 0.10%)</title><rect x="761.4" y="1861" width="1.2" height="15.0" fill="rgb(215,205,43)" rx="2" ry="2" />
+<text  x="764.41" y="1871.5" ></text>
+</g>
+<g >
+<title>[db_bench] (2 samples, 0.01%)</title><rect x="1188.8" y="2005" width="0.1" height="15.0" fill="rgb(218,200,1)" rx="2" ry="2" />
+<text  x="1191.78" y="2015.5" ></text>
+</g>
+<g >
+<title>__indirect_thunk_start (5 samples, 0.02%)</title><rect x="586.9" y="1781" width="0.3" height="15.0" fill="rgb(232,58,13)" rx="2" ry="2" />
+<text  x="589.91" y="1791.5" ></text>
+</g>
+<g >
+<title>bio_endio (45 samples, 0.19%)</title><rect x="523.7" y="1749" width="2.3" height="15.0" fill="rgb(220,37,49)" rx="2" ry="2" />
+<text  x="526.71" y="1759.5" ></text>
+</g>
+<g >
+<title>do_page_fault (24 samples, 0.10%)</title><rect x="775.1" y="1813" width="1.2" height="15.0" fill="rgb(234,86,39)" rx="2" ry="2" />
+<text  x="778.13" y="1823.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="581" width="1.7" height="15.0" fill="rgb(224,42,51)" rx="2" ry="2" />
+<text  x="14.01" y="591.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1941" width="1.7" height="15.0" fill="rgb(252,70,26)" rx="2" ry="2" />
+<text  x="14.01" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::MemTable::KeyComparator::operator (65 samples, 0.28%)</title><rect x="812.9" y="1829" width="3.2" height="15.0" fill="rgb(240,188,21)" rx="2" ry="2" />
+<text  x="815.85" y="1839.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_create (9 samples, 0.04%)</title><rect x="1176.6" y="1941" width="0.4" height="15.0" fill="rgb(252,165,16)" rx="2" ry="2" />
+<text  x="1179.58" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="885" width="1.7" height="15.0" fill="rgb(212,137,11)" rx="2" ry="2" />
+<text  x="14.01" y="895.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_append@plt (3 samples, 0.01%)</title><rect x="1182.7" y="1973" width="0.2" height="15.0" fill="rgb(205,211,18)" rx="2" ry="2" />
+<text  x="1185.71" y="1983.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="693" width="1.7" height="15.0" fill="rgb(217,144,35)" rx="2" ry="2" />
+<text  x="14.01" y="703.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1685" width="1.7" height="15.0" fill="rgb(224,65,39)" rx="2" ry="2" />
+<text  x="14.01" y="1695.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1029" width="1.7" height="15.0" fill="rgb(216,109,16)" rx="2" ry="2" />
+<text  x="14.01" y="1039.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum_set (2 samples, 0.01%)</title><rect x="614.8" y="1813" width="0.1" height="15.0" fill="rgb(235,94,31)" rx="2" ry="2" />
+<text  x="617.81" y="1823.5" ></text>
+</g>
+<g >
+<title>__memcmp_avx2_movbe (2 samples, 0.01%)</title><rect x="642.5" y="2053" width="0.1" height="15.0" fill="rgb(209,28,2)" rx="2" ry="2" />
+<text  x="645.46" y="2063.5" ></text>
+</g>
+<g >
+<title>arch_tlb_finish_mmu (16 samples, 0.07%)</title><rect x="641.3" y="1957" width="0.8" height="15.0" fill="rgb(224,142,19)" rx="2" ry="2" />
+<text  x="644.29" y="1967.5" ></text>
+</g>
+<g >
+<title>__memmove_avx_unaligned_erms (12 samples, 0.05%)</title><rect x="717.8" y="1861" width="0.6" height="15.0" fill="rgb(213,194,12)" rx="2" ry="2" />
+<text  x="720.81" y="1871.5" ></text>
+</g>
+<g >
+<title>__strcmp_sse2_unaligned (3 samples, 0.01%)</title><rect x="10.5" y="2021" width="0.1" height="15.0" fill="rgb(222,132,53)" rx="2" ry="2" />
+<text  x="13.46" y="2031.5" ></text>
+</g>
+<g >
+<title>rocksdb::FlushScheduler::Empty (8 samples, 0.03%)</title><rect x="691.7" y="1925" width="0.4" height="15.0" fill="rgb(231,64,8)" rx="2" ry="2" />
+<text  x="694.68" y="1935.5" ></text>
+</g>
+<g >
+<title>__f_unlock_pos (4 samples, 0.02%)</title><rect x="33.4" y="1989" width="0.2" height="15.0" fill="rgb(217,183,16)" rx="2" ry="2" />
+<text  x="36.39" y="1999.5" ></text>
+</g>
+<g >
+<title>__dynamic_cast (8 samples, 0.03%)</title><rect x="639.9" y="2053" width="0.4" height="15.0" fill="rgb(209,162,19)" rx="2" ry="2" />
+<text  x="642.88" y="2063.5" ></text>
+</g>
+<g >
+<title>__do_page_fault (24 samples, 0.10%)</title><rect x="775.1" y="1797" width="1.2" height="15.0" fill="rgb(238,147,5)" rx="2" ry="2" />
+<text  x="778.13" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::VersionSet::Recover (87 samples, 0.37%)</title><rect x="20.6" y="1909" width="4.4" height="15.0" fill="rgb(236,6,33)" rx="2" ry="2" />
+<text  x="23.58" y="1919.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="837" width="1.7" height="15.0" fill="rgb(206,181,22)" rx="2" ry="2" />
+<text  x="14.01" y="847.5" ></text>
+</g>
+<g >
+<title>dax_direct_access (46 samples, 0.20%)</title><rect x="64.6" y="1861" width="2.3" height="15.0" fill="rgb(237,114,20)" rx="2" ry="2" />
+<text  x="67.59" y="1871.5" ></text>
+</g>
+<g >
+<title>_raw_spin_lock_irqsave (43 samples, 0.18%)</title><rect x="523.7" y="1701" width="2.2" height="15.0" fill="rgb(253,35,27)" rx="2" ry="2" />
+<text  x="526.71" y="1711.5" ></text>
+</g>
+<g >
+<title>__handle_mm_fault (8 samples, 0.03%)</title><rect x="911.6" y="1765" width="0.4" height="15.0" fill="rgb(213,66,43)" rx="2" ry="2" />
+<text  x="914.60" y="1775.5" ></text>
+</g>
+<g >
+<title>_cond_resched (6 samples, 0.03%)</title><rect x="40.6" y="1941" width="0.3" height="15.0" fill="rgb(234,74,50)" rx="2" ry="2" />
+<text  x="43.58" y="1951.5" ></text>
+</g>
+<g >
+<title>intel_pmu_handle_irq (2 samples, 0.01%)</title><rect x="22.2" y="1733" width="0.1" height="15.0" fill="rgb(232,165,29)" rx="2" ry="2" />
+<text  x="25.20" y="1743.5" ></text>
+</g>
+<g >
+<title>rocksdb::SyncPoint::Data::Process (12 samples, 0.05%)</title><rect x="1170.2" y="1925" width="0.6" height="15.0" fill="rgb(211,217,36)" rx="2" ry="2" />
+<text  x="1173.15" y="1935.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="661" width="1.7" height="15.0" fill="rgb(232,116,11)" rx="2" ry="2" />
+<text  x="14.01" y="671.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::WriteImpl (4 samples, 0.02%)</title><rect x="1178.9" y="1989" width="0.2" height="15.0" fill="rgb(207,87,31)" rx="2" ry="2" />
+<text  x="1181.86" y="1999.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (2 samples, 0.01%)</title><rect x="633.9" y="2037" width="0.1" height="15.0" fill="rgb(253,150,43)" rx="2" ry="2" />
+<text  x="636.85" y="2047.5" ></text>
+</g>
+<g >
+<title>rocksdb::PosixWritableFile::use_direct_io (39 samples, 0.17%)</title><rect x="727.2" y="1877" width="2.0" height="15.0" fill="rgb(227,28,45)" rx="2" ry="2" />
+<text  x="730.23" y="1887.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::Recover (89 samples, 0.38%)</title><rect x="20.5" y="1925" width="4.5" height="15.0" fill="rgb(248,34,44)" rx="2" ry="2" />
+<text  x="23.48" y="1935.5" ></text>
+</g>
+<g >
+<title>crc32c_pcl_intel_update (2 samples, 0.01%)</title><rect x="614.5" y="1797" width="0.1" height="15.0" fill="rgb(237,10,24)" rx="2" ry="2" />
+<text  x="617.46" y="1807.5" ></text>
+</g>
+<g >
+<title>__clone (2 samples, 0.01%)</title><rect x="20.2" y="1909" width="0.1" height="15.0" fill="rgb(243,8,1)" rx="2" ry="2" />
+<text  x="23.23" y="1919.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="437" width="1.7" height="15.0" fill="rgb(205,69,2)" rx="2" ry="2" />
+<text  x="14.01" y="447.5" ></text>
+</g>
+<g >
+<title>jbd2_write_access_granted.part.9 (3 samples, 0.01%)</title><rect x="614.1" y="1813" width="0.2" height="15.0" fill="rgb(253,121,20)" rx="2" ry="2" />
+<text  x="617.10" y="1823.5" ></text>
+</g>
+<g >
+<title>__srcu_read_unlock (8,210 samples, 35.23%)</title><rect x="69.4" y="1845" width="415.7" height="15.0" fill="rgb(233,181,33)" rx="2" ry="2" />
+<text  x="72.40" y="1855.5" >__srcu_read_unlock</text>
+</g>
+<g >
+<title>unmap_vmas (3 samples, 0.01%)</title><rect x="643.6" y="1941" width="0.1" height="15.0" fill="rgb(213,29,12)" rx="2" ry="2" />
+<text  x="646.57" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="789" width="1.7" height="15.0" fill="rgb(221,199,17)" rx="2" ry="2" />
+<text  x="14.01" y="799.5" ></text>
+</g>
+<g >
+<title>rocksdb::Benchmark::Run (105 samples, 0.45%)</title><rect x="20.3" y="2005" width="5.3" height="15.0" fill="rgb(212,47,8)" rx="2" ry="2" />
+<text  x="23.33" y="2015.5" ></text>
+</g>
+<g >
+<title>__getblk_gfp (59 samples, 0.25%)</title><rect x="607.6" y="1813" width="3.0" height="15.0" fill="rgb(218,138,32)" rx="2" ry="2" />
+<text  x="610.62" y="1823.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1333" width="1.7" height="15.0" fill="rgb(239,195,49)" rx="2" ry="2" />
+<text  x="14.01" y="1343.5" ></text>
+</g>
+<g >
+<title>[unknown] (10 samples, 0.04%)</title><rect x="1187.8" y="2053" width="0.5" height="15.0" fill="rgb(239,84,16)" rx="2" ry="2" />
+<text  x="1190.82" y="2063.5" ></text>
+</g>
+<g >
+<title>__pthread_mutex_unlock (28 samples, 0.12%)</title><rect x="690.1" y="1925" width="1.4" height="15.0" fill="rgb(222,130,42)" rx="2" ry="2" />
+<text  x="693.11" y="1935.5" ></text>
+</g>
+<g >
+<title>_raw_read_lock (3 samples, 0.01%)</title><rect x="518.7" y="1845" width="0.1" height="15.0" fill="rgb(242,36,2)" rx="2" ry="2" />
+<text  x="521.65" y="1855.5" ></text>
+</g>
+<g >
+<title>down_write (20 samples, 0.09%)</title><rect x="563.5" y="1861" width="1.0" height="15.0" fill="rgb(251,113,34)" rx="2" ry="2" />
+<text  x="566.52" y="1871.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum_set (2 samples, 0.01%)</title><rect x="536.5" y="1813" width="0.1" height="15.0" fill="rgb(217,36,1)" rx="2" ry="2" />
+<text  x="539.53" y="1823.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (3 samples, 0.01%)</title><rect x="651.2" y="2021" width="0.2" height="15.0" fill="rgb(245,229,23)" rx="2" ry="2" />
+<text  x="654.22" y="2031.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1925" width="1.7" height="15.0" fill="rgb(219,8,38)" rx="2" ry="2" />
+<text  x="14.01" y="1935.5" ></text>
+</g>
+<g >
+<title>rocksdb::SanitizeOptions (3 samples, 0.01%)</title><rect x="20.2" y="1973" width="0.1" height="15.0" fill="rgb(216,60,24)" rx="2" ry="2" />
+<text  x="23.18" y="1983.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_construct&lt;char const*&gt; (2 samples, 0.01%)</title><rect x="722.9" y="1877" width="0.1" height="15.0" fill="rgb(223,166,34)" rx="2" ry="2" />
+<text  x="725.92" y="1887.5" ></text>
+</g>
+<g >
+<title>rcu_all_qs (2 samples, 0.01%)</title><rect x="581.8" y="1797" width="0.1" height="15.0" fill="rgb(250,167,40)" rx="2" ry="2" />
+<text  x="584.80" y="1807.5" ></text>
+</g>
+<g >
+<title>ext4_do_update_inode (2 samples, 0.01%)</title><rect x="565.8" y="1845" width="0.1" height="15.0" fill="rgb(216,11,17)" rx="2" ry="2" />
+<text  x="568.85" y="1855.5" ></text>
+</g>
+<g >
+<title>fput (2 samples, 0.01%)</title><rect x="33.6" y="1989" width="0.1" height="15.0" fill="rgb(214,139,28)" rx="2" ry="2" />
+<text  x="36.65" y="1999.5" ></text>
+</g>
+<g >
+<title>std::thread::join (18 samples, 0.08%)</title><rect x="14.4" y="2005" width="0.9" height="15.0" fill="rgb(232,1,18)" rx="2" ry="2" />
+<text  x="17.35" y="2015.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (3 samples, 0.01%)</title><rect x="651.1" y="2037" width="0.1" height="15.0" fill="rgb(254,77,19)" rx="2" ry="2" />
+<text  x="654.07" y="2047.5" ></text>
+</g>
+<g >
+<title>__memcmp_avx2_movbe (879 samples, 3.77%)</title><rect x="1002.6" y="1797" width="44.5" height="15.0" fill="rgb(254,61,48)" rx="2" ry="2" />
+<text  x="1005.59" y="1807.5" >__me..</text>
+</g>
+<g >
+<title>rocksdb::WritableFileWriter::Flush (316 samples, 1.36%)</title><rect x="707.0" y="1893" width="16.0" height="15.0" fill="rgb(213,167,11)" rx="2" ry="2" />
+<text  x="710.02" y="1903.5" ></text>
+</g>
+<g >
+<title>[unknown] (54 samples, 0.23%)</title><rect x="11.0" y="2021" width="2.7" height="15.0" fill="rgb(209,44,3)" rx="2" ry="2" />
+<text  x="14.01" y="2031.5" ></text>
+</g>
+<g >
+<title>__perf_event_task_sched_in (5 samples, 0.02%)</title><rect x="1188.9" y="1957" width="0.3" height="15.0" fill="rgb(224,114,3)" rx="2" ry="2" />
+<text  x="1191.94" y="1967.5" ></text>
+</g>
+<g >
+<title>start_thread (10,577 samples, 45.39%)</title><rect x="651.2" y="2053" width="535.6" height="15.0" fill="rgb(242,212,40)" rx="2" ry="2" />
+<text  x="654.22" y="2063.5" >start_thread</text>
+</g>
+<g >
+<title>find_get_pages_range (4 samples, 0.02%)</title><rect x="518.9" y="1813" width="0.2" height="15.0" fill="rgb(243,152,11)" rx="2" ry="2" />
+<text  x="521.85" y="1823.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_replace_aux@plt (4 samples, 0.02%)</title><rect x="1182.9" y="1989" width="0.2" height="15.0" fill="rgb(214,96,1)" rx="2" ry="2" />
+<text  x="1185.91" y="1999.5" ></text>
+</g>
+<g >
+<title>get_page_from_freelist (3 samples, 0.01%)</title><rect x="770.8" y="1749" width="0.2" height="15.0" fill="rgb(228,172,43)" rx="2" ry="2" />
+<text  x="773.82" y="1759.5" ></text>
+</g>
+<g >
+<title>rocksdb::MemTable::KeyComparator::operator (2,805 samples, 12.04%)</title><rect x="934.3" y="1813" width="142.1" height="15.0" fill="rgb(224,23,48)" rx="2" ry="2" />
+<text  x="937.33" y="1823.5" >rocksdb::MemTable:..</text>
+</g>
+<g >
+<title>__wake_up (80 samples, 0.34%)</title><rect x="558.0" y="1829" width="4.0" height="15.0" fill="rgb(229,123,53)" rx="2" ry="2" />
+<text  x="561.00" y="1839.5" ></text>
+</g>
+<g >
+<title>jbd2_transaction_committed (43 samples, 0.18%)</title><rect x="537.0" y="1861" width="2.2" height="15.0" fill="rgb(238,187,18)" rx="2" ry="2" />
+<text  x="540.03" y="1871.5" ></text>
+</g>
+<g >
+<title>rocksdb::ThreadStatusUtil::TEST_StateDelay (7 samples, 0.03%)</title><rect x="750.2" y="1925" width="0.4" height="15.0" fill="rgb(224,30,53)" rx="2" ry="2" />
+<text  x="753.22" y="1935.5" ></text>
+</g>
+<g >
+<title>nmi_restore (2 samples, 0.01%)</title><rect x="24.7" y="1733" width="0.1" height="15.0" fill="rgb(248,6,36)" rx="2" ry="2" />
+<text  x="27.68" y="1743.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::StartTimedTasks (2 samples, 0.01%)</title><rect x="25.0" y="1925" width="0.1" height="15.0" fill="rgb(213,6,13)" rx="2" ry="2" />
+<text  x="27.99" y="1935.5" ></text>
+</g>
+<g >
+<title>add_transaction_credits (41 samples, 0.18%)</title><rect x="550.4" y="1813" width="2.1" height="15.0" fill="rgb(231,192,44)" rx="2" ry="2" />
+<text  x="553.40" y="1823.5" ></text>
+</g>
+<g >
+<title>[db_bench] (12 samples, 0.05%)</title><rect x="13.7" y="2005" width="0.7" height="15.0" fill="rgb(211,9,5)" rx="2" ry="2" />
+<text  x="16.75" y="2015.5" ></text>
+</g>
+<g >
+<title>do_mmap (3 samples, 0.01%)</title><rect x="651.1" y="1957" width="0.1" height="15.0" fill="rgb(217,111,40)" rx="2" ry="2" />
+<text  x="654.07" y="1967.5" ></text>
+</g>
+<g >
+<title>ext4_mark_iloc_dirty (735 samples, 3.15%)</title><rect x="565.9" y="1845" width="37.3" height="15.0" fill="rgb(234,61,39)" rx="2" ry="2" />
+<text  x="568.95" y="1855.5" >ext..</text>
+</g>
+<g >
+<title>operator new (5 samples, 0.02%)</title><rect x="684.9" y="1941" width="0.2" height="15.0" fill="rgb(234,134,0)" rx="2" ry="2" />
+<text  x="687.89" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::SanitizeOptions (3 samples, 0.01%)</title><rect x="20.2" y="1957" width="0.1" height="15.0" fill="rgb(207,114,14)" rx="2" ry="2" />
+<text  x="23.18" y="1967.5" ></text>
+</g>
+<g >
+<title>crypto_shash_update (5 samples, 0.02%)</title><rect x="583.7" y="1797" width="0.3" height="15.0" fill="rgb(245,31,38)" rx="2" ry="2" />
+<text  x="586.72" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::InlineSkipList&lt;rocksdb::MemTableRep::KeyComparator const&amp;&gt;::RecomputeSpliceLevels (5,217 samples, 22.39%)</title><rect x="816.1" y="1845" width="264.2" height="15.0" fill="rgb(239,24,14)" rx="2" ry="2" />
+<text  x="819.15" y="1855.5" >rocksdb::InlineSkipList&lt;rocksdb::Me..</text>
+</g>
+<g >
+<title>rocksdb::port::Mutex::Unlock (6 samples, 0.03%)</title><rect x="1188.9" y="2037" width="0.3" height="15.0" fill="rgb(237,223,11)" rx="2" ry="2" />
+<text  x="1191.89" y="2047.5" ></text>
+</g>
+<g >
+<title>jbd2_journal_get_write_access (27 samples, 0.12%)</title><rect x="612.7" y="1813" width="1.4" height="15.0" fill="rgb(205,189,14)" rx="2" ry="2" />
+<text  x="615.74" y="1823.5" ></text>
+</g>
+<g >
+<title>rocksdb::InlineSkipList&lt;rocksdb::MemTableRep::KeyComparator const&amp;&gt;::AllocateNode (142 samples, 0.61%)</title><rect x="774.0" y="1845" width="7.2" height="15.0" fill="rgb(214,162,42)" rx="2" ry="2" />
+<text  x="776.96" y="1855.5" ></text>
+</g>
+<g >
+<title>perf_event_init_task (2 samples, 0.01%)</title><rect x="25.0" y="1797" width="0.1" height="15.0" fill="rgb(218,9,51)" rx="2" ry="2" />
+<text  x="27.99" y="1807.5" ></text>
+</g>
+<g >
+<title>crypto_shash_update (6 samples, 0.03%)</title><rect x="535.9" y="1813" width="0.3" height="15.0" fill="rgb(240,196,45)" rx="2" ry="2" />
+<text  x="538.92" y="1823.5" ></text>
+</g>
+<g >
+<title>__f_unlock_pos (14 samples, 0.06%)</title><rect x="34.4" y="1973" width="0.7" height="15.0" fill="rgb(246,140,46)" rx="2" ry="2" />
+<text  x="37.36" y="1983.5" ></text>
+</g>
+<g >
+<title>vfs_read (22 samples, 0.09%)</title><rect x="638.0" y="1973" width="1.1" height="15.0" fill="rgb(210,175,43)" rx="2" ry="2" />
+<text  x="640.95" y="1983.5" ></text>
+</g>
+<g >
+<title>perf_event_exec (9 samples, 0.04%)</title><rect x="1187.9" y="1925" width="0.4" height="15.0" fill="rgb(224,164,34)" rx="2" ry="2" />
+<text  x="1190.87" y="1935.5" ></text>
+</g>
+<g >
+<title>memcmp@plt (107 samples, 0.46%)</title><rect x="1047.2" y="1797" width="5.4" height="15.0" fill="rgb(215,154,46)" rx="2" ry="2" />
+<text  x="1050.15" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::MergeBatch (4 samples, 0.02%)</title><rect x="686.2" y="1941" width="0.2" height="15.0" fill="rgb(205,141,14)" rx="2" ry="2" />
+<text  x="689.16" y="1951.5" ></text>
+</g>
+<g >
+<title>lru_cache_add_active_or_unevictable (5 samples, 0.02%)</title><rect x="761.8" y="1781" width="0.3" height="15.0" fill="rgb(214,35,2)" rx="2" ry="2" />
+<text  x="764.81" y="1791.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="773" width="1.7" height="15.0" fill="rgb(228,94,32)" rx="2" ry="2" />
+<text  x="14.01" y="783.5" ></text>
+</g>
+<g >
+<title>ext4_reserve_inode_write (2 samples, 0.01%)</title><rect x="614.9" y="1845" width="0.1" height="15.0" fill="rgb(244,99,32)" rx="2" ry="2" />
+<text  x="617.91" y="1855.5" ></text>
+</g>
+<g >
+<title>__vfs_write (11,370 samples, 48.79%)</title><rect x="46.4" y="1957" width="575.7" height="15.0" fill="rgb(243,112,38)" rx="2" ry="2" />
+<text  x="49.36" y="1967.5" >__vfs_write</text>
+</g>
+<g >
+<title>__intel_pmu_enable_all.constprop.23 (13 samples, 0.06%)</title><rect x="20.8" y="1733" width="0.6" height="15.0" fill="rgb(240,114,37)" rx="2" ry="2" />
+<text  x="23.79" y="1743.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1813" width="1.7" height="15.0" fill="rgb(249,73,27)" rx="2" ry="2" />
+<text  x="14.01" y="1823.5" ></text>
+</g>
+<g >
+<title>mem_cgroup_try_charge (9 samples, 0.04%)</title><rect x="762.1" y="1781" width="0.4" height="15.0" fill="rgb(228,34,49)" rx="2" ry="2" />
+<text  x="765.06" y="1791.5" ></text>
+</g>
+<g >
+<title>ext4_reserve_inode_write (223 samples, 0.96%)</title><rect x="603.2" y="1845" width="11.3" height="15.0" fill="rgb(216,98,53)" rx="2" ry="2" />
+<text  x="606.16" y="1855.5" ></text>
+</g>
+<g >
+<title>free@plt (2 samples, 0.01%)</title><rect x="682.0" y="1941" width="0.1" height="15.0" fill="rgb(207,70,1)" rx="2" ry="2" />
+<text  x="685.01" y="1951.5" ></text>
+</g>
+<g >
+<title>__wake_up_common_lock (70 samples, 0.30%)</title><rect x="510.5" y="1813" width="3.6" height="15.0" fill="rgb(228,123,2)" rx="2" ry="2" />
+<text  x="513.55" y="1823.5" ></text>
+</g>
+<g >
+<title>should_numa_migrate_memory (2 samples, 0.01%)</title><rect x="911.8" y="1733" width="0.2" height="15.0" fill="rgb(206,208,44)" rx="2" ry="2" />
+<text  x="914.85" y="1743.5" ></text>
+</g>
+<g >
+<title>add_transaction_credits (2 samples, 0.01%)</title><rect x="492.2" y="1829" width="0.1" height="15.0" fill="rgb(237,132,6)" rx="2" ry="2" />
+<text  x="495.22" y="1839.5" ></text>
+</g>
+<g >
+<title>current_time (12 samples, 0.05%)</title><rect x="619.9" y="1893" width="0.6" height="15.0" fill="rgb(230,122,15)" rx="2" ry="2" />
+<text  x="622.93" y="1903.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="709" width="1.7" height="15.0" fill="rgb(206,154,11)" rx="2" ry="2" />
+<text  x="14.01" y="719.5" ></text>
+</g>
+<g >
+<title>common_file_perm (26 samples, 0.11%)</title><rect x="624.1" y="1909" width="1.3" height="15.0" fill="rgb(254,102,24)" rx="2" ry="2" />
+<text  x="627.13" y="1919.5" ></text>
+</g>
+<g >
+<title>_cond_resched (14 samples, 0.06%)</title><rect x="495.4" y="1813" width="0.7" height="15.0" fill="rgb(230,20,47)" rx="2" ry="2" />
+<text  x="498.36" y="1823.5" ></text>
+</g>
+<g >
+<title>start_this_handle (138 samples, 0.59%)</title><rect x="545.5" y="1829" width="7.0" height="15.0" fill="rgb(245,196,27)" rx="2" ry="2" />
+<text  x="548.49" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::ExitAsMemTableWriter (21 samples, 0.09%)</title><rect x="1166.9" y="1941" width="1.0" height="15.0" fill="rgb(215,58,12)" rx="2" ry="2" />
+<text  x="1169.86" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::SetPerfLevel (2 samples, 0.01%)</title><rect x="721.5" y="1861" width="0.1" height="15.0" fill="rgb(238,148,24)" rx="2" ry="2" />
+<text  x="724.50" y="1871.5" ></text>
+</g>
+<g >
+<title>change_protection_range (2 samples, 0.01%)</title><rect x="642.5" y="1925" width="0.1" height="15.0" fill="rgb(232,228,34)" rx="2" ry="2" />
+<text  x="645.46" y="1935.5" ></text>
+</g>
+<g >
+<title>from_kuid (3 samples, 0.01%)</title><rect x="603.0" y="1829" width="0.2" height="15.0" fill="rgb(239,114,30)" rx="2" ry="2" />
+<text  x="606.01" y="1839.5" ></text>
+</g>
+<g >
+<title>native_write_msr (36 samples, 0.15%)</title><rect x="22.9" y="1733" width="1.8" height="15.0" fill="rgb(240,44,2)" rx="2" ry="2" />
+<text  x="25.86" y="1743.5" ></text>
+</g>
+<g >
+<title>__do_page_fault (16 samples, 0.07%)</title><rect x="911.3" y="1797" width="0.8" height="15.0" fill="rgb(226,70,15)" rx="2" ry="2" />
+<text  x="914.29" y="1807.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (3 samples, 0.01%)</title><rect x="651.2" y="2037" width="0.2" height="15.0" fill="rgb(223,58,33)" rx="2" ry="2" />
+<text  x="654.22" y="2047.5" ></text>
+</g>
+<g >
+<title>kernel_fpu_end (3 samples, 0.01%)</title><rect x="535.9" y="1781" width="0.2" height="15.0" fill="rgb(226,13,30)" rx="2" ry="2" />
+<text  x="538.92" y="1791.5" ></text>
+</g>
+<g >
+<title>sys_mmap_pgoff (3 samples, 0.01%)</title><rect x="651.1" y="1989" width="0.1" height="15.0" fill="rgb(214,99,41)" rx="2" ry="2" />
+<text  x="654.07" y="1999.5" ></text>
+</g>
+<g >
+<title>apparmor_file_permission (27 samples, 0.12%)</title><rect x="624.1" y="1925" width="1.3" height="15.0" fill="rgb(233,5,21)" rx="2" ry="2" />
+<text  x="627.08" y="1935.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="293" width="1.7" height="15.0" fill="rgb(243,202,31)" rx="2" ry="2" />
+<text  x="14.01" y="303.5" ></text>
+</g>
+<g >
+<title>rw_verify_area (4 samples, 0.02%)</title><rect x="43.6" y="1973" width="0.2" height="15.0" fill="rgb(227,124,23)" rx="2" ry="2" />
+<text  x="46.57" y="1983.5" ></text>
+</g>
+<g >
+<title>rocksdb::Arena::AllocateAligned (13 samples, 0.06%)</title><rect x="780.5" y="1813" width="0.7" height="15.0" fill="rgb(226,127,25)" rx="2" ry="2" />
+<text  x="783.50" y="1823.5" ></text>
+</g>
+<g >
+<title>rocksdb::SyncPoint::Data::Process (9 samples, 0.04%)</title><rect x="743.0" y="1861" width="0.4" height="15.0" fill="rgb(229,31,42)" rx="2" ry="2" />
+<text  x="745.97" y="1871.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1205" width="1.7" height="15.0" fill="rgb(210,188,29)" rx="2" ry="2" />
+<text  x="14.01" y="1215.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (2 samples, 0.01%)</title><rect x="25.0" y="1877" width="0.1" height="15.0" fill="rgb(237,181,20)" rx="2" ry="2" />
+<text  x="27.99" y="1887.5" ></text>
+</g>
+<g >
+<title>try_charge (4 samples, 0.02%)</title><rect x="771.0" y="1765" width="0.2" height="15.0" fill="rgb(239,191,7)" rx="2" ry="2" />
+<text  x="774.03" y="1775.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1349" width="1.7" height="15.0" fill="rgb(215,221,43)" rx="2" ry="2" />
+<text  x="14.01" y="1359.5" ></text>
+</g>
+<g >
+<title>rocksdb::(anonymous namespace)::SkipListRep::Allocate (199 samples, 0.85%)</title><rect x="771.2" y="1861" width="10.1" height="15.0" fill="rgb(253,115,36)" rx="2" ry="2" />
+<text  x="774.23" y="1871.5" ></text>
+</g>
+<g >
+<title>rocksdb:pst_st (3 samples, 0.01%)</title><rect x="1189.8" y="2069" width="0.2" height="15.0" fill="rgb(205,156,51)" rx="2" ry="2" />
+<text  x="1192.85" y="2079.5" ></text>
+</g>
+<g >
+<title>change_prot_numa (2 samples, 0.01%)</title><rect x="642.5" y="1957" width="0.1" height="15.0" fill="rgb(228,161,53)" rx="2" ry="2" />
+<text  x="645.46" y="1967.5" ></text>
+</g>
+<g >
+<title>__check_block_validity.constprop.80 (13 samples, 0.06%)</title><rect x="518.0" y="1845" width="0.7" height="15.0" fill="rgb(244,92,33)" rx="2" ry="2" />
+<text  x="520.99" y="1855.5" ></text>
+</g>
+<g >
+<title>rocksdb::(anonymous namespace)::BytewiseComparatorImpl::Compare (3 samples, 0.01%)</title><rect x="812.7" y="1829" width="0.2" height="15.0" fill="rgb(226,147,9)" rx="2" ry="2" />
+<text  x="815.70" y="1839.5" ></text>
+</g>
+<g >
+<title>aa_file_perm (6 samples, 0.03%)</title><rect x="625.1" y="1893" width="0.3" height="15.0" fill="rgb(219,59,39)" rx="2" ry="2" />
+<text  x="628.14" y="1903.5" ></text>
+</g>
+<g >
+<title>__handle_mm_fault (20 samples, 0.09%)</title><rect x="775.3" y="1765" width="1.0" height="15.0" fill="rgb(241,112,8)" rx="2" ry="2" />
+<text  x="778.28" y="1775.5" ></text>
+</g>
+<g >
+<title>acpi_os_read_memory (2 samples, 0.01%)</title><rect x="21.9" y="1733" width="0.1" height="15.0" fill="rgb(208,197,9)" rx="2" ry="2" />
+<text  x="24.90" y="1743.5" ></text>
+</g>
+<g >
+<title>sys_madvise (37 samples, 0.16%)</title><rect x="640.6" y="2005" width="1.9" height="15.0" fill="rgb(227,68,22)" rx="2" ry="2" />
+<text  x="643.59" y="2015.5" ></text>
+</g>
+<g >
+<title>acpi_os_read_memory (2 samples, 0.01%)</title><rect x="14.5" y="1861" width="0.1" height="15.0" fill="rgb(216,118,12)" rx="2" ry="2" />
+<text  x="17.51" y="1871.5" ></text>
+</g>
+<g >
+<title>rocksdb::FSWritableFile::PrepareWrite (66 samples, 0.28%)</title><rect x="739.6" y="1861" width="3.4" height="15.0" fill="rgb(241,131,32)" rx="2" ry="2" />
+<text  x="742.63" y="1871.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum.isra.57 (2 samples, 0.01%)</title><rect x="536.5" y="1797" width="0.1" height="15.0" fill="rgb(240,28,33)" rx="2" ry="2" />
+<text  x="539.53" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb:high0 (13 samples, 0.06%)</title><rect x="1188.6" y="2069" width="0.6" height="15.0" fill="rgb(234,135,17)" rx="2" ry="2" />
+<text  x="1191.58" y="2079.5" ></text>
+</g>
+<g >
+<title>pmem_make_request (214 samples, 0.92%)</title><rect x="523.7" y="1765" width="10.9" height="15.0" fill="rgb(237,179,12)" rx="2" ry="2" />
+<text  x="526.71" y="1775.5" ></text>
+</g>
+<g >
+<title>prefetch_freepointer (4 samples, 0.02%)</title><rect x="496.1" y="1813" width="0.2" height="15.0" fill="rgb(246,76,36)" rx="2" ry="2" />
+<text  x="499.07" y="1823.5" ></text>
+</g>
+<g >
+<title>sys_exit_group (4 samples, 0.02%)</title><rect x="643.5" y="2021" width="0.2" height="15.0" fill="rgb(252,2,46)" rx="2" ry="2" />
+<text  x="646.52" y="2031.5" ></text>
+</g>
+<g >
+<title>ext4_meta_trans_blocks (2 samples, 0.01%)</title><rect x="616.8" y="1877" width="0.1" height="15.0" fill="rgb(251,195,21)" rx="2" ry="2" />
+<text  x="619.84" y="1887.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteBatch::HasMerge (2 samples, 0.01%)</title><rect x="752.2" y="1941" width="0.1" height="15.0" fill="rgb(225,154,14)" rx="2" ry="2" />
+<text  x="755.19" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::EnterAsMemTableWriter (26 samples, 0.11%)</title><rect x="1158.3" y="1941" width="1.3" height="15.0" fill="rgb(224,105,41)" rx="2" ry="2" />
+<text  x="1161.30" y="1951.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::_M_append (6 samples, 0.03%)</title><rect x="1182.4" y="1973" width="0.3" height="15.0" fill="rgb(219,159,24)" rx="2" ry="2" />
+<text  x="1185.40" y="1983.5" ></text>
+</g>
+<g >
+<title>__perf_event_task_sched_in (16 samples, 0.07%)</title><rect x="14.5" y="1925" width="0.8" height="15.0" fill="rgb(227,146,1)" rx="2" ry="2" />
+<text  x="17.46" y="1935.5" ></text>
+</g>
+<g >
+<title>native_write_msr (2 samples, 0.01%)</title><rect x="1188.8" y="1845" width="0.1" height="15.0" fill="rgb(217,170,33)" rx="2" ry="2" />
+<text  x="1191.78" y="1855.5" ></text>
+</g>
+<g >
+<title>_cond_resched (2 samples, 0.01%)</title><rect x="523.2" y="1797" width="0.1" height="15.0" fill="rgb(213,127,6)" rx="2" ry="2" />
+<text  x="526.21" y="1807.5" ></text>
+</g>
+<g >
+<title>rocksdb::ColumnFamilySet::NumberOfColumnFamilies (13 samples, 0.06%)</title><rect x="685.5" y="1941" width="0.7" height="15.0" fill="rgb(218,99,12)" rx="2" ry="2" />
+<text  x="688.50" y="1951.5" ></text>
+</g>
+<g >
+<title>__memset_avx2_unaligned_erms (2 samples, 0.01%)</title><rect x="642.8" y="2053" width="0.1" height="15.0" fill="rgb(241,172,50)" rx="2" ry="2" />
+<text  x="645.81" y="2063.5" ></text>
+</g>
+<g >
+<title>native_write_msr (6 samples, 0.03%)</title><rect x="25.3" y="1829" width="0.3" height="15.0" fill="rgb(206,120,11)" rx="2" ry="2" />
+<text  x="28.29" y="1839.5" ></text>
+</g>
+<g >
+<title>rocksdb::WriteThread::EnterAsBatchGroupLeader (20 samples, 0.09%)</title><rect x="1157.3" y="1941" width="1.0" height="15.0" fill="rgb(247,8,33)" rx="2" ry="2" />
+<text  x="1160.29" y="1951.5" ></text>
+</g>
+<g >
+<title>native_sched_clock (4 samples, 0.02%)</title><rect x="22.7" y="1733" width="0.2" height="15.0" fill="rgb(217,190,3)" rx="2" ry="2" />
+<text  x="25.66" y="1743.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="869" width="1.7" height="15.0" fill="rgb(222,59,51)" rx="2" ry="2" />
+<text  x="14.01" y="879.5" ></text>
+</g>
+<g >
+<title>rcu_all_qs (2 samples, 0.01%)</title><rect x="490.0" y="1829" width="0.1" height="15.0" fill="rgb(244,139,3)" rx="2" ry="2" />
+<text  x="493.04" y="1839.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="101" width="1.7" height="15.0" fill="rgb(227,183,5)" rx="2" ry="2" />
+<text  x="14.01" y="111.5" ></text>
+</g>
+<g >
+<title>perf_event_init_task (6 samples, 0.03%)</title><rect x="21.4" y="1765" width="0.3" height="15.0" fill="rgb(218,139,29)" rx="2" ry="2" />
+<text  x="24.44" y="1775.5" ></text>
+</g>
+<g >
+<title>rocksdb::Random::GetTLSInstance (3 samples, 0.01%)</title><rect x="781.2" y="1845" width="0.1" height="15.0" fill="rgb(229,104,28)" rx="2" ry="2" />
+<text  x="784.15" y="1855.5" ></text>
+</g>
+<g >
+<title>schedule_tail (9 samples, 0.04%)</title><rect x="1189.3" y="1877" width="0.5" height="15.0" fill="rgb(253,86,24)" rx="2" ry="2" />
+<text  x="1192.34" y="1887.5" ></text>
+</g>
+<g >
+<title>__fsnotify_parent (8 samples, 0.03%)</title><rect x="44.9" y="1957" width="0.4" height="15.0" fill="rgb(222,119,29)" rx="2" ry="2" />
+<text  x="47.89" y="1967.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1525" width="1.7" height="15.0" fill="rgb(224,13,26)" rx="2" ry="2" />
+<text  x="14.01" y="1535.5" ></text>
+</g>
+<g >
+<title>rw_verify_area (35 samples, 0.15%)</title><rect x="623.7" y="1957" width="1.8" height="15.0" fill="rgb(216,117,50)" rx="2" ry="2" />
+<text  x="626.72" y="1967.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum.isra.57 (2 samples, 0.01%)</title><rect x="583.3" y="1813" width="0.1" height="15.0" fill="rgb(245,124,47)" rx="2" ry="2" />
+<text  x="586.32" y="1823.5" ></text>
+</g>
+<g >
+<title>free_unref_page_commit (8 samples, 0.03%)</title><rect x="641.6" y="1877" width="0.4" height="15.0" fill="rgb(240,9,46)" rx="2" ry="2" />
+<text  x="644.60" y="1887.5" ></text>
+</g>
+<g >
+<title>clear_page_erms (2 samples, 0.01%)</title><rect x="775.5" y="1717" width="0.1" height="15.0" fill="rgb(206,54,48)" rx="2" ry="2" />
+<text  x="778.48" y="1727.5" ></text>
+</g>
+<g >
+<title>rocksdb::SuperVersionContext::~SuperVersionContext (7 samples, 0.03%)</title><rect x="750.9" y="1941" width="0.4" height="15.0" fill="rgb(247,187,48)" rx="2" ry="2" />
+<text  x="753.92" y="1951.5" ></text>
+</g>
+<g >
+<title>rocksdb::DBImpl::Write (10,268 samples, 44.06%)</title><rect x="658.9" y="1989" width="520.0" height="15.0" fill="rgb(245,99,20)" rx="2" ry="2" />
+<text  x="661.92" y="1999.5" >rocksdb::DBImpl::Write</text>
+</g>
+<g >
+<title>__pthread_mutex_lock (48 samples, 0.21%)</title><rect x="747.7" y="1925" width="2.4" height="15.0" fill="rgb(254,132,32)" rx="2" ry="2" />
+<text  x="750.68" y="1935.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="741" width="1.7" height="15.0" fill="rgb(240,84,13)" rx="2" ry="2" />
+<text  x="14.01" y="751.5" ></text>
+</g>
+<g >
+<title>jbd2__journal_start (7 samples, 0.03%)</title><rect x="615.2" y="1861" width="0.3" height="15.0" fill="rgb(236,33,33)" rx="2" ry="2" />
+<text  x="618.17" y="1871.5" ></text>
+</g>
+<g >
+<title>jbd2_write_access_granted.part.9 (22 samples, 0.09%)</title><rect x="613.0" y="1797" width="1.1" height="15.0" fill="rgb(240,58,33)" rx="2" ry="2" />
+<text  x="615.99" y="1807.5" ></text>
+</g>
+<g >
+<title>sys_clone (2 samples, 0.01%)</title><rect x="25.0" y="1845" width="0.1" height="15.0" fill="rgb(206,128,48)" rx="2" ry="2" />
+<text  x="27.99" y="1855.5" ></text>
+</g>
+<g >
+<title>rocksdb::port::Mutex::Lock (7 samples, 0.03%)</title><rect x="750.6" y="1925" width="0.3" height="15.0" fill="rgb(252,103,24)" rx="2" ry="2" />
+<text  x="753.57" y="1935.5" ></text>
+</g>
+<g >
+<title>intel_pmu_enable_all (16 samples, 0.07%)</title><rect x="14.5" y="1893" width="0.8" height="15.0" fill="rgb(243,101,41)" rx="2" ry="2" />
+<text  x="17.46" y="1903.5" ></text>
+</g>
+<g >
+<title>__ext4_journal_start_sb (249 samples, 1.07%)</title><rect x="540.2" y="1861" width="12.6" height="15.0" fill="rgb(249,205,34)" rx="2" ry="2" />
+<text  x="543.17" y="1871.5" ></text>
+</g>
+<g >
+<title>rocksdb::FlushScheduler::Empty (3 samples, 0.01%)</title><rect x="746.7" y="1941" width="0.2" height="15.0" fill="rgb(225,0,43)" rx="2" ry="2" />
+<text  x="749.72" y="1951.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="1189" width="1.7" height="15.0" fill="rgb(244,155,48)" rx="2" ry="2" />
+<text  x="14.01" y="1199.5" ></text>
+</g>
+<g >
+<title>[unknown] (34 samples, 0.15%)</title><rect x="11.0" y="533" width="1.7" height="15.0" fill="rgb(252,153,2)" rx="2" ry="2" />
+<text  x="14.01" y="543.5" ></text>
+</g>
+<g >
+<title>iomap_apply (3 samples, 0.01%)</title><rect x="620.8" y="1909" width="0.1" height="15.0" fill="rgb(220,144,53)" rx="2" ry="2" />
+<text  x="623.79" y="1919.5" ></text>
+</g>
+<g >
+<title>__perf_event_task_sched_in (11 samples, 0.05%)</title><rect x="13.7" y="1925" width="0.6" height="15.0" fill="rgb(253,222,14)" rx="2" ry="2" />
+<text  x="16.75" y="1935.5" ></text>
+</g>
+<g >
+<title>mmap_region (3 samples, 0.01%)</title><rect x="651.1" y="1941" width="0.1" height="15.0" fill="rgb(216,210,38)" rx="2" ry="2" />
+<text  x="654.07" y="1951.5" ></text>
+</g>
+<g >
+<title>task_work_run (2 samples, 0.01%)</title><rect x="642.5" y="1989" width="0.1" height="15.0" fill="rgb(235,14,1)" rx="2" ry="2" />
+<text  x="645.46" y="1999.5" ></text>
+</g>
+<g >
+<title>[unknown] (10 samples, 0.04%)</title><rect x="1188.7" y="2053" width="0.5" height="15.0" fill="rgb(210,174,2)" rx="2" ry="2" />
+<text  x="1191.68" y="2063.5" ></text>
+</g>
+</g>
+</svg>
