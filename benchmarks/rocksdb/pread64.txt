@@ -1,0 +1,16 @@
+Workload	pread64-bound
+readseq	8
+readtocache	8
+readreverse	7
+readrandom	26
+readmissing	24
+readwhilewriting	10
+readwhilemerging	26
+readwhilescanning	24
+readrandomwriterandom	18
+updaterandom	8
+xorupdaterandom	9
+appendrandom	12
+seekrandom	20
+seekrandomwhilewriting	9
+seekrandomwhilemerging	20
