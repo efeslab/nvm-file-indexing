@@ -11,7 +11,15 @@ while read i;do
   echo $i;
   rm -rf $db_dir/*
   rm -rf perf.data
-  perf record -g -- ./db_bench --db=$db_dir --benchmarks="$i" &> tmp/$i.txt;
+  if [[ "$i" =~ ^fill.* ]] || [[ "$i" =~ ^randomreplacekeys.* ]] || [[ "$i" =~ ^timeseries.* ]] ;
+  then
+    echo "Not doing an initial fill load";
+    perf record -g -- ./db_bench --db=$db_dir --benchmarks="$i" &> tmp/$i.txt;
+  else
+    echo "Doing an initial fill load";
+    ./db_bench --db=$db_dir --benchmarks="fillseq" &> tmp/initial_load.txt;
+    perf record -g -- ./db_bench --db=$db_dir --use_existing_db --benchmarks="$i" &> tmp/$i.txt;
+  fi
   perf script|$flame_path/stackcollapse-perf.pl|$flame_path/flamegraph.pl>$output_dir/$i.svg
   rm -rf perf.data
   rm -rf $db_dir/*
