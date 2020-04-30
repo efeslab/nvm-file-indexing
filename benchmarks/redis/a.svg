@@ -373,1664 +373,2232 @@
 <text id="matched" x="1090.00" y="901" > </text>
 <g id="frames">
 <g >
-<title>ipv4_conntrack_defrag (2 samples, 0.51%)</title><rect x="578.9" y="341" width="6.0" height="15.0" fill="rgb(235,84,42)" rx="2" ry="2" />
-<text  x="581.93" y="351.5" ></text>
+<title>_IO_vsprintf (1 samples, 0.19%)</title><rect x="71.0" y="805" width="2.3" height="15.0" fill="rgb(214,148,53)" rx="2" ry="2" />
+<text  x="74.03" y="815.5" ></text>
 </g>
 <g >
-<title>sock_sendmsg (124 samples, 31.63%)</title><rect x="265.9" y="693" width="373.2" height="15.0" fill="rgb(210,92,48)" rx="2" ry="2" />
-<text  x="268.87" y="703.5" >sock_sendmsg</text>
+<title>aeProcessEvents (4 samples, 0.77%)</title><rect x="982.0" y="837" width="9.1" height="15.0" fill="rgb(209,76,49)" rx="2" ry="2" />
+<text  x="985.03" y="847.5" ></text>
 </g>
 <g >
-<title>ipt_do_table (3 samples, 0.77%)</title><rect x="347.1" y="485" width="9.1" height="15.0" fill="rgb(243,20,32)" rx="2" ry="2" />
-<text  x="350.14" y="495.5" ></text>
+<title>entry_SYSCALL_64_after_hwframe (36 samples, 6.90%)</title><rect x="73.3" y="805" width="81.4" height="15.0" fill="rgb(207,163,0)" rx="2" ry="2" />
+<text  x="76.30" y="815.5" >entry_SYS..</text>
 </g>
 <g >
-<title>__alloc_skb (4 samples, 1.02%)</title><rect x="277.9" y="613" width="12.0" height="15.0" fill="rgb(214,15,41)" rx="2" ry="2" />
-<text  x="280.91" y="623.5" ></text>
+<title>do_dentry_open (1 samples, 0.19%)</title><rect x="952.6" y="709" width="2.3" height="15.0" fill="rgb(229,69,36)" rx="2" ry="2" />
+<text  x="955.64" y="719.5" ></text>
 </g>
 <g >
-<title>aeMain (2 samples, 0.51%)</title><rect x="40.1" y="805" width="6.0" height="15.0" fill="rgb(228,30,54)" rx="2" ry="2" />
-<text  x="43.10" y="815.5" ></text>
+<title>sock_read_iter (18 samples, 3.45%)</title><rect x="75.6" y="709" width="40.6" height="15.0" fill="rgb(247,184,5)" rx="2" ry="2" />
+<text  x="78.56" y="719.5" >soc..</text>
 </g>
 <g >
-<title>finish_task_switch (11 samples, 2.81%)</title><rect x="979.3" y="677" width="33.1" height="15.0" fill="rgb(230,105,50)" rx="2" ry="2" />
-<text  x="982.29" y="687.5" >fi..</text>
+<title>dictEncObjKeyCompare (1 samples, 0.19%)</title><rect x="25.8" y="789" width="2.3" height="15.0" fill="rgb(229,8,21)" rx="2" ry="2" />
+<text  x="28.82" y="799.5" ></text>
 </g>
 <g >
-<title>tcp_send_mss (2 samples, 0.51%)</title><rect x="630.1" y="629" width="6.0" height="15.0" fill="rgb(216,151,32)" rx="2" ry="2" />
-<text  x="633.10" y="639.5" ></text>
+<title>je_arena_ralloc (1 samples, 0.19%)</title><rect x="900.7" y="821" width="2.2" height="15.0" fill="rgb(221,108,44)" rx="2" ry="2" />
+<text  x="903.65" y="831.5" ></text>
 </g>
 <g >
-<title>ip_send_check (3 samples, 0.77%)</title><rect x="329.1" y="517" width="9.0" height="15.0" fill="rgb(250,23,11)" rx="2" ry="2" />
-<text  x="332.08" y="527.5" ></text>
+<title>_raw_spin_lock (1 samples, 0.19%)</title><rect x="123.0" y="645" width="2.3" height="15.0" fill="rgb(225,157,42)" rx="2" ry="2" />
+<text  x="126.03" y="655.5" ></text>
 </g>
 <g >
-<title>[unknown] (335 samples, 85.46%)</title><rect x="10.0" y="837" width="1008.4" height="15.0" fill="rgb(254,176,22)" rx="2" ry="2" />
-<text  x="13.00" y="847.5" >[unknown]</text>
+<title>jbd2__journal_start (1 samples, 0.19%)</title><rect x="218.0" y="629" width="2.2" height="15.0" fill="rgb(213,124,30)" rx="2" ry="2" />
+<text  x="220.97" y="639.5" ></text>
 </g>
 <g >
-<title>ext4_mark_inode_dirty (3 samples, 0.77%)</title><rect x="247.8" y="645" width="9.0" height="15.0" fill="rgb(250,198,29)" rx="2" ry="2" />
-<text  x="250.81" y="655.5" ></text>
+<title>do_get_write_access (1 samples, 0.19%)</title><rect x="236.1" y="581" width="2.2" height="15.0" fill="rgb(249,46,38)" rx="2" ry="2" />
+<text  x="239.05" y="591.5" ></text>
 </g>
 <g >
-<title>beforeSleep (1 samples, 0.26%)</title><rect x="49.1" y="805" width="3.0" height="15.0" fill="rgb(237,75,7)" rx="2" ry="2" />
-<text  x="52.13" y="815.5" ></text>
+<title>__vdso_gettimeofday (1 samples, 0.19%)</title><rect x="53.0" y="789" width="2.2" height="15.0" fill="rgb(207,150,48)" rx="2" ry="2" />
+<text  x="55.95" y="799.5" ></text>
 </g>
 <g >
-<title>_raw_spin_lock_irqsave (1 samples, 0.26%)</title><rect x="488.6" y="117" width="3.0" height="15.0" fill="rgb(246,6,37)" rx="2" ry="2" />
-<text  x="491.62" y="127.5" ></text>
+<title>_raw_spin_lock (1 samples, 0.19%)</title><rect x="575.1" y="677" width="2.3" height="15.0" fill="rgb(225,59,25)" rx="2" ry="2" />
+<text  x="578.13" y="687.5" ></text>
 </g>
 <g >
-<title>__tcp_transmit_skb (107 samples, 27.30%)</title><rect x="308.0" y="581" width="322.1" height="15.0" fill="rgb(217,196,12)" rx="2" ry="2" />
-<text  x="311.01" y="591.5" >__tcp_transmit_skb</text>
+<title>__strchr_avx2 (2 samples, 0.38%)</title><rect x="966.2" y="837" width="4.5" height="15.0" fill="rgb(228,10,51)" rx="2" ry="2" />
+<text  x="969.21" y="847.5" ></text>
 </g>
 <g >
-<title>__accumulate_pelt_segments (1 samples, 0.26%)</title><rect x="1009.4" y="549" width="3.0" height="15.0" fill="rgb(251,72,45)" rx="2" ry="2" />
-<text  x="1012.39" y="559.5" ></text>
+<title>ext4_sync_file (37 samples, 7.09%)</title><rect x="1058.9" y="741" width="83.6" height="15.0" fill="rgb(239,200,32)" rx="2" ry="2" />
+<text  x="1061.89" y="751.5" >ext4_sync..</text>
 </g>
 <g >
-<title>tcp_sendmsg (1 samples, 0.26%)</title><rect x="636.1" y="677" width="3.0" height="15.0" fill="rgb(227,167,53)" rx="2" ry="2" />
-<text  x="639.12" y="687.5" ></text>
+<title>__dcigettext (1 samples, 0.19%)</title><rect x="71.0" y="821" width="2.3" height="15.0" fill="rgb(229,185,53)" rx="2" ry="2" />
+<text  x="74.03" y="831.5" ></text>
 </g>
 <g >
-<title>do_futex (11 samples, 2.81%)</title><rect x="979.3" y="757" width="33.1" height="15.0" fill="rgb(226,116,7)" rx="2" ry="2" />
-<text  x="982.29" y="767.5" >do..</text>
+<title>file_check_and_advance_wb_err (1 samples, 0.19%)</title><rect x="1058.9" y="725" width="2.2" height="15.0" fill="rgb(223,23,37)" rx="2" ry="2" />
+<text  x="1061.89" y="735.5" ></text>
 </g>
 <g >
-<title>__vdso_gettimeofday (1 samples, 0.26%)</title><rect x="31.1" y="805" width="3.0" height="15.0" fill="rgb(254,151,52)" rx="2" ry="2" />
-<text  x="34.07" y="815.5" ></text>
+<title>__get_task_comm (1 samples, 0.19%)</title><rect x="120.8" y="661" width="2.2" height="15.0" fill="rgb(247,117,54)" rx="2" ry="2" />
+<text  x="123.77" y="671.5" ></text>
 </g>
 <g >
-<title>tcp_recvmsg (12 samples, 3.06%)</title><rect x="82.2" y="661" width="36.2" height="15.0" fill="rgb(233,25,39)" rx="2" ry="2" />
-<text  x="85.24" y="671.5" >tcp..</text>
+<title>loopback_xmit (1 samples, 0.19%)</title><rect x="416.9" y="453" width="2.3" height="15.0" fill="rgb(222,85,24)" rx="2" ry="2" />
+<text  x="419.90" y="463.5" ></text>
 </g>
 <g >
-<title>dictNext (5 samples, 1.28%)</title><rect x="1087.7" y="837" width="15.0" height="15.0" fill="rgb(231,180,10)" rx="2" ry="2" />
-<text  x="1090.65" y="847.5" ></text>
+<title>account_entity_dequeue (1 samples, 0.19%)</title><rect x="579.7" y="629" width="2.2" height="15.0" fill="rgb(226,178,33)" rx="2" ry="2" />
+<text  x="582.66" y="639.5" ></text>
 </g>
 <g >
-<title>resched_curr (2 samples, 0.51%)</title><rect x="542.8" y="69" width="6.0" height="15.0" fill="rgb(246,172,16)" rx="2" ry="2" />
-<text  x="545.81" y="79.5" ></text>
+<title>resetClient (1 samples, 0.19%)</title><rect x="907.4" y="821" width="2.3" height="15.0" fill="rgb(219,40,17)" rx="2" ry="2" />
+<text  x="910.43" y="831.5" ></text>
 </g>
 <g >
-<title>enqueue_entity (13 samples, 3.32%)</title><rect x="500.7" y="69" width="39.1" height="15.0" fill="rgb(240,194,8)" rx="2" ry="2" />
-<text  x="503.66" y="79.5" >enq..</text>
+<title>__perf_event_task_sched_out (2 samples, 0.38%)</title><rect x="1108.6" y="661" width="4.5" height="15.0" fill="rgb(233,44,24)" rx="2" ry="2" />
+<text  x="1111.62" y="671.5" ></text>
 </g>
 <g >
-<title>flushAppendOnlyFile.part.1 (1 samples, 0.26%)</title><rect x="1126.8" y="837" width="3.0" height="15.0" fill="rgb(234,102,23)" rx="2" ry="2" />
-<text  x="1129.79" y="847.5" ></text>
+<title>getname (2 samples, 0.38%)</title><rect x="959.4" y="757" width="4.5" height="15.0" fill="rgb(241,108,18)" rx="2" ry="2" />
+<text  x="962.43" y="767.5" ></text>
 </g>
 <g >
-<title>ext4_map_blocks (3 samples, 0.77%)</title><rect x="226.7" y="645" width="9.1" height="15.0" fill="rgb(229,152,1)" rx="2" ry="2" />
-<text  x="229.73" y="655.5" ></text>
+<title>sched_clock_cpu (1 samples, 0.19%)</title><rect x="1088.3" y="581" width="2.2" height="15.0" fill="rgb(224,194,32)" rx="2" ry="2" />
+<text  x="1091.28" y="591.5" ></text>
 </g>
 <g >
-<title>__tcp_transmit_skb (1 samples, 0.26%)</title><rect x="296.0" y="597" width="3.0" height="15.0" fill="rgb(231,144,27)" rx="2" ry="2" />
-<text  x="298.97" y="607.5" ></text>
+<title>_raw_spin_unlock_irqrestore (1 samples, 0.19%)</title><rect x="561.6" y="709" width="2.2" height="15.0" fill="rgb(234,155,15)" rx="2" ry="2" />
+<text  x="564.57" y="719.5" ></text>
 </g>
 <g >
-<title>update_load_avg (1 samples, 0.26%)</title><rect x="539.8" y="69" width="3.0" height="15.0" fill="rgb(250,2,11)" rx="2" ry="2" />
-<text  x="542.80" y="79.5" ></text>
+<title>rw_verify_area (3 samples, 0.57%)</title><rect x="450.8" y="741" width="6.8" height="15.0" fill="rgb(225,68,35)" rx="2" ry="2" />
+<text  x="453.80" y="751.5" ></text>
 </g>
 <g >
-<title>update_load_avg (1 samples, 0.26%)</title><rect x="795.7" y="629" width="3.0" height="15.0" fill="rgb(236,179,16)" rx="2" ry="2" />
-<text  x="798.66" y="639.5" ></text>
+<title>ipt_do_table (2 samples, 0.38%)</title><rect x="401.1" y="277" width="4.5" height="15.0" fill="rgb(206,1,25)" rx="2" ry="2" />
+<text  x="404.07" y="287.5" ></text>
 </g>
 <g >
-<title>sdscatlen (1 samples, 0.26%)</title><rect x="1012.4" y="821" width="3.0" height="15.0" fill="rgb(217,227,40)" rx="2" ry="2" />
-<text  x="1015.40" y="831.5" ></text>
+<title>ext4_reserve_inode_write (4 samples, 0.77%)</title><rect x="231.5" y="629" width="9.1" height="15.0" fill="rgb(234,193,52)" rx="2" ry="2" />
+<text  x="234.53" y="639.5" ></text>
 </g>
 <g >
-<title>__perf_event_task_sched_in (41 samples, 10.46%)</title><rect x="807.7" y="661" width="123.4" height="15.0" fill="rgb(250,125,0)" rx="2" ry="2" />
-<text  x="810.70" y="671.5" >__perf_event_ta..</text>
+<title>idle_cpu (1 samples, 0.19%)</title><rect x="866.7" y="629" width="2.3" height="15.0" fill="rgb(213,5,13)" rx="2" ry="2" />
+<text  x="869.74" y="639.5" ></text>
 </g>
 <g >
-<title>sock_poll (2 samples, 0.51%)</title><rect x="732.4" y="693" width="6.1" height="15.0" fill="rgb(234,218,38)" rx="2" ry="2" />
-<text  x="735.45" y="703.5" ></text>
+<title>rcu_all_qs (1 samples, 0.19%)</title><rect x="1040.8" y="757" width="2.3" height="15.0" fill="rgb(254,72,43)" rx="2" ry="2" />
+<text  x="1043.80" y="767.5" ></text>
 </g>
 <g >
-<title>read@plt (1 samples, 0.26%)</title><rect x="1156.9" y="837" width="3.0" height="15.0" fill="rgb(218,100,25)" rx="2" ry="2" />
-<text  x="1159.89" y="847.5" ></text>
+<title>deactivate_task (5 samples, 0.96%)</title><rect x="1113.1" y="661" width="11.3" height="15.0" fill="rgb(244,130,24)" rx="2" ry="2" />
+<text  x="1116.14" y="671.5" ></text>
 </g>
 <g >
-<title>__intel_pmu_enable_all.constprop.23 (9 samples, 2.30%)</title><rect x="982.3" y="613" width="27.1" height="15.0" fill="rgb(219,164,23)" rx="2" ry="2" />
-<text  x="985.30" y="623.5" >_..</text>
+<title>select_idle_sibling (2 samples, 0.38%)</title><rect x="1074.7" y="581" width="4.5" height="15.0" fill="rgb(231,69,51)" rx="2" ry="2" />
+<text  x="1077.71" y="591.5" ></text>
 </g>
 <g >
-<title>inet_ehashfn (1 samples, 0.26%)</title><rect x="437.4" y="277" width="3.1" height="15.0" fill="rgb(225,11,39)" rx="2" ry="2" />
-<text  x="440.45" y="287.5" ></text>
+<title>sys_fdatasync (38 samples, 7.28%)</title><rect x="1056.6" y="789" width="85.9" height="15.0" fill="rgb(207,203,48)" rx="2" ry="2" />
+<text  x="1059.63" y="799.5" >sys_fdatas..</text>
 </g>
 <g >
-<title>_copy_to_iter (2 samples, 0.51%)</title><rect x="103.3" y="629" width="6.0" height="15.0" fill="rgb(252,168,9)" rx="2" ry="2" />
-<text  x="106.32" y="639.5" ></text>
+<title>ttwu_do_wakeup (1 samples, 0.19%)</title><rect x="1086.0" y="581" width="2.3" height="15.0" fill="rgb(215,201,47)" rx="2" ry="2" />
+<text  x="1089.02" y="591.5" ></text>
 </g>
 <g >
-<title>ext4_mb_mark_diskspace_used (1 samples, 0.26%)</title><rect x="229.7" y="597" width="3.1" height="15.0" fill="rgb(234,163,2)" rx="2" ry="2" />
-<text  x="232.74" y="607.5" ></text>
+<title>try_to_wake_up (10 samples, 1.92%)</title><rect x="367.2" y="133" width="22.6" height="15.0" fill="rgb(249,203,33)" rx="2" ry="2" />
+<text  x="370.16" y="143.5" >t..</text>
 </g>
 <g >
-<title>ipv4_confirm (2 samples, 0.51%)</title><rect x="618.1" y="501" width="6.0" height="15.0" fill="rgb(227,118,11)" rx="2" ry="2" />
-<text  x="621.06" y="511.5" ></text>
+<title>__vdso_gettimeofday (1 samples, 0.19%)</title><rect x="34.9" y="805" width="2.2" height="15.0" fill="rgb(205,122,30)" rx="2" ry="2" />
+<text  x="37.87" y="815.5" ></text>
 </g>
 <g >
-<title>__open64 (4 samples, 1.02%)</title><rect x="1045.5" y="837" width="12.1" height="15.0" fill="rgb(219,84,32)" rx="2" ry="2" />
-<text  x="1048.51" y="847.5" ></text>
+<title>dequeue_entity (4 samples, 0.77%)</title><rect x="1115.4" y="629" width="9.0" height="15.0" fill="rgb(208,164,50)" rx="2" ry="2" />
+<text  x="1118.40" y="639.5" ></text>
 </g>
 <g >
-<title>sys_write (161 samples, 41.07%)</title><rect x="157.5" y="773" width="484.6" height="15.0" fill="rgb(253,124,48)" rx="2" ry="2" />
-<text  x="160.50" y="783.5" >sys_write</text>
+<title>pid_delete_dentry (1 samples, 0.19%)</title><rect x="918.7" y="709" width="2.3" height="15.0" fill="rgb(210,202,27)" rx="2" ry="2" />
+<text  x="921.74" y="719.5" ></text>
 </g>
 <g >
-<title>__skb_clone (1 samples, 0.26%)</title><rect x="627.1" y="549" width="3.0" height="15.0" fill="rgb(210,211,10)" rx="2" ry="2" />
-<text  x="630.09" y="559.5" ></text>
+<title>activate_task (6 samples, 1.15%)</title><rect x="373.9" y="101" width="13.6" height="15.0" fill="rgb(243,168,14)" rx="2" ry="2" />
+<text  x="376.95" y="111.5" ></text>
 </g>
 <g >
-<title>__fdget_pos (2 samples, 0.51%)</title><rect x="73.2" y="757" width="6.0" height="15.0" fill="rgb(235,164,39)" rx="2" ry="2" />
-<text  x="76.21" y="767.5" ></text>
+<title>__kfree_skb (2 samples, 0.38%)</title><rect x="355.9" y="213" width="4.5" height="15.0" fill="rgb(249,107,16)" rx="2" ry="2" />
+<text  x="358.86" y="223.5" ></text>
 </g>
 <g >
-<title>schedule_hrtimeout_range_clock (66 samples, 16.84%)</title><rect x="759.5" y="725" width="198.7" height="15.0" fill="rgb(224,36,51)" rx="2" ry="2" />
-<text  x="762.54" y="735.5" >schedule_hrtimeout_range_c..</text>
+<title>je_tcache_event_hard (1 samples, 0.19%)</title><rect x="1158.4" y="837" width="2.2" height="15.0" fill="rgb(231,125,39)" rx="2" ry="2" />
+<text  x="1161.35" y="847.5" ></text>
 </g>
 <g >
-<title>update_load_avg (5 samples, 1.28%)</title><rect x="524.7" y="53" width="15.1" height="15.0" fill="rgb(240,7,0)" rx="2" ry="2" />
-<text  x="527.74" y="63.5" ></text>
+<title>tcp_recvmsg (1 samples, 0.19%)</title><rect x="114.0" y="677" width="2.2" height="15.0" fill="rgb(206,131,3)" rx="2" ry="2" />
+<text  x="116.98" y="687.5" ></text>
 </g>
 <g >
-<title>prepareClientToWrite (1 samples, 0.26%)</title><rect x="973.3" y="821" width="3.0" height="15.0" fill="rgb(245,200,44)" rx="2" ry="2" />
-<text  x="976.27" y="831.5" ></text>
+<title>call_rcu_sched (1 samples, 0.19%)</title><rect x="916.5" y="725" width="2.2" height="15.0" fill="rgb(208,46,40)" rx="2" ry="2" />
+<text  x="919.48" y="735.5" ></text>
 </g>
 <g >
-<title>minmax_running_min (1 samples, 0.26%)</title><rect x="464.5" y="197" width="3.1" height="15.0" fill="rgb(248,11,11)" rx="2" ry="2" />
-<text  x="467.54" y="207.5" ></text>
+<title>get_unused_fd_flags (1 samples, 0.19%)</title><rect x="957.2" y="757" width="2.2" height="15.0" fill="rgb(252,88,17)" rx="2" ry="2" />
+<text  x="960.16" y="767.5" ></text>
 </g>
 <g >
-<title>entry_SYSCALL_64_after_hwframe (1 samples, 0.26%)</title><rect x="1114.7" y="821" width="3.1" height="15.0" fill="rgb(251,84,30)" rx="2" ry="2" />
-<text  x="1117.74" y="831.5" ></text>
+<title>update_load_avg (2 samples, 0.38%)</title><rect x="1119.9" y="613" width="4.5" height="15.0" fill="rgb(242,54,34)" rx="2" ry="2" />
+<text  x="1122.92" y="623.5" ></text>
 </g>
 <g >
-<title>__netif_receive_skb (61 samples, 15.56%)</title><rect x="404.3" y="389" width="183.7" height="15.0" fill="rgb(254,197,37)" rx="2" ry="2" />
-<text  x="407.34" y="399.5" >__netif_receive_skb</text>
+<title>netif_rx_internal (1 samples, 0.19%)</title><rect x="414.6" y="405" width="2.3" height="15.0" fill="rgb(214,13,31)" rx="2" ry="2" />
+<text  x="417.64" y="415.5" ></text>
 </g>
 <g >
-<title>dictSdsKeyCompare (1 samples, 0.26%)</title><rect x="28.1" y="789" width="3.0" height="15.0" fill="rgb(234,120,29)" rx="2" ry="2" />
-<text  x="31.06" y="799.5" ></text>
+<title>fill_pmd (1 samples, 0.19%)</title><rect x="622.6" y="597" width="2.3" height="15.0" fill="rgb(219,109,26)" rx="2" ry="2" />
+<text  x="625.61" y="607.5" ></text>
 </g>
 <g >
-<title>sched_clock_cpu (1 samples, 0.26%)</title><rect x="777.6" y="629" width="3.0" height="15.0" fill="rgb(218,36,30)" rx="2" ry="2" />
-<text  x="780.60" y="639.5" ></text>
+<title>__mmdrop (1 samples, 0.19%)</title><rect x="595.5" y="661" width="2.2" height="15.0" fill="rgb(243,93,9)" rx="2" ry="2" />
+<text  x="598.48" y="671.5" ></text>
 </g>
 <g >
-<title>ext4_inode_csum_set (2 samples, 0.51%)</title><rect x="250.8" y="597" width="6.0" height="15.0" fill="rgb(245,90,22)" rx="2" ry="2" />
-<text  x="253.82" y="607.5" ></text>
+<title>add_timer (1 samples, 0.19%)</title><rect x="206.7" y="597" width="2.2" height="15.0" fill="rgb(210,194,16)" rx="2" ry="2" />
+<text  x="209.67" y="607.5" ></text>
 </g>
 <g >
-<title>processMultibulkBuffer (1 samples, 0.26%)</title><rect x="976.3" y="821" width="3.0" height="15.0" fill="rgb(233,47,16)" rx="2" ry="2" />
-<text  x="979.28" y="831.5" ></text>
+<title>put_prev_task_fair (1 samples, 0.19%)</title><rect x="873.5" y="677" width="2.3" height="15.0" fill="rgb(223,10,20)" rx="2" ry="2" />
+<text  x="876.52" y="687.5" ></text>
 </g>
 <g >
-<title>pollwake (22 samples, 5.61%)</title><rect x="488.6" y="165" width="66.2" height="15.0" fill="rgb(219,126,14)" rx="2" ry="2" />
-<text  x="491.62" y="175.5" >pollwake</text>
+<title>__netif_receive_skb (41 samples, 7.85%)</title><rect x="317.4" y="389" width="92.7" height="15.0" fill="rgb(253,48,32)" rx="2" ry="2" />
+<text  x="320.43" y="399.5" >__netif_rec..</text>
 </g>
 <g >
-<title>native_flush_tlb_one_user (1 samples, 0.26%)</title><rect x="985.3" y="597" width="3.0" height="15.0" fill="rgb(223,219,19)" rx="2" ry="2" />
-<text  x="988.31" y="607.5" ></text>
+<title>default_wake_function (13 samples, 2.49%)</title><rect x="1061.1" y="629" width="29.4" height="15.0" fill="rgb(211,158,18)" rx="2" ry="2" />
+<text  x="1064.15" y="639.5" >de..</text>
 </g>
 <g >
-<title>__netif_receive_skb_core (61 samples, 15.56%)</title><rect x="404.3" y="373" width="183.7" height="15.0" fill="rgb(221,62,23)" rx="2" ry="2" />
-<text  x="407.34" y="383.5" >__netif_receive_skb_core</text>
+<title>__vdso_gettimeofday (1 samples, 0.19%)</title><rect x="480.2" y="805" width="2.3" height="15.0" fill="rgb(218,14,39)" rx="2" ry="2" />
+<text  x="483.19" y="815.5" ></text>
 </g>
 <g >
-<title>rcu_nmi_exit (1 samples, 0.26%)</title><rect x="928.1" y="597" width="3.0" height="15.0" fill="rgb(219,81,12)" rx="2" ry="2" />
-<text  x="931.11" y="607.5" ></text>
+<title>vfs_write (131 samples, 25.10%)</title><rect x="161.5" y="757" width="296.1" height="15.0" fill="rgb(226,129,31)" rx="2" ry="2" />
+<text  x="164.46" y="767.5" >vfs_write</text>
 </g>
 <g >
-<title>enqueue_to_backlog (2 samples, 0.51%)</title><rect x="606.0" y="389" width="6.0" height="15.0" fill="rgb(250,35,17)" rx="2" ry="2" />
-<text  x="609.02" y="399.5" ></text>
+<title>apparmor_file_permission (2 samples, 0.38%)</title><rect x="147.9" y="709" width="4.5" height="15.0" fill="rgb(233,51,32)" rx="2" ry="2" />
+<text  x="150.89" y="719.5" ></text>
 </g>
 <g >
-<title>__ext4_journal_stop (1 samples, 0.26%)</title><rect x="223.7" y="645" width="3.0" height="15.0" fill="rgb(232,149,6)" rx="2" ry="2" />
-<text  x="226.72" y="655.5" ></text>
+<title>timerqueue_add (1 samples, 0.19%)</title><rect x="566.1" y="677" width="2.3" height="15.0" fill="rgb(206,0,5)" rx="2" ry="2" />
+<text  x="569.09" y="687.5" ></text>
 </g>
 <g >
-<title>__nf_conntrack_find_get (3 samples, 0.77%)</title><rect x="368.2" y="469" width="9.0" height="15.0" fill="rgb(236,22,4)" rx="2" ry="2" />
-<text  x="371.21" y="479.5" ></text>
+<title>__vfs_read (31 samples, 5.94%)</title><rect x="75.6" y="741" width="70.0" height="15.0" fill="rgb(213,114,18)" rx="2" ry="2" />
+<text  x="78.56" y="751.5" >__vfs_r..</text>
 </g>
 <g >
-<title>sock_def_readable (26 samples, 6.63%)</title><rect x="476.6" y="229" width="78.2" height="15.0" fill="rgb(220,113,52)" rx="2" ry="2" />
-<text  x="479.58" y="239.5" >sock_def_..</text>
+<title>kfree_skbmem (1 samples, 0.19%)</title><rect x="355.9" y="197" width="2.2" height="15.0" fill="rgb(254,214,41)" rx="2" ry="2" />
+<text  x="358.86" y="207.5" ></text>
 </g>
 <g >
-<title>tcp_packet (2 samples, 0.51%)</title><rect x="383.3" y="469" width="6.0" height="15.0" fill="rgb(242,130,31)" rx="2" ry="2" />
-<text  x="386.27" y="479.5" ></text>
+<title>page_counter_uncharge (1 samples, 0.19%)</title><rect x="595.5" y="549" width="2.2" height="15.0" fill="rgb(205,78,44)" rx="2" ry="2" />
+<text  x="598.48" y="559.5" ></text>
 </g>
 <g >
-<title>blk_status_to_errno (1 samples, 0.26%)</title><rect x="232.8" y="597" width="3.0" height="15.0" fill="rgb(246,122,53)" rx="2" ry="2" />
-<text  x="235.76" y="607.5" ></text>
+<title>update_min_vruntime (1 samples, 0.19%)</title><rect x="141.1" y="581" width="2.3" height="15.0" fill="rgb(248,150,21)" rx="2" ry="2" />
+<text  x="144.11" y="591.5" ></text>
 </g>
 <g >
-<title>__inet_lookup_established (1 samples, 0.26%)</title><rect x="434.4" y="277" width="3.0" height="15.0" fill="rgb(212,16,7)" rx="2" ry="2" />
-<text  x="437.44" y="287.5" ></text>
+<title>seq_vprintf (2 samples, 0.38%)</title><rect x="127.5" y="645" width="4.6" height="15.0" fill="rgb(217,87,30)" rx="2" ry="2" />
+<text  x="130.55" y="655.5" ></text>
 </g>
 <g >
-<title>entry_SYSCALL_64 (1 samples, 0.26%)</title><rect x="690.3" y="805" width="3.0" height="15.0" fill="rgb(211,152,17)" rx="2" ry="2" />
-<text  x="693.31" y="815.5" ></text>
+<title>hrtimer_try_to_cancel (1 samples, 0.19%)</title><rect x="568.4" y="709" width="2.2" height="15.0" fill="rgb(236,137,22)" rx="2" ry="2" />
+<text  x="571.35" y="719.5" ></text>
 </g>
 <g >
-<title>entry_SYSCALL_64_after_hwframe (89 samples, 22.70%)</title><rect x="693.3" y="805" width="267.9" height="15.0" fill="rgb(236,45,9)" rx="2" ry="2" />
-<text  x="696.32" y="815.5" >entry_SYSCALL_64_after_hwframe</text>
+<title>get_empty_filp (3 samples, 0.57%)</title><rect x="936.8" y="725" width="6.8" height="15.0" fill="rgb(218,155,33)" rx="2" ry="2" />
+<text  x="939.82" y="735.5" ></text>
 </g>
 <g >
-<title>syscall_return_via_sysret (3 samples, 0.77%)</title><rect x="1117.8" y="821" width="9.0" height="15.0" fill="rgb(244,103,12)" rx="2" ry="2" />
-<text  x="1120.76" y="831.5" ></text>
+<title>inet_ehashfn (1 samples, 0.19%)</title><rect x="337.8" y="261" width="2.2" height="15.0" fill="rgb(216,142,36)" rx="2" ry="2" />
+<text  x="340.78" y="271.5" ></text>
 </g>
 <g >
-<title>ext4_ext_map_blocks (2 samples, 0.51%)</title><rect x="226.7" y="629" width="6.1" height="15.0" fill="rgb(238,227,36)" rx="2" ry="2" />
-<text  x="229.73" y="639.5" ></text>
+<title>[unknown] (4 samples, 0.77%)</title><rect x="25.8" y="805" width="9.1" height="15.0" fill="rgb(251,3,35)" rx="2" ry="2" />
+<text  x="28.82" y="815.5" ></text>
 </g>
 <g >
-<title>schedule_hrtimeout_range (68 samples, 17.35%)</title><rect x="753.5" y="741" width="204.7" height="15.0" fill="rgb(250,101,32)" rx="2" ry="2" />
-<text  x="756.52" y="751.5" >schedule_hrtimeout_range</text>
+<title>netif_rx (1 samples, 0.19%)</title><rect x="414.6" y="421" width="2.3" height="15.0" fill="rgb(223,91,48)" rx="2" ry="2" />
+<text  x="417.64" y="431.5" ></text>
 </g>
 <g >
-<title>do_syscall_64 (1 samples, 0.26%)</title><rect x="1114.7" y="805" width="3.1" height="15.0" fill="rgb(253,64,9)" rx="2" ry="2" />
-<text  x="1117.74" y="815.5" ></text>
+<title>inode_permission (2 samples, 0.38%)</title><rect x="943.6" y="709" width="4.5" height="15.0" fill="rgb(229,144,48)" rx="2" ry="2" />
+<text  x="946.60" y="719.5" ></text>
 </g>
 <g >
-<title>pmem_copy_from_iter (1 samples, 0.26%)</title><rect x="166.5" y="629" width="3.0" height="15.0" fill="rgb(218,153,15)" rx="2" ry="2" />
-<text  x="169.53" y="639.5" ></text>
+<title>native_sched_clock (6 samples, 1.15%)</title><rect x="652.0" y="597" width="13.6" height="15.0" fill="rgb(251,86,8)" rx="2" ry="2" />
+<text  x="654.99" y="607.5" ></text>
 </g>
 <g >
-<title>__intel_pmu_enable_all.constprop.23 (2 samples, 0.51%)</title><rect x="807.7" y="597" width="6.0" height="15.0" fill="rgb(216,139,47)" rx="2" ry="2" />
-<text  x="810.70" y="607.5" ></text>
+<title>dictSdsKeyCompare (1 samples, 0.19%)</title><rect x="32.6" y="789" width="2.3" height="15.0" fill="rgb(237,169,25)" rx="2" ry="2" />
+<text  x="35.61" y="799.5" ></text>
 </g>
 <g >
-<title>dax_read_unlock (12 samples, 3.06%)</title><rect x="169.5" y="645" width="36.2" height="15.0" fill="rgb(209,4,53)" rx="2" ry="2" />
-<text  x="172.54" y="655.5" >dax..</text>
+<title>nf_hook_slow (11 samples, 2.11%)</title><rect x="283.5" y="517" width="24.9" height="15.0" fill="rgb(238,174,28)" rx="2" ry="2" />
+<text  x="286.52" y="527.5" >n..</text>
 </g>
 <g >
-<title>jbd2_journal_get_write_access (1 samples, 0.26%)</title><rect x="229.7" y="565" width="3.1" height="15.0" fill="rgb(223,29,49)" rx="2" ry="2" />
-<text  x="232.74" y="575.5" ></text>
+<title>try_to_wake_up (13 samples, 2.49%)</title><rect x="1061.1" y="613" width="29.4" height="15.0" fill="rgb(229,17,31)" rx="2" ry="2" />
+<text  x="1064.15" y="623.5" >tr..</text>
 </g>
 <g >
-<title>fsnotify (1 samples, 0.26%)</title><rect x="142.4" y="725" width="3.1" height="15.0" fill="rgb(224,173,12)" rx="2" ry="2" />
-<text  x="145.45" y="735.5" ></text>
+<title>rb_insert_color (1 samples, 0.19%)</title><rect x="563.8" y="677" width="2.3" height="15.0" fill="rgb(235,227,45)" rx="2" ry="2" />
+<text  x="566.83" y="687.5" ></text>
 </g>
 <g >
-<title>vfprintf (2 samples, 0.51%)</title><rect x="1057.6" y="821" width="6.0" height="15.0" fill="rgb(242,174,37)" rx="2" ry="2" />
-<text  x="1060.55" y="831.5" ></text>
+<title>select_task_rq_fair (1 samples, 0.19%)</title><rect x="364.9" y="133" width="2.3" height="15.0" fill="rgb(213,138,34)" rx="2" ry="2" />
+<text  x="367.90" y="143.5" ></text>
 </g>
 <g >
-<title>redis-server (392 samples, 100.00%)</title><rect x="10.0" y="853" width="1180.0" height="15.0" fill="rgb(208,49,23)" rx="2" ry="2" />
+<title>ext4_iomap_end (11 samples, 2.11%)</title><rect x="218.0" y="661" width="24.8" height="15.0" fill="rgb(222,49,0)" rx="2" ry="2" />
+<text  x="220.97" y="671.5" >e..</text>
+</g>
+<g >
+<title>sock_rfree (2 samples, 0.38%)</title><rect x="86.9" y="597" width="4.5" height="15.0" fill="rgb(240,14,14)" rx="2" ry="2" />
+<text  x="89.86" y="607.5" ></text>
+</g>
+<g >
+<title>apparmor_file_permission (1 samples, 0.19%)</title><rect x="145.6" y="725" width="2.3" height="15.0" fill="rgb(224,34,47)" rx="2" ry="2" />
+<text  x="148.63" y="735.5" ></text>
+</g>
+<g >
+<title>redis-server (522 samples, 100.00%)</title><rect x="10.0" y="853" width="1180.0" height="15.0" fill="rgb(249,180,32)" rx="2" ry="2" />
 <text  x="13.00" y="863.5" >redis-server</text>
 </g>
 <g >
-<title>tcp_v4_rcv (1 samples, 0.26%)</title><rect x="575.9" y="309" width="3.0" height="15.0" fill="rgb(225,229,33)" rx="2" ry="2" />
-<text  x="578.92" y="319.5" ></text>
+<title>__libc_write (134 samples, 25.67%)</title><rect x="154.7" y="821" width="302.9" height="15.0" fill="rgb(217,176,4)" rx="2" ry="2" />
+<text  x="157.67" y="831.5" >__libc_write</text>
 </g>
 <g >
-<title>select_task_rq_fair (3 samples, 0.77%)</title><rect x="491.6" y="117" width="9.1" height="15.0" fill="rgb(227,63,13)" rx="2" ry="2" />
-<text  x="494.63" y="127.5" ></text>
+<title>prepare_to_wait_event (2 samples, 0.38%)</title><rect x="1097.3" y="693" width="4.5" height="15.0" fill="rgb(243,149,8)" rx="2" ry="2" />
+<text  x="1100.32" y="703.5" ></text>
 </g>
 <g >
-<title>idle_cpu (1 samples, 0.26%)</title><rect x="943.2" y="629" width="3.0" height="15.0" fill="rgb(215,177,14)" rx="2" ry="2" />
-<text  x="946.16" y="639.5" ></text>
+<title>vfs_open (2 samples, 0.38%)</title><rect x="952.6" y="725" width="4.6" height="15.0" fill="rgb(213,226,2)" rx="2" ry="2" />
+<text  x="955.64" y="735.5" ></text>
 </g>
 <g >
-<title>do_softirq.part.17 (65 samples, 16.58%)</title><rect x="398.3" y="469" width="195.7" height="15.0" fill="rgb(229,229,3)" rx="2" ry="2" />
-<text  x="401.32" y="479.5" >do_softirq.part.17</text>
+<title>pick_next_task_idle (1 samples, 0.19%)</title><rect x="871.3" y="677" width="2.2" height="15.0" fill="rgb(250,211,22)" rx="2" ry="2" />
+<text  x="874.26" y="687.5" ></text>
 </g>
 <g >
-<title>single_start (1 samples, 0.26%)</title><rect x="133.4" y="725" width="3.0" height="15.0" fill="rgb(230,170,17)" rx="2" ry="2" />
-<text  x="136.42" y="735.5" ></text>
+<title>__libc_read (1 samples, 0.19%)</title><rect x="925.5" y="837" width="2.3" height="15.0" fill="rgb(225,225,42)" rx="2" ry="2" />
+<text  x="928.52" y="847.5" ></text>
 </g>
 <g >
-<title>__memmove_avx_unaligned_erms (7 samples, 1.79%)</title><rect x="1024.4" y="837" width="21.1" height="15.0" fill="rgb(223,83,8)" rx="2" ry="2" />
-<text  x="1027.44" y="847.5" ></text>
+<title>intel_pmu_enable_all (111 samples, 21.26%)</title><rect x="604.5" y="629" width="250.9" height="15.0" fill="rgb(249,133,16)" rx="2" ry="2" />
+<text  x="607.52" y="639.5" >intel_pmu_enable_all</text>
 </g>
 <g >
-<title>tcp_urg (1 samples, 0.26%)</title><rect x="560.9" y="245" width="3.0" height="15.0" fill="rgb(208,14,47)" rx="2" ry="2" />
-<text  x="563.87" y="255.5" ></text>
+<title>apic_timer_interrupt (1 samples, 0.19%)</title><rect x="855.4" y="661" width="2.3" height="15.0" fill="rgb(234,205,16)" rx="2" ry="2" />
+<text  x="858.44" y="671.5" ></text>
 </g>
 <g >
-<title>schedule (64 samples, 16.33%)</title><rect x="765.6" y="709" width="192.6" height="15.0" fill="rgb(247,138,22)" rx="2" ry="2" />
-<text  x="768.56" y="719.5" >schedule</text>
+<title>do_syscall_64 (3 samples, 0.57%)</title><rect x="914.2" y="805" width="6.8" height="15.0" fill="rgb(222,146,23)" rx="2" ry="2" />
+<text  x="917.21" y="815.5" ></text>
 </g>
 <g >
-<title>sock_read_iter (13 samples, 3.32%)</title><rect x="79.2" y="709" width="39.2" height="15.0" fill="rgb(231,134,19)" rx="2" ry="2" />
-<text  x="82.23" y="719.5" >soc..</text>
+<title>sys_epoll_ctl (9 samples, 1.72%)</title><rect x="1025.0" y="789" width="20.3" height="15.0" fill="rgb(248,139,10)" rx="2" ry="2" />
+<text  x="1027.98" y="799.5" ></text>
 </g>
 <g >
-<title>tcp_ack_update_rtt.isra.40 (1 samples, 0.26%)</title><rect x="464.5" y="213" width="3.1" height="15.0" fill="rgb(209,82,27)" rx="2" ry="2" />
-<text  x="467.54" y="223.5" ></text>
+<title>flushAppendOnlyFile.part.1 (1 samples, 0.19%)</title><rect x="1144.8" y="837" width="2.2" height="15.0" fill="rgb(246,114,46)" rx="2" ry="2" />
+<text  x="1147.79" y="847.5" ></text>
 </g>
 <g >
-<title>je_malloc (2 samples, 0.51%)</title><rect x="1138.8" y="837" width="6.0" height="15.0" fill="rgb(212,190,48)" rx="2" ry="2" />
-<text  x="1141.83" y="847.5" ></text>
+<title>__vdso_gettimeofday (1 samples, 0.19%)</title><rect x="909.7" y="805" width="2.3" height="15.0" fill="rgb(233,205,37)" rx="2" ry="2" />
+<text  x="912.69" y="815.5" ></text>
 </g>
 <g >
-<title>sched_clock (1 samples, 0.26%)</title><rect x="777.6" y="613" width="3.0" height="15.0" fill="rgb(226,38,46)" rx="2" ry="2" />
-<text  x="780.60" y="623.5" ></text>
+<title>process_backlog (41 samples, 7.85%)</title><rect x="317.4" y="405" width="92.7" height="15.0" fill="rgb(223,59,18)" rx="2" ry="2" />
+<text  x="320.43" y="415.5" >process_bac..</text>
 </g>
 <g >
-<title>tcp_rcv_established (40 samples, 10.20%)</title><rect x="443.5" y="261" width="120.4" height="15.0" fill="rgb(232,93,7)" rx="2" ry="2" />
-<text  x="446.47" y="271.5" >tcp_rcv_establi..</text>
+<title>__vdso_gettimeofday (1 samples, 0.19%)</title><rect x="970.7" y="837" width="2.3" height="15.0" fill="rgb(211,150,54)" rx="2" ry="2" />
+<text  x="973.73" y="847.5" ></text>
 </g>
 <g >
-<title>ext4_mb_new_blocks (2 samples, 0.51%)</title><rect x="226.7" y="613" width="6.1" height="15.0" fill="rgb(222,75,42)" rx="2" ry="2" />
-<text  x="229.73" y="623.5" ></text>
+<title>exit_to_usermode_loop (3 samples, 0.57%)</title><rect x="914.2" y="789" width="6.8" height="15.0" fill="rgb(228,136,43)" rx="2" ry="2" />
+<text  x="917.21" y="799.5" ></text>
 </g>
 <g >
-<title>hash_conntrack_raw (1 samples, 0.26%)</title><rect x="377.2" y="469" width="3.1" height="15.0" fill="rgb(240,80,9)" rx="2" ry="2" />
-<text  x="380.24" y="479.5" ></text>
+<title>__alloc_fd (1 samples, 0.19%)</title><rect x="957.2" y="741" width="2.2" height="15.0" fill="rgb(253,64,35)" rx="2" ry="2" />
+<text  x="960.16" y="751.5" ></text>
 </g>
 <g >
-<title>netif_rx (3 samples, 0.77%)</title><rect x="603.0" y="421" width="9.0" height="15.0" fill="rgb(210,187,5)" rx="2" ry="2" />
-<text  x="606.01" y="431.5" ></text>
+<title>__ext4_get_inode_loc (1 samples, 0.19%)</title><rect x="240.6" y="613" width="2.2" height="15.0" fill="rgb(209,20,29)" rx="2" ry="2" />
+<text  x="243.57" y="623.5" ></text>
 </g>
 <g >
-<title>activeExpireCycle (1 samples, 0.26%)</title><rect x="37.1" y="805" width="3.0" height="15.0" fill="rgb(231,2,49)" rx="2" ry="2" />
-<text  x="40.09" y="815.5" ></text>
+<title>jbd2_log_wait_commit (22 samples, 4.21%)</title><rect x="1092.8" y="709" width="49.7" height="15.0" fill="rgb(227,23,22)" rx="2" ry="2" />
+<text  x="1095.80" y="719.5" >jbd2_..</text>
 </g>
 <g >
-<title>ctx_sched_out (1 samples, 0.26%)</title><rect x="777.6" y="645" width="3.0" height="15.0" fill="rgb(230,61,25)" rx="2" ry="2" />
-<text  x="780.60" y="655.5" ></text>
+<title>gettimeofday@plt (1 samples, 0.19%)</title><rect x="62.0" y="805" width="2.3" height="15.0" fill="rgb(248,68,6)" rx="2" ry="2" />
+<text  x="64.99" y="815.5" ></text>
 </g>
 <g >
-<title>single_release (1 samples, 0.26%)</title><rect x="1018.4" y="725" width="3.0" height="15.0" fill="rgb(246,14,14)" rx="2" ry="2" />
-<text  x="1021.42" y="735.5" ></text>
+<title>decrRefCount (1 samples, 0.19%)</title><rect x="57.5" y="805" width="2.2" height="15.0" fill="rgb(252,132,11)" rx="2" ry="2" />
+<text  x="60.47" y="815.5" ></text>
 </g>
 <g >
-<title>dequeue_entity (5 samples, 1.28%)</title><rect x="783.6" y="645" width="15.1" height="15.0" fill="rgb(207,160,16)" rx="2" ry="2" />
-<text  x="786.62" y="655.5" ></text>
+<title>dictRehash (1 samples, 0.19%)</title><rect x="59.7" y="805" width="2.3" height="15.0" fill="rgb(225,228,10)" rx="2" ry="2" />
+<text  x="62.73" y="815.5" ></text>
 </g>
 <g >
-<title>entry_SYSCALL_64_after_hwframe (1 samples, 0.26%)</title><rect x="1018.4" y="821" width="3.0" height="15.0" fill="rgb(220,134,27)" rx="2" ry="2" />
-<text  x="1021.42" y="831.5" ></text>
+<title>tcp_rcv_established (26 samples, 4.98%)</title><rect x="340.0" y="261" width="58.8" height="15.0" fill="rgb(233,59,7)" rx="2" ry="2" />
+<text  x="343.04" y="271.5" >tcp_rc..</text>
 </g>
 <g >
-<title>seq_read (4 samples, 1.02%)</title><rect x="121.4" y="725" width="12.0" height="15.0" fill="rgb(248,8,48)" rx="2" ry="2" />
-<text  x="124.38" y="735.5" ></text>
+<title>fput (2 samples, 0.38%)</title><rect x="1018.2" y="789" width="4.5" height="15.0" fill="rgb(225,28,15)" rx="2" ry="2" />
+<text  x="1021.20" y="799.5" ></text>
 </g>
 <g >
-<title>sdsMakeRoomFor (1 samples, 0.26%)</title><rect x="1159.9" y="837" width="3.0" height="15.0" fill="rgb(233,132,14)" rx="2" ry="2" />
-<text  x="1162.90" y="847.5" ></text>
+<title>_raw_spin_lock_irqsave (1 samples, 0.19%)</title><rect x="1090.5" y="661" width="2.3" height="15.0" fill="rgb(252,100,38)" rx="2" ry="2" />
+<text  x="1093.54" y="671.5" ></text>
 </g>
 <g >
-<title>ttwu_do_wakeup (2 samples, 0.51%)</title><rect x="542.8" y="101" width="6.0" height="15.0" fill="rgb(214,214,29)" rx="2" ry="2" />
-<text  x="545.81" y="111.5" ></text>
+<title>skb_release_all (3 samples, 0.57%)</title><rect x="84.6" y="629" width="6.8" height="15.0" fill="rgb(239,96,50)" rx="2" ry="2" />
+<text  x="87.60" y="639.5" ></text>
 </g>
 <g >
-<title>sk_stream_alloc_skb (4 samples, 1.02%)</title><rect x="277.9" y="629" width="12.0" height="15.0" fill="rgb(215,29,4)" rx="2" ry="2" />
-<text  x="280.91" y="639.5" ></text>
+<title>__pthread_disable_asynccancel (1 samples, 0.19%)</title><rect x="963.9" y="837" width="2.3" height="15.0" fill="rgb(223,31,12)" rx="2" ry="2" />
+<text  x="966.95" y="847.5" ></text>
 </g>
 <g >
-<title>copy_user_generic_unrolled (1 samples, 0.26%)</title><rect x="106.3" y="613" width="3.0" height="15.0" fill="rgb(243,15,22)" rx="2" ry="2" />
-<text  x="109.33" y="623.5" ></text>
+<title>hrtimer_start_range_ns (2 samples, 0.38%)</title><rect x="563.8" y="709" width="4.6" height="15.0" fill="rgb(213,81,53)" rx="2" ry="2" />
+<text  x="566.83" y="719.5" ></text>
 </g>
 <g >
-<title>sched_clock_cpu (1 samples, 0.26%)</title><rect x="449.5" y="245" width="3.0" height="15.0" fill="rgb(236,132,14)" rx="2" ry="2" />
-<text  x="452.49" y="255.5" ></text>
+<title>set_root (1 samples, 0.19%)</title><rect x="950.4" y="709" width="2.2" height="15.0" fill="rgb(254,228,32)" rx="2" ry="2" />
+<text  x="953.38" y="719.5" ></text>
 </g>
 <g >
-<title>__check_object_size (1 samples, 0.26%)</title><rect x="1054.5" y="709" width="3.1" height="15.0" fill="rgb(246,17,33)" rx="2" ry="2" />
-<text  x="1057.54" y="719.5" ></text>
+<title>sys_read (36 samples, 6.90%)</title><rect x="73.3" y="773" width="81.4" height="15.0" fill="rgb(240,43,0)" rx="2" ry="2" />
+<text  x="76.30" y="783.5" >sys_read</text>
 </g>
 <g >
-<title>__libc_read (30 samples, 7.65%)</title><rect x="64.2" y="821" width="90.3" height="15.0" fill="rgb(252,45,10)" rx="2" ry="2" />
-<text  x="67.18" y="831.5" >__libc_read</text>
+<title>update_cfs_group (3 samples, 0.57%)</title><rect x="378.5" y="53" width="6.7" height="15.0" fill="rgb(206,98,52)" rx="2" ry="2" />
+<text  x="381.47" y="63.5" ></text>
 </g>
 <g >
-<title>je_realloc (1 samples, 0.26%)</title><rect x="967.2" y="821" width="3.1" height="15.0" fill="rgb(224,19,6)" rx="2" ry="2" />
-<text  x="970.24" y="831.5" ></text>
+<title>put_dec_trunc8 (1 samples, 0.19%)</title><rect x="138.9" y="613" width="2.2" height="15.0" fill="rgb(221,8,15)" rx="2" ry="2" />
+<text  x="141.85" y="623.5" ></text>
 </g>
 <g >
-<title>ipv4_conntrack_defrag (1 samples, 0.26%)</title><rect x="338.1" y="517" width="3.0" height="15.0" fill="rgb(220,105,43)" rx="2" ry="2" />
-<text  x="341.11" y="527.5" ></text>
+<title>__lock_task_sighand (1 samples, 0.19%)</title><rect x="123.0" y="661" width="2.3" height="15.0" fill="rgb(211,184,1)" rx="2" ry="2" />
+<text  x="126.03" y="671.5" ></text>
 </g>
 <g >
-<title>__sched_text_start (62 samples, 15.82%)</title><rect x="768.6" y="693" width="186.6" height="15.0" fill="rgb(235,172,40)" rx="2" ry="2" />
-<text  x="771.57" y="703.5" >__sched_text_start</text>
+<title>start_this_handle (1 samples, 0.19%)</title><rect x="218.0" y="613" width="2.2" height="15.0" fill="rgb(216,1,34)" rx="2" ry="2" />
+<text  x="220.97" y="623.5" ></text>
 </g>
 <g >
-<title>__dev_queue_xmit (7 samples, 1.79%)</title><rect x="594.0" y="469" width="21.1" height="15.0" fill="rgb(223,215,46)" rx="2" ry="2" />
-<text  x="596.98" y="479.5" ></text>
+<title>sock_write_iter (91 samples, 17.43%)</title><rect x="242.8" y="709" width="205.7" height="15.0" fill="rgb(226,129,27)" rx="2" ry="2" />
+<text  x="245.84" y="719.5" >sock_write_iter</text>
 </g>
 <g >
-<title>__mark_inode_dirty (1 samples, 0.26%)</title><rect x="226.7" y="597" width="3.0" height="15.0" fill="rgb(235,119,50)" rx="2" ry="2" />
-<text  x="229.73" y="607.5" ></text>
+<title>activate_task (3 samples, 0.57%)</title><rect x="1079.2" y="581" width="6.8" height="15.0" fill="rgb(210,168,23)" rx="2" ry="2" />
+<text  x="1082.23" y="591.5" ></text>
 </g>
 <g >
-<title>ip_finish_output (75 samples, 19.13%)</title><rect x="389.3" y="517" width="225.8" height="15.0" fill="rgb(209,70,0)" rx="2" ry="2" />
-<text  x="392.29" y="527.5" >ip_finish_output</text>
+<title>__inet_lookup_established (3 samples, 0.57%)</title><rect x="333.3" y="277" width="6.7" height="15.0" fill="rgb(246,36,37)" rx="2" ry="2" />
+<text  x="336.26" y="287.5" ></text>
 </g>
 <g >
-<title>pick_next_task_idle (1 samples, 0.26%)</title><rect x="952.2" y="677" width="3.0" height="15.0" fill="rgb(205,13,22)" rx="2" ry="2" />
-<text  x="955.19" y="687.5" ></text>
+<title>_copy_from_iter_full (2 samples, 0.38%)</title><rect x="245.1" y="629" width="4.5" height="15.0" fill="rgb(246,66,5)" rx="2" ry="2" />
+<text  x="248.10" y="639.5" ></text>
 </g>
 <g >
-<title>find_busiest_group (5 samples, 1.28%)</title><rect x="931.1" y="645" width="15.1" height="15.0" fill="rgb(206,139,27)" rx="2" ry="2" />
-<text  x="934.12" y="655.5" ></text>
+<title>__fget (2 samples, 0.38%)</title><rect x="1029.5" y="741" width="4.5" height="15.0" fill="rgb(215,167,40)" rx="2" ry="2" />
+<text  x="1032.50" y="751.5" ></text>
 </g>
 <g >
-<title>crc32c_pcl_intel_update (1 samples, 0.26%)</title><rect x="235.8" y="581" width="3.0" height="15.0" fill="rgb(246,35,35)" rx="2" ry="2" />
-<text  x="238.77" y="591.5" ></text>
+<title>mutex_unlock (1 samples, 0.19%)</title><rect x="1022.7" y="789" width="2.3" height="15.0" fill="rgb(218,59,20)" rx="2" ry="2" />
+<text  x="1025.72" y="799.5" ></text>
 </g>
 <g >
-<title>ep_item_poll.isra.12 (4 samples, 1.02%)</title><rect x="729.4" y="709" width="12.1" height="15.0" fill="rgb(241,93,43)" rx="2" ry="2" />
-<text  x="732.44" y="719.5" ></text>
+<title>tcp_queue_rcv (1 samples, 0.19%)</title><rect x="394.3" y="245" width="2.3" height="15.0" fill="rgb(228,214,54)" rx="2" ry="2" />
+<text  x="397.29" y="255.5" ></text>
 </g>
 <g >
-<title>getname_flags (1 samples, 0.26%)</title><rect x="1054.5" y="741" width="3.1" height="15.0" fill="rgb(234,193,32)" rx="2" ry="2" />
-<text  x="1057.54" y="751.5" ></text>
+<title>start_this_handle (4 samples, 0.77%)</title><rect x="199.9" y="613" width="9.0" height="15.0" fill="rgb(221,26,36)" rx="2" ry="2" />
+<text  x="202.89" y="623.5" ></text>
 </g>
 <g >
-<title>ll2string (1 samples, 0.26%)</title><rect x="970.3" y="821" width="3.0" height="15.0" fill="rgb(219,90,12)" rx="2" ry="2" />
-<text  x="973.26" y="831.5" ></text>
+<title>[unknown] (18 samples, 3.45%)</title><rect x="25.8" y="821" width="40.7" height="15.0" fill="rgb(242,113,52)" rx="2" ry="2" />
+<text  x="28.82" y="831.5" >[un..</text>
 </g>
 <g >
-<title>finish_task_switch (43 samples, 10.97%)</title><rect x="801.7" y="677" width="129.4" height="15.0" fill="rgb(250,124,42)" rx="2" ry="2" />
-<text  x="804.68" y="687.5" >finish_task_switch</text>
+<title>[[vdso]] (1 samples, 0.19%)</title><rect x="909.7" y="789" width="2.3" height="15.0" fill="rgb(242,149,54)" rx="2" ry="2" />
+<text  x="912.69" y="799.5" ></text>
 </g>
 <g >
-<title>ghes_notify_nmi (1 samples, 0.26%)</title><rect x="816.7" y="597" width="3.0" height="15.0" fill="rgb(210,184,34)" rx="2" ry="2" />
-<text  x="819.73" y="607.5" ></text>
+<title>native_write_cr2 (1 samples, 0.19%)</title><rect x="665.6" y="597" width="2.2" height="15.0" fill="rgb(246,143,2)" rx="2" ry="2" />
+<text  x="668.56" y="607.5" ></text>
 </g>
 <g >
-<title>__perf_event_task_sched_out (1 samples, 0.26%)</title><rect x="777.6" y="677" width="3.0" height="15.0" fill="rgb(244,101,26)" rx="2" ry="2" />
-<text  x="780.60" y="687.5" ></text>
+<title>aeCreateFileEvent (1 samples, 0.19%)</title><rect x="477.9" y="821" width="2.3" height="15.0" fill="rgb(233,106,49)" rx="2" ry="2" />
+<text  x="480.93" y="831.5" ></text>
 </g>
 <g >
-<title>tcp_wfree (1 samples, 0.26%)</title><rect x="612.0" y="421" width="3.1" height="15.0" fill="rgb(224,76,22)" rx="2" ry="2" />
-<text  x="615.04" y="431.5" ></text>
+<title>ext4_inode_csum.isra.57 (3 samples, 0.57%)</title><rect x="224.8" y="581" width="6.7" height="15.0" fill="rgb(250,189,49)" rx="2" ry="2" />
+<text  x="227.75" y="591.5" ></text>
 </g>
 <g >
-<title>__srcu_read_unlock (12 samples, 3.06%)</title><rect x="169.5" y="629" width="36.2" height="15.0" fill="rgb(218,198,25)" rx="2" ry="2" />
-<text  x="172.54" y="639.5" >__s..</text>
+<title>_raw_spin_unlock_irqrestore (3 samples, 0.57%)</title><rect x="516.4" y="741" width="6.7" height="15.0" fill="rgb(234,65,3)" rx="2" ry="2" />
+<text  x="519.36" y="751.5" ></text>
 </g>
 <g >
-<title>apparmor_file_alloc_security (1 samples, 0.26%)</title><rect x="1045.5" y="693" width="3.0" height="15.0" fill="rgb(206,128,50)" rx="2" ry="2" />
-<text  x="1048.51" y="703.5" ></text>
+<title>__fdget (1 samples, 0.19%)</title><rect x="505.1" y="757" width="2.2" height="15.0" fill="rgb(216,165,13)" rx="2" ry="2" />
+<text  x="508.06" y="767.5" ></text>
 </g>
 <g >
-<title>apic_timer_interrupt (1 samples, 0.26%)</title><rect x="1009.4" y="661" width="3.0" height="15.0" fill="rgb(239,228,11)" rx="2" ry="2" />
-<text  x="1012.39" y="671.5" ></text>
+<title>entry_SYSCALL_64_after_hwframe (174 samples, 33.33%)</title><rect x="498.3" y="805" width="393.3" height="15.0" fill="rgb(229,78,48)" rx="2" ry="2" />
+<text  x="501.28" y="815.5" >entry_SYSCALL_64_after_hwframe</text>
 </g>
 <g >
-<title>__ext4_handle_dirty_super (1 samples, 0.26%)</title><rect x="235.8" y="629" width="3.0" height="15.0" fill="rgb(244,2,1)" rx="2" ry="2" />
-<text  x="238.77" y="639.5" ></text>
+<title>ip_queue_xmit (66 samples, 12.64%)</title><rect x="276.7" y="565" width="149.2" height="15.0" fill="rgb(225,219,33)" rx="2" ry="2" />
+<text  x="279.74" y="575.5" >ip_queue_xmit</text>
 </g>
 <g >
-<title>ip_copy_addrs (1 samples, 0.26%)</title><rect x="323.1" y="565" width="3.0" height="15.0" fill="rgb(220,122,44)" rx="2" ry="2" />
-<text  x="326.06" y="575.5" ></text>
+<title>__call_rcu.constprop.69 (1 samples, 0.19%)</title><rect x="916.5" y="709" width="2.2" height="15.0" fill="rgb(238,161,45)" rx="2" ry="2" />
+<text  x="919.48" y="719.5" ></text>
 </g>
 <g >
-<title>__vfs_write (159 samples, 40.56%)</title><rect x="160.5" y="741" width="478.6" height="15.0" fill="rgb(242,25,37)" rx="2" ry="2" />
-<text  x="163.51" y="751.5" >__vfs_write</text>
+<title>__ext4_journal_start_sb (1 samples, 0.19%)</title><rect x="218.0" y="645" width="2.2" height="15.0" fill="rgb(226,48,21)" rx="2" ry="2" />
+<text  x="220.97" y="655.5" ></text>
 </g>
 <g >
-<title>ipv4_conntrack_in (1 samples, 0.26%)</title><rect x="584.9" y="325" width="3.1" height="15.0" fill="rgb(230,172,49)" rx="2" ry="2" />
-<text  x="587.95" y="335.5" ></text>
+<title>trackInstantaneousMetric (1 samples, 0.19%)</title><rect x="909.7" y="821" width="2.3" height="15.0" fill="rgb(207,222,40)" rx="2" ry="2" />
+<text  x="912.69" y="831.5" ></text>
 </g>
 <g >
-<title>do_syscall_64 (28 samples, 7.14%)</title><rect x="70.2" y="789" width="84.3" height="15.0" fill="rgb(214,19,53)" rx="2" ry="2" />
-<text  x="73.20" y="799.5" >do_syscal..</text>
+<title>enqueue_entity (2 samples, 0.38%)</title><rect x="1081.5" y="549" width="4.5" height="15.0" fill="rgb(224,69,28)" rx="2" ry="2" />
+<text  x="1084.49" y="559.5" ></text>
 </g>
 <g >
-<title>sock_rfree (1 samples, 0.26%)</title><rect x="91.3" y="597" width="3.0" height="15.0" fill="rgb(225,96,45)" rx="2" ry="2" />
-<text  x="94.28" y="607.5" ></text>
+<title>tcp_push (78 samples, 14.94%)</title><rect x="260.9" y="629" width="176.3" height="15.0" fill="rgb(235,42,23)" rx="2" ry="2" />
+<text  x="263.92" y="639.5" >tcp_push</text>
 </g>
 <g >
-<title>pick_next_task_idle (1 samples, 0.26%)</title><rect x="955.2" y="693" width="3.0" height="15.0" fill="rgb(210,80,33)" rx="2" ry="2" />
-<text  x="958.20" y="703.5" ></text>
+<title>security_file_permission (3 samples, 0.57%)</title><rect x="147.9" y="725" width="6.8" height="15.0" fill="rgb(253,129,31)" rx="2" ry="2" />
+<text  x="150.89" y="735.5" ></text>
 </g>
 <g >
-<title>select_estimate_accuracy (1 samples, 0.26%)</title><rect x="958.2" y="741" width="3.0" height="15.0" fill="rgb(230,185,2)" rx="2" ry="2" />
-<text  x="961.21" y="751.5" ></text>
+<title>processCommand (2 samples, 0.38%)</title><rect x="1162.9" y="837" width="4.5" height="15.0" fill="rgb(233,29,9)" rx="2" ry="2" />
+<text  x="1165.87" y="847.5" ></text>
 </g>
 <g >
-<title>__softirqentry_text_start (64 samples, 16.33%)</title><rect x="401.3" y="437" width="192.7" height="15.0" fill="rgb(231,96,3)" rx="2" ry="2" />
-<text  x="404.33" y="447.5" >__softirqentry_text_start</text>
+<title>ep_send_events_proc (9 samples, 1.72%)</title><rect x="532.2" y="725" width="20.3" height="15.0" fill="rgb(244,207,41)" rx="2" ry="2" />
+<text  x="535.18" y="735.5" ></text>
 </g>
 <g >
-<title>common_file_perm (3 samples, 0.77%)</title><rect x="145.5" y="693" width="9.0" height="15.0" fill="rgb(238,54,26)" rx="2" ry="2" />
-<text  x="148.46" y="703.5" ></text>
+<title>acpi_os_read_memory (4 samples, 0.77%)</title><rect x="606.8" y="597" width="9.0" height="15.0" fill="rgb(217,226,54)" rx="2" ry="2" />
+<text  x="609.78" y="607.5" ></text>
 </g>
 <g >
-<title>__tcp_push_pending_frames (112 samples, 28.57%)</title><rect x="293.0" y="613" width="337.1" height="15.0" fill="rgb(247,58,8)" rx="2" ry="2" />
-<text  x="295.96" y="623.5" >__tcp_push_pending_frames</text>
+<title>__find_get_block (1 samples, 0.19%)</title><rect x="240.6" y="597" width="2.2" height="15.0" fill="rgb(252,124,43)" rx="2" ry="2" />
+<text  x="243.57" y="607.5" ></text>
 </g>
 <g >
-<title>tcp_sendmsg_locked (122 samples, 31.12%)</title><rect x="268.9" y="645" width="367.2" height="15.0" fill="rgb(215,179,6)" rx="2" ry="2" />
-<text  x="271.88" y="655.5" >tcp_sendmsg_locked</text>
+<title>tcp_v4_do_rcv (26 samples, 4.98%)</title><rect x="340.0" y="277" width="58.8" height="15.0" fill="rgb(249,43,26)" rx="2" ry="2" />
+<text  x="343.04" y="287.5" >tcp_v4..</text>
 </g>
 <g >
-<title>__kernel_fpu_begin (1 samples, 0.26%)</title><rect x="235.8" y="549" width="3.0" height="15.0" fill="rgb(222,56,20)" rx="2" ry="2" />
-<text  x="238.77" y="559.5" ></text>
+<title>irq_exit (1 samples, 0.19%)</title><rect x="855.4" y="629" width="2.3" height="15.0" fill="rgb(214,143,24)" rx="2" ry="2" />
+<text  x="858.44" y="639.5" ></text>
 </g>
 <g >
-<title>close@plt (1 samples, 0.26%)</title><rect x="1078.6" y="837" width="3.0" height="15.0" fill="rgb(218,118,11)" rx="2" ry="2" />
-<text  x="1081.62" y="847.5" ></text>
+<title>__kfree_skb (5 samples, 0.96%)</title><rect x="80.1" y="645" width="11.3" height="15.0" fill="rgb(250,143,51)" rx="2" ry="2" />
+<text  x="83.08" y="655.5" ></text>
 </g>
 <g >
-<title>__local_bh_enable_ip (65 samples, 16.58%)</title><rect x="398.3" y="485" width="195.7" height="15.0" fill="rgb(238,54,8)" rx="2" ry="2" />
-<text  x="401.32" y="495.5" >__local_bh_enable_ip</text>
+<title>dequeue_task_fair (5 samples, 0.96%)</title><rect x="1113.1" y="645" width="11.3" height="15.0" fill="rgb(227,184,27)" rx="2" ry="2" />
+<text  x="1116.14" y="655.5" ></text>
 </g>
 <g >
-<title>update_blocked_averages (2 samples, 0.51%)</title><rect x="946.2" y="661" width="6.0" height="15.0" fill="rgb(227,207,52)" rx="2" ry="2" />
-<text  x="949.17" y="671.5" ></text>
+<title>fput (1 samples, 0.19%)</title><rect x="159.2" y="757" width="2.3" height="15.0" fill="rgb(210,121,52)" rx="2" ry="2" />
+<text  x="162.20" y="767.5" ></text>
 </g>
 <g >
-<title>do_syscall_64 (1 samples, 0.26%)</title><rect x="1018.4" y="805" width="3.0" height="15.0" fill="rgb(240,111,46)" rx="2" ry="2" />
-<text  x="1021.42" y="815.5" ></text>
+<title>tcp_data_queue (14 samples, 2.68%)</title><rect x="362.6" y="245" width="31.7" height="15.0" fill="rgb(239,95,29)" rx="2" ry="2" />
+<text  x="365.64" y="255.5" >tc..</text>
 </g>
 <g >
-<title>smp_apic_timer_interrupt (1 samples, 0.26%)</title><rect x="1009.4" y="645" width="3.0" height="15.0" fill="rgb(234,62,48)" rx="2" ry="2" />
-<text  x="1012.39" y="655.5" ></text>
+<title>ep_item_poll.isra.12 (4 samples, 0.77%)</title><rect x="541.2" y="709" width="9.1" height="15.0" fill="rgb(246,217,22)" rx="2" ry="2" />
+<text  x="544.23" y="719.5" ></text>
 </g>
 <g >
-<title>nf_hook_slow (3 samples, 0.77%)</title><rect x="615.1" y="517" width="9.0" height="15.0" fill="rgb(252,98,15)" rx="2" ry="2" />
-<text  x="618.05" y="527.5" ></text>
+<title>sk_stream_alloc_skb (4 samples, 0.77%)</title><rect x="249.6" y="629" width="9.1" height="15.0" fill="rgb(235,145,42)" rx="2" ry="2" />
+<text  x="252.62" y="639.5" ></text>
 </g>
 <g >
-<title>ktime_get_ts64 (2 samples, 0.51%)</title><rect x="747.5" y="741" width="6.0" height="15.0" fill="rgb(219,181,20)" rx="2" ry="2" />
-<text  x="750.50" y="751.5" ></text>
+<title>sock_recvmsg (18 samples, 3.45%)</title><rect x="75.6" y="693" width="40.6" height="15.0" fill="rgb(247,105,36)" rx="2" ry="2" />
+<text  x="78.56" y="703.5" >soc..</text>
 </g>
 <g >
-<title>ip_rcv_finish (55 samples, 14.03%)</title><rect x="413.4" y="341" width="165.5" height="15.0" fill="rgb(249,118,8)" rx="2" ry="2" />
-<text  x="416.37" y="351.5" >ip_rcv_finish</text>
+<title>__cgroup_account_cputime (1 samples, 0.19%)</title><rect x="1117.7" y="597" width="2.2" height="15.0" fill="rgb(232,152,2)" rx="2" ry="2" />
+<text  x="1120.66" y="607.5" ></text>
 </g>
 <g >
-<title>seq_put_decimal_ll (2 samples, 0.51%)</title><rect x="124.4" y="661" width="6.0" height="15.0" fill="rgb(244,188,17)" rx="2" ry="2" />
-<text  x="127.39" y="671.5" ></text>
+<title>__update_load_avg_se.isra.37 (1 samples, 0.19%)</title><rect x="1081.5" y="533" width="2.3" height="15.0" fill="rgb(240,149,0)" rx="2" ry="2" />
+<text  x="1084.49" y="543.5" ></text>
 </g>
 <g >
-<title>hrtimer_start_range_ns (2 samples, 0.51%)</title><rect x="759.5" y="709" width="6.1" height="15.0" fill="rgb(210,174,3)" rx="2" ry="2" />
-<text  x="762.54" y="719.5" ></text>
+<title>mark_page_accessed (1 samples, 0.19%)</title><rect x="233.8" y="565" width="2.3" height="15.0" fill="rgb(232,133,54)" rx="2" ry="2" />
+<text  x="236.79" y="575.5" ></text>
 </g>
 <g >
-<title>ext4_inode_csum.isra.57 (2 samples, 0.51%)</title><rect x="250.8" y="581" width="6.0" height="15.0" fill="rgb(225,52,13)" rx="2" ry="2" />
-<text  x="253.82" y="591.5" ></text>
+<title>__vdso_gettimeofday (1 samples, 0.19%)</title><rect x="462.1" y="821" width="2.3" height="15.0" fill="rgb(205,223,3)" rx="2" ry="2" />
+<text  x="465.11" y="831.5" ></text>
 </g>
 <g >
-<title>up_write (2 samples, 0.51%)</title><rect x="259.8" y="693" width="6.1" height="15.0" fill="rgb(249,152,53)" rx="2" ry="2" />
-<text  x="262.85" y="703.5" ></text>
+<title>tcp_tso_segs (2 samples, 0.38%)</title><rect x="430.5" y="581" width="4.5" height="15.0" fill="rgb(252,69,31)" rx="2" ry="2" />
+<text  x="433.46" y="591.5" ></text>
 </g>
 <g >
-<title>blkdev_issue_zeroout (1 samples, 0.26%)</title><rect x="232.8" y="613" width="3.0" height="15.0" fill="rgb(233,149,12)" rx="2" ry="2" />
-<text  x="235.76" y="623.5" ></text>
+<title>dictNext (5 samples, 0.96%)</title><rect x="1002.4" y="837" width="11.3" height="15.0" fill="rgb(209,80,34)" rx="2" ry="2" />
+<text  x="1005.38" y="847.5" ></text>
 </g>
 <g >
-<title>__vsnprintf_chk (2 samples, 0.51%)</title><rect x="1057.6" y="837" width="6.0" height="15.0" fill="rgb(252,167,24)" rx="2" ry="2" />
-<text  x="1060.55" y="847.5" ></text>
+<title>[unknown] (399 samples, 76.44%)</title><rect x="10.0" y="837" width="902.0" height="15.0" fill="rgb(224,98,42)" rx="2" ry="2" />
+<text  x="13.00" y="847.5" >[unknown]</text>
 </g>
 <g >
-<title>____fput (1 samples, 0.26%)</title><rect x="1018.4" y="757" width="3.0" height="15.0" fill="rgb(223,143,25)" rx="2" ry="2" />
-<text  x="1021.42" y="767.5" ></text>
+<title>dequeue_task_fair (6 samples, 1.15%)</title><rect x="579.7" y="661" width="13.5" height="15.0" fill="rgb(208,201,6)" rx="2" ry="2" />
+<text  x="582.66" y="671.5" ></text>
 </g>
 <g >
-<title>native_write_msr (6 samples, 1.53%)</title><rect x="988.3" y="597" width="18.1" height="15.0" fill="rgb(237,54,42)" rx="2" ry="2" />
-<text  x="991.32" y="607.5" ></text>
+<title>reweight_entity (1 samples, 0.19%)</title><rect x="584.2" y="613" width="2.2" height="15.0" fill="rgb(241,128,1)" rx="2" ry="2" />
+<text  x="587.18" y="623.5" ></text>
 </g>
 <g >
-<title>aeProcessEvents (1 samples, 0.26%)</title><rect x="46.1" y="805" width="3.0" height="15.0" fill="rgb(244,208,16)" rx="2" ry="2" />
-<text  x="49.12" y="815.5" ></text>
+<title>new_sync_read (18 samples, 3.45%)</title><rect x="75.6" y="725" width="40.6" height="15.0" fill="rgb(205,109,45)" rx="2" ry="2" />
+<text  x="78.56" y="735.5" >new..</text>
 </g>
 <g >
-<title>do_syscall_64 (89 samples, 22.70%)</title><rect x="693.3" y="789" width="267.9" height="15.0" fill="rgb(240,4,20)" rx="2" ry="2" />
-<text  x="696.32" y="799.5" >do_syscall_64</text>
+<title>skb_release_data (1 samples, 0.19%)</title><rect x="358.1" y="181" width="2.3" height="15.0" fill="rgb(239,2,10)" rx="2" ry="2" />
+<text  x="361.12" y="191.5" ></text>
 </g>
 <g >
-<title>jbd2__journal_start (1 samples, 0.26%)</title><rect x="241.8" y="629" width="3.0" height="15.0" fill="rgb(213,42,36)" rx="2" ry="2" />
-<text  x="244.79" y="639.5" ></text>
+<title>do_fsync (38 samples, 7.28%)</title><rect x="1056.6" y="773" width="85.9" height="15.0" fill="rgb(249,62,17)" rx="2" ry="2" />
+<text  x="1059.63" y="783.5" >do_fsync</text>
 </g>
 <g >
-<title>netif_rx_internal (2 samples, 0.51%)</title><rect x="606.0" y="405" width="6.0" height="15.0" fill="rgb(232,199,30)" rx="2" ry="2" />
-<text  x="609.02" y="415.5" ></text>
+<title>____fput (3 samples, 0.57%)</title><rect x="914.2" y="757" width="6.8" height="15.0" fill="rgb(242,126,32)" rx="2" ry="2" />
+<text  x="917.21" y="767.5" ></text>
 </g>
 <g >
-<title>ip_finish_output2 (74 samples, 18.88%)</title><rect x="392.3" y="501" width="222.8" height="15.0" fill="rgb(222,22,54)" rx="2" ry="2" />
-<text  x="395.30" y="511.5" >ip_finish_output2</text>
+<title>tcp_event_new_data_sent (1 samples, 0.19%)</title><rect x="428.2" y="581" width="2.3" height="15.0" fill="rgb(247,176,30)" rx="2" ry="2" />
+<text  x="431.20" y="591.5" ></text>
 </g>
 <g >
-<title>ip_output (78 samples, 19.90%)</title><rect x="389.3" y="533" width="234.8" height="15.0" fill="rgb(217,143,6)" rx="2" ry="2" />
-<text  x="392.29" y="543.5" >ip_output</text>
+<title>getDecodedObject (1 samples, 0.19%)</title><rect x="896.1" y="821" width="2.3" height="15.0" fill="rgb(238,206,9)" rx="2" ry="2" />
+<text  x="899.13" y="831.5" ></text>
 </g>
 <g >
-<title>tcp_write_xmit (108 samples, 27.55%)</title><rect x="305.0" y="597" width="325.1" height="15.0" fill="rgb(215,43,2)" rx="2" ry="2" />
-<text  x="308.00" y="607.5" >tcp_write_xmit</text>
+<title>update_rq_clock (1 samples, 0.19%)</title><rect x="1088.3" y="597" width="2.2" height="15.0" fill="rgb(251,70,18)" rx="2" ry="2" />
+<text  x="1091.28" y="607.5" ></text>
 </g>
 <g >
-<title>tryResizeHashTables (1 samples, 0.26%)</title><rect x="1168.9" y="837" width="3.0" height="15.0" fill="rgb(210,160,30)" rx="2" ry="2" />
-<text  x="1171.93" y="847.5" ></text>
+<title>_IO_old_init (2 samples, 0.38%)</title><rect x="66.5" y="821" width="4.5" height="15.0" fill="rgb(254,4,54)" rx="2" ry="2" />
+<text  x="69.51" y="831.5" ></text>
 </g>
 <g >
-<title>__ctype_tolower_loc (1 samples, 0.26%)</title><rect x="1021.4" y="837" width="3.0" height="15.0" fill="rgb(250,53,34)" rx="2" ry="2" />
-<text  x="1024.43" y="847.5" ></text>
+<title>__ext4_get_inode_loc (2 samples, 0.38%)</title><rect x="231.5" y="613" width="4.6" height="15.0" fill="rgb(233,210,51)" rx="2" ry="2" />
+<text  x="234.53" y="623.5" ></text>
 </g>
 <g >
-<title>sys_futex (11 samples, 2.81%)</title><rect x="979.3" y="773" width="33.1" height="15.0" fill="rgb(235,212,4)" rx="2" ry="2" />
-<text  x="982.29" y="783.5" >sy..</text>
+<title>num_to_str (4 samples, 0.77%)</title><rect x="132.1" y="645" width="9.0" height="15.0" fill="rgb(233,111,16)" rx="2" ry="2" />
+<text  x="135.07" y="655.5" ></text>
 </g>
 <g >
-<title>zfree (3 samples, 0.77%)</title><rect x="1171.9" y="837" width="9.1" height="15.0" fill="rgb(235,157,13)" rx="2" ry="2" />
-<text  x="1174.94" y="847.5" ></text>
+<title>common_file_perm (2 samples, 0.38%)</title><rect x="147.9" y="693" width="4.5" height="15.0" fill="rgb(246,101,43)" rx="2" ry="2" />
+<text  x="150.89" y="703.5" ></text>
 </g>
 <g >
-<title>x86_pmu_enable (41 samples, 10.46%)</title><rect x="807.7" y="645" width="123.4" height="15.0" fill="rgb(234,107,40)" rx="2" ry="2" />
-<text  x="810.70" y="655.5" >x86_pmu_enable</text>
+<title>_raw_spin_lock_irqsave (1 samples, 0.19%)</title><rect x="527.7" y="725" width="2.2" height="15.0" fill="rgb(216,228,17)" rx="2" ry="2" />
+<text  x="530.66" y="735.5" ></text>
 </g>
 <g >
-<title>ns_to_timespec64 (1 samples, 0.26%)</title><rect x="100.3" y="645" width="3.0" height="15.0" fill="rgb(240,225,27)" rx="2" ry="2" />
-<text  x="103.31" y="655.5" ></text>
+<title>ip_local_deliver_finish (31 samples, 5.94%)</title><rect x="328.7" y="309" width="70.1" height="15.0" fill="rgb(244,158,30)" rx="2" ry="2" />
+<text  x="331.74" y="319.5" >ip_loca..</text>
 </g>
 <g >
-<title>nf_hook_slow (15 samples, 3.83%)</title><rect x="344.1" y="517" width="45.2" height="15.0" fill="rgb(220,164,48)" rx="2" ry="2" />
-<text  x="347.13" y="527.5" >nf_h..</text>
+<title>__vdso_gettimeofday (2 samples, 0.38%)</title><rect x="43.9" y="789" width="4.5" height="15.0" fill="rgb(254,202,11)" rx="2" ry="2" />
+<text  x="46.91" y="799.5" ></text>
 </g>
 <g >
-<title>pmem_dax_direct_access (1 samples, 0.26%)</title><rect x="205.7" y="645" width="3.0" height="15.0" fill="rgb(222,143,43)" rx="2" ry="2" />
-<text  x="208.66" y="655.5" ></text>
+<title>sys_write (133 samples, 25.48%)</title><rect x="156.9" y="773" width="300.7" height="15.0" fill="rgb(208,146,21)" rx="2" ry="2" />
+<text  x="159.93" y="783.5" >sys_write</text>
 </g>
 <g >
-<title>futex_wait_queue_me (11 samples, 2.81%)</title><rect x="979.3" y="725" width="33.1" height="15.0" fill="rgb(228,130,30)" rx="2" ry="2" />
-<text  x="982.29" y="735.5" >fu..</text>
+<title>kfree_skbmem (2 samples, 0.38%)</title><rect x="80.1" y="629" width="4.5" height="15.0" fill="rgb(227,182,0)" rx="2" ry="2" />
+<text  x="83.08" y="639.5" ></text>
 </g>
 <g >
-<title>feedAppendOnlyFile (1 samples, 0.26%)</title><rect x="58.2" y="805" width="3.0" height="15.0" fill="rgb(235,90,44)" rx="2" ry="2" />
-<text  x="61.16" y="815.5" ></text>
+<title>update_blocked_averages (1 samples, 0.19%)</title><rect x="869.0" y="661" width="2.3" height="15.0" fill="rgb(252,177,52)" rx="2" ry="2" />
+<text  x="872.00" y="671.5" ></text>
 </g>
 <g >
-<title>task_work_run (1 samples, 0.26%)</title><rect x="1018.4" y="773" width="3.0" height="15.0" fill="rgb(250,24,39)" rx="2" ry="2" />
-<text  x="1021.42" y="783.5" ></text>
+<title>__softirqentry_text_start (1 samples, 0.19%)</title><rect x="855.4" y="613" width="2.3" height="15.0" fill="rgb(235,96,5)" rx="2" ry="2" />
+<text  x="858.44" y="623.5" ></text>
 </g>
 <g >
-<title>new_sync_read (13 samples, 3.32%)</title><rect x="79.2" y="725" width="39.2" height="15.0" fill="rgb(234,204,48)" rx="2" ry="2" />
-<text  x="82.23" y="735.5" >new..</text>
+<title>ep_item_poll.isra.12 (1 samples, 0.19%)</title><rect x="1038.5" y="773" width="2.3" height="15.0" fill="rgb(241,217,45)" rx="2" ry="2" />
+<text  x="1041.54" y="783.5" ></text>
 </g>
 <g >
-<title>ep_scan_ready_list.constprop.17 (11 samples, 2.81%)</title><rect x="714.4" y="741" width="33.1" height="15.0" fill="rgb(243,179,54)" rx="2" ry="2" />
-<text  x="717.39" y="751.5" >ep..</text>
+<title>ksize (1 samples, 0.19%)</title><rect x="256.4" y="597" width="2.3" height="15.0" fill="rgb(205,36,0)" rx="2" ry="2" />
+<text  x="259.40" y="607.5" ></text>
 </g>
 <g >
-<title>intel_pmu_enable_all (9 samples, 2.30%)</title><rect x="982.3" y="629" width="27.1" height="15.0" fill="rgb(248,46,48)" rx="2" ry="2" />
-<text  x="985.30" y="639.5" >i..</text>
+<title>intel_bts_enable_local (3 samples, 0.57%)</title><rect x="629.4" y="597" width="6.8" height="15.0" fill="rgb(214,132,42)" rx="2" ry="2" />
+<text  x="632.39" y="607.5" ></text>
 </g>
 <g >
-<title>load_balance (5 samples, 1.28%)</title><rect x="931.1" y="661" width="15.1" height="15.0" fill="rgb(243,100,0)" rx="2" ry="2" />
-<text  x="934.12" y="671.5" ></text>
+<title>_copy_to_iter (5 samples, 0.96%)</title><rect x="100.4" y="629" width="11.3" height="15.0" fill="rgb(216,106,3)" rx="2" ry="2" />
+<text  x="103.42" y="639.5" ></text>
 </g>
 <g >
-<title>activate_task (14 samples, 3.57%)</title><rect x="500.7" y="101" width="42.1" height="15.0" fill="rgb(230,39,30)" rx="2" ry="2" />
-<text  x="503.66" y="111.5" >act..</text>
+<title>dictGenHashFunction (1 samples, 0.19%)</title><rect x="30.3" y="789" width="2.3" height="15.0" fill="rgb(249,19,53)" rx="2" ry="2" />
+<text  x="33.34" y="799.5" ></text>
 </g>
 <g >
-<title>__netif_receive_skb_core (2 samples, 0.51%)</title><rect x="588.0" y="389" width="6.0" height="15.0" fill="rgb(229,180,10)" rx="2" ry="2" />
-<text  x="590.96" y="399.5" ></text>
+<title>__pthread_enable_asynccancel (1 samples, 0.19%)</title><rect x="457.6" y="821" width="2.2" height="15.0" fill="rgb(239,223,9)" rx="2" ry="2" />
+<text  x="460.59" y="831.5" ></text>
 </g>
 <g >
-<title>call (2 samples, 0.51%)</title><rect x="1072.6" y="837" width="6.0" height="15.0" fill="rgb(240,84,23)" rx="2" ry="2" />
-<text  x="1075.60" y="847.5" ></text>
+<title>entry_SYSCALL_64_after_hwframe (39 samples, 7.47%)</title><rect x="1054.4" y="821" width="88.1" height="15.0" fill="rgb(246,13,7)" rx="2" ry="2" />
+<text  x="1057.37" y="831.5" >entry_SYSC..</text>
 </g>
 <g >
-<title>deactivate_task (6 samples, 1.53%)</title><rect x="783.6" y="677" width="18.1" height="15.0" fill="rgb(221,106,31)" rx="2" ry="2" />
-<text  x="786.62" y="687.5" ></text>
+<title>tcp_check_space (1 samples, 0.19%)</title><rect x="360.4" y="245" width="2.2" height="15.0" fill="rgb(252,158,20)" rx="2" ry="2" />
+<text  x="363.38" y="255.5" ></text>
 </g>
 <g >
-<title>update_blocked_averages (1 samples, 0.26%)</title><rect x="1009.4" y="565" width="3.0" height="15.0" fill="rgb(244,66,22)" rx="2" ry="2" />
-<text  x="1012.39" y="575.5" ></text>
+<title>ipv4_conntrack_local (9 samples, 1.72%)</title><rect x="288.0" y="501" width="20.4" height="15.0" fill="rgb(221,12,36)" rx="2" ry="2" />
+<text  x="291.05" y="511.5" ></text>
 </g>
 <g >
-<title>default_wake_function (22 samples, 5.61%)</title><rect x="488.6" y="149" width="66.2" height="15.0" fill="rgb(232,196,37)" rx="2" ry="2" />
-<text  x="491.62" y="159.5" >default..</text>
+<title>__blkdev_issue_zero_pages (2 samples, 0.38%)</title><rect x="211.2" y="597" width="4.5" height="15.0" fill="rgb(235,154,13)" rx="2" ry="2" />
+<text  x="214.19" y="607.5" ></text>
 </g>
 <g >
-<title>copyout (1 samples, 0.26%)</title><rect x="109.3" y="629" width="3.0" height="15.0" fill="rgb(236,68,16)" rx="2" ry="2" />
-<text  x="112.34" y="639.5" ></text>
+<title>__kmalloc_reserve.isra.43 (1 samples, 0.19%)</title><rect x="251.9" y="597" width="2.2" height="15.0" fill="rgb(211,26,22)" rx="2" ry="2" />
+<text  x="254.88" y="607.5" ></text>
 </g>
 <g >
-<title>enqueue_task_fair (14 samples, 3.57%)</title><rect x="500.7" y="85" width="42.1" height="15.0" fill="rgb(227,86,50)" rx="2" ry="2" />
-<text  x="503.66" y="95.5" >enq..</text>
+<title>readQueryFromClient (1 samples, 0.19%)</title><rect x="1171.9" y="837" width="2.3" height="15.0" fill="rgb(240,66,20)" rx="2" ry="2" />
+<text  x="1174.92" y="847.5" ></text>
 </g>
 <g >
-<title>vfs_write (160 samples, 40.82%)</title><rect x="160.5" y="757" width="481.6" height="15.0" fill="rgb(249,23,25)" rx="2" ry="2" />
-<text  x="163.51" y="767.5" >vfs_write</text>
+<title>skb_release_data (1 samples, 0.19%)</title><rect x="84.6" y="613" width="2.3" height="15.0" fill="rgb(220,160,19)" rx="2" ry="2" />
+<text  x="87.60" y="623.5" ></text>
 </g>
 <g >
-<title>kfree (1 samples, 0.26%)</title><rect x="1018.4" y="709" width="3.0" height="15.0" fill="rgb(250,33,12)" rx="2" ry="2" />
-<text  x="1021.42" y="719.5" ></text>
+<title>mutex_unlock (1 samples, 0.19%)</title><rect x="1043.1" y="773" width="2.2" height="15.0" fill="rgb(209,197,5)" rx="2" ry="2" />
+<text  x="1046.07" y="783.5" ></text>
 </g>
 <g >
-<title>sys_epoll_wait (89 samples, 22.70%)</title><rect x="693.3" y="773" width="267.9" height="15.0" fill="rgb(235,53,15)" rx="2" ry="2" />
-<text  x="696.32" y="783.5" >sys_epoll_wait</text>
+<title>x86_pmu_enable (113 samples, 21.65%)</title><rect x="600.0" y="645" width="255.4" height="15.0" fill="rgb(225,209,41)" rx="2" ry="2" />
+<text  x="603.00" y="655.5" >x86_pmu_enable</text>
 </g>
 <g >
-<title>update_cfs_group (2 samples, 0.51%)</title><rect x="518.7" y="53" width="6.0" height="15.0" fill="rgb(246,80,11)" rx="2" ry="2" />
-<text  x="521.72" y="63.5" ></text>
+<title>updateCachedTime (1 samples, 0.19%)</title><rect x="1185.5" y="837" width="2.2" height="15.0" fill="rgb(236,116,19)" rx="2" ry="2" />
+<text  x="1188.48" y="847.5" ></text>
 </g>
 <g >
-<title>sock_def_readable (1 samples, 0.26%)</title><rect x="452.5" y="245" width="3.0" height="15.0" fill="rgb(209,188,51)" rx="2" ry="2" />
-<text  x="455.50" y="255.5" ></text>
+<title>native_flush_tlb_one_user (2 samples, 0.38%)</title><rect x="647.5" y="597" width="4.5" height="15.0" fill="rgb(244,193,47)" rx="2" ry="2" />
+<text  x="650.47" y="607.5" ></text>
 </g>
 <g >
-<title>epoll_wait (93 samples, 23.72%)</title><rect x="684.3" y="821" width="279.9" height="15.0" fill="rgb(246,102,52)" rx="2" ry="2" />
-<text  x="687.29" y="831.5" >epoll_wait</text>
+<title>bictcp_cong_avoid (1 samples, 0.19%)</title><rect x="346.8" y="245" width="2.3" height="15.0" fill="rgb(236,130,46)" rx="2" ry="2" />
+<text  x="349.82" y="255.5" ></text>
 </g>
 <g >
-<title>__fdget_pos (1 samples, 0.26%)</title><rect x="154.5" y="773" width="3.0" height="15.0" fill="rgb(222,91,36)" rx="2" ry="2" />
-<text  x="157.49" y="783.5" ></text>
+<title>_raw_spin_lock_irqsave (1 samples, 0.19%)</title><rect x="514.1" y="741" width="2.3" height="15.0" fill="rgb(229,58,1)" rx="2" ry="2" />
+<text  x="517.10" y="751.5" ></text>
 </g>
 <g >
-<title>tcp_cleanup_rbuf (1 samples, 0.26%)</title><rect x="112.3" y="645" width="3.1" height="15.0" fill="rgb(235,161,50)" rx="2" ry="2" />
-<text  x="115.35" y="655.5" ></text>
+<title>__check_object_size (3 samples, 0.57%)</title><rect x="93.6" y="629" width="6.8" height="15.0" fill="rgb(214,141,21)" rx="2" ry="2" />
+<text  x="96.64" y="639.5" ></text>
 </g>
 <g >
-<title>net_rx_action (64 samples, 16.33%)</title><rect x="401.3" y="421" width="192.7" height="15.0" fill="rgb(213,5,25)" rx="2" ry="2" />
-<text  x="404.33" y="431.5" >net_rx_action</text>
+<title>crc32c_pcl_intel_update (2 samples, 0.38%)</title><rect x="227.0" y="549" width="4.5" height="15.0" fill="rgb(212,212,48)" rx="2" ry="2" />
+<text  x="230.01" y="559.5" ></text>
 </g>
 <g >
-<title>get_unused_fd_flags (1 samples, 0.26%)</title><rect x="1051.5" y="757" width="3.0" height="15.0" fill="rgb(240,34,23)" rx="2" ry="2" />
-<text  x="1054.53" y="767.5" ></text>
+<title>kmem_cache_alloc_node (1 samples, 0.19%)</title><rect x="254.1" y="597" width="2.3" height="15.0" fill="rgb(252,84,46)" rx="2" ry="2" />
+<text  x="257.14" y="607.5" ></text>
 </g>
 <g >
-<title>__intel_pmu_enable_all.constprop.23 (1 samples, 0.26%)</title><rect x="982.3" y="597" width="3.0" height="15.0" fill="rgb(242,22,30)" rx="2" ry="2" />
-<text  x="985.30" y="607.5" ></text>
+<title>__fget_light (1 samples, 0.19%)</title><rect x="73.3" y="741" width="2.3" height="15.0" fill="rgb(244,134,1)" rx="2" ry="2" />
+<text  x="76.30" y="751.5" ></text>
 </g>
 <g >
-<title>loopback_xmit (5 samples, 1.28%)</title><rect x="600.0" y="437" width="15.1" height="15.0" fill="rgb(220,80,12)" rx="2" ry="2" />
-<text  x="603.00" y="447.5" ></text>
+<title>__getpagesize (2 samples, 0.38%)</title><rect x="921.0" y="837" width="4.5" height="15.0" fill="rgb(232,42,14)" rx="2" ry="2" />
+<text  x="924.00" y="847.5" ></text>
 </g>
 <g >
-<title>do_filp_open (2 samples, 0.51%)</title><rect x="1045.5" y="757" width="6.0" height="15.0" fill="rgb(254,8,16)" rx="2" ry="2" />
-<text  x="1048.51" y="767.5" ></text>
+<title>epoll_wait (179 samples, 34.29%)</title><rect x="491.5" y="821" width="404.6" height="15.0" fill="rgb(233,207,32)" rx="2" ry="2" />
+<text  x="494.49" y="831.5" >epoll_wait</text>
 </g>
 <g >
-<title>kmem_cache_alloc (1 samples, 0.26%)</title><rect x="211.7" y="613" width="3.0" height="15.0" fill="rgb(251,146,39)" rx="2" ry="2" />
-<text  x="214.68" y="623.5" ></text>
+<title>jbd2_complete_transaction (36 samples, 6.90%)</title><rect x="1061.1" y="725" width="81.4" height="15.0" fill="rgb(217,164,32)" rx="2" ry="2" />
+<text  x="1064.15" y="735.5" >jbd2_comp..</text>
 </g>
 <g >
-<title>check_preempt_curr (2 samples, 0.51%)</title><rect x="542.8" y="85" width="6.0" height="15.0" fill="rgb(215,163,4)" rx="2" ry="2" />
-<text  x="545.81" y="95.5" ></text>
+<title>tcp_event_data_recv (2 samples, 0.38%)</title><rect x="389.8" y="229" width="4.5" height="15.0" fill="rgb(214,176,52)" rx="2" ry="2" />
+<text  x="392.77" y="239.5" ></text>
 </g>
 <g >
-<title>hrtimer_try_to_cancel (1 samples, 0.26%)</title><rect x="756.5" y="725" width="3.0" height="15.0" fill="rgb(247,198,27)" rx="2" ry="2" />
-<text  x="759.53" y="735.5" ></text>
+<title>dev_hard_start_xmit (3 samples, 0.57%)</title><rect x="410.1" y="453" width="6.8" height="15.0" fill="rgb(219,123,3)" rx="2" ry="2" />
+<text  x="413.11" y="463.5" ></text>
 </g>
 <g >
-<title>tcp_clean_rtx_queue (4 samples, 1.02%)</title><rect x="455.5" y="229" width="12.1" height="15.0" fill="rgb(208,193,12)" rx="2" ry="2" />
-<text  x="458.51" y="239.5" ></text>
+<title>skb_release_head_state (2 samples, 0.38%)</title><rect x="86.9" y="613" width="4.5" height="15.0" fill="rgb(237,201,37)" rx="2" ry="2" />
+<text  x="89.86" y="623.5" ></text>
 </g>
 <g >
-<title>ext4_mark_iloc_dirty (3 samples, 0.77%)</title><rect x="247.8" y="629" width="9.0" height="15.0" fill="rgb(231,209,34)" rx="2" ry="2" />
-<text  x="250.81" y="639.5" ></text>
+<title>skb_copy_datagram_iter (8 samples, 1.53%)</title><rect x="93.6" y="645" width="18.1" height="15.0" fill="rgb(248,119,6)" rx="2" ry="2" />
+<text  x="96.64" y="655.5" ></text>
 </g>
 <g >
-<title>_raw_spin_lock (1 samples, 0.26%)</title><rect x="609.0" y="373" width="3.0" height="15.0" fill="rgb(207,168,32)" rx="2" ry="2" />
-<text  x="612.03" y="383.5" ></text>
+<title>rw_verify_area (4 samples, 0.77%)</title><rect x="145.6" y="741" width="9.1" height="15.0" fill="rgb(217,79,2)" rx="2" ry="2" />
+<text  x="148.63" y="751.5" ></text>
 </g>
 <g >
-<title>nf_conntrack_in (1 samples, 0.26%)</title><rect x="584.9" y="309" width="3.1" height="15.0" fill="rgb(209,58,25)" rx="2" ry="2" />
-<text  x="587.95" y="319.5" ></text>
+<title>put_prev_task_fair (1 samples, 0.19%)</title><rect x="871.3" y="661" width="2.2" height="15.0" fill="rgb(234,203,54)" rx="2" ry="2" />
+<text  x="874.26" y="671.5" ></text>
 </g>
 <g >
-<title>_copy_from_iter_flushcache (1 samples, 0.26%)</title><rect x="166.5" y="613" width="3.0" height="15.0" fill="rgb(249,207,10)" rx="2" ry="2" />
-<text  x="169.53" y="623.5" ></text>
+<title>thread_group_cputime_adjusted (1 samples, 0.19%)</title><rect x="141.1" y="661" width="2.3" height="15.0" fill="rgb(218,119,43)" rx="2" ry="2" />
+<text  x="144.11" y="671.5" ></text>
 </g>
 <g >
-<title>tcp_tso_segs (1 samples, 0.26%)</title><rect x="302.0" y="597" width="3.0" height="15.0" fill="rgb(211,172,53)" rx="2" ry="2" />
-<text  x="304.99" y="607.5" ></text>
+<title>ext4_orphan_del (1 samples, 0.19%)</title><rect x="240.6" y="645" width="2.2" height="15.0" fill="rgb(242,15,5)" rx="2" ry="2" />
+<text  x="243.57" y="655.5" ></text>
 </g>
 <g >
-<title>ipt_do_table (3 samples, 0.77%)</title><rect x="566.9" y="277" width="9.0" height="15.0" fill="rgb(207,77,45)" rx="2" ry="2" />
-<text  x="569.89" y="287.5" ></text>
+<title>tcp_in_window (2 samples, 0.38%)</title><rect x="301.6" y="453" width="4.5" height="15.0" fill="rgb(254,137,6)" rx="2" ry="2" />
+<text  x="304.61" y="463.5" ></text>
 </g>
 <g >
-<title>fsnotify (1 samples, 0.26%)</title><rect x="639.1" y="741" width="3.0" height="15.0" fill="rgb(227,43,45)" rx="2" ry="2" />
-<text  x="642.13" y="751.5" ></text>
+<title>rebalance_domains (1 samples, 0.19%)</title><rect x="855.4" y="581" width="2.3" height="15.0" fill="rgb(228,47,21)" rx="2" ry="2" />
+<text  x="858.44" y="591.5" ></text>
 </g>
 <g >
-<title>crypto_shash_update (1 samples, 0.26%)</title><rect x="235.8" y="597" width="3.0" height="15.0" fill="rgb(234,2,44)" rx="2" ry="2" />
-<text  x="238.77" y="607.5" ></text>
+<title>tcp_error (1 samples, 0.19%)</title><rect x="297.1" y="469" width="2.2" height="15.0" fill="rgb(227,107,3)" rx="2" ry="2" />
+<text  x="300.09" y="479.5" ></text>
 </g>
 <g >
-<title>crypto_shash_update (1 samples, 0.26%)</title><rect x="253.8" y="565" width="3.0" height="15.0" fill="rgb(234,72,49)" rx="2" ry="2" />
-<text  x="256.83" y="575.5" ></text>
+<title>__intel_pmu_enable_all.constprop.23 (111 samples, 21.26%)</title><rect x="604.5" y="613" width="250.9" height="15.0" fill="rgb(239,80,25)" rx="2" ry="2" />
+<text  x="607.52" y="623.5" >__intel_pmu_enable_all.constprop.23</text>
 </g>
 <g >
-<title>mutex_lock (2 samples, 0.51%)</title><rect x="741.5" y="725" width="6.0" height="15.0" fill="rgb(223,158,10)" rx="2" ry="2" />
-<text  x="744.48" y="735.5" ></text>
+<title>dst_release (1 samples, 0.19%)</title><rect x="362.6" y="229" width="2.3" height="15.0" fill="rgb(250,133,12)" rx="2" ry="2" />
+<text  x="365.64" y="239.5" ></text>
 </g>
 <g >
-<title>[unknown] (7 samples, 1.79%)</title><rect x="10.0" y="805" width="21.1" height="15.0" fill="rgb(252,88,35)" rx="2" ry="2" />
-<text  x="13.00" y="815.5" ></text>
+<title>schedule (18 samples, 3.45%)</title><rect x="1101.8" y="693" width="40.7" height="15.0" fill="rgb(248,209,54)" rx="2" ry="2" />
+<text  x="1104.84" y="703.5" >sch..</text>
 </g>
 <g >
-<title>try_to_wake_up (22 samples, 5.61%)</title><rect x="488.6" y="133" width="66.2" height="15.0" fill="rgb(227,92,43)" rx="2" ry="2" />
-<text  x="491.62" y="143.5" >try_to_..</text>
+<title>__ext4_handle_dirty_metadata (1 samples, 0.19%)</title><rect x="222.5" y="597" width="2.3" height="15.0" fill="rgb(216,76,9)" rx="2" ry="2" />
+<text  x="225.49" y="607.5" ></text>
 </g>
 <g >
-<title>ext4_issue_zeroout (1 samples, 0.26%)</title><rect x="232.8" y="629" width="3.0" height="15.0" fill="rgb(207,18,23)" rx="2" ry="2" />
-<text  x="235.76" y="639.5" ></text>
+<title>check_preempt_curr (1 samples, 0.19%)</title><rect x="1086.0" y="565" width="2.3" height="15.0" fill="rgb(206,143,13)" rx="2" ry="2" />
+<text  x="1089.02" y="575.5" ></text>
 </g>
 <g >
-<title>reweight_entity (1 samples, 0.26%)</title><rect x="521.7" y="37" width="3.0" height="15.0" fill="rgb(251,57,2)" rx="2" ry="2" />
-<text  x="524.73" y="47.5" ></text>
+<title>iptable_filter_hook (2 samples, 0.38%)</title><rect x="283.5" y="501" width="4.5" height="15.0" fill="rgb(225,146,16)" rx="2" ry="2" />
+<text  x="286.52" y="511.5" ></text>
 </g>
 <g >
-<title>jbd2_journal_stop (1 samples, 0.26%)</title><rect x="223.7" y="629" width="3.0" height="15.0" fill="rgb(215,119,33)" rx="2" ry="2" />
-<text  x="226.72" y="639.5" ></text>
+<title>run_rebalance_domains (1 samples, 0.19%)</title><rect x="855.4" y="597" width="2.3" height="15.0" fill="rgb(213,86,13)" rx="2" ry="2" />
+<text  x="858.44" y="607.5" ></text>
 </g>
 <g >
-<title>__inode_permission (1 samples, 0.26%)</title><rect x="1048.5" y="709" width="3.0" height="15.0" fill="rgb(231,4,10)" rx="2" ry="2" />
-<text  x="1051.52" y="719.5" ></text>
+<title>ext4_meta_trans_blocks (1 samples, 0.19%)</title><rect x="215.7" y="645" width="2.3" height="15.0" fill="rgb(252,10,10)" rx="2" ry="2" />
+<text  x="218.71" y="655.5" ></text>
 </g>
 <g >
-<title>tcp_poll (1 samples, 0.26%)</title><rect x="738.5" y="693" width="3.0" height="15.0" fill="rgb(252,32,29)" rx="2" ry="2" />
-<text  x="741.47" y="703.5" ></text>
+<title>tcp_v4_send_check (1 samples, 0.19%)</title><rect x="435.0" y="581" width="2.2" height="15.0" fill="rgb(237,86,11)" rx="2" ry="2" />
+<text  x="437.98" y="591.5" ></text>
 </g>
 <g >
-<title>string2ll.part.0 (2 samples, 0.51%)</title><rect x="1162.9" y="837" width="6.0" height="15.0" fill="rgb(244,43,8)" rx="2" ry="2" />
-<text  x="1165.91" y="847.5" ></text>
+<title>do_sys_open (12 samples, 2.30%)</title><rect x="936.8" y="773" width="27.1" height="15.0" fill="rgb(241,39,20)" rx="2" ry="2" />
+<text  x="939.82" y="783.5" >d..</text>
 </g>
 <g >
-<title>nf_conntrack_in (11 samples, 2.81%)</title><rect x="356.2" y="485" width="33.1" height="15.0" fill="rgb(235,216,37)" rx="2" ry="2" />
-<text  x="359.17" y="495.5" >nf..</text>
+<title>security_socket_recvmsg (1 samples, 0.19%)</title><rect x="111.7" y="677" width="2.3" height="15.0" fill="rgb(233,183,50)" rx="2" ry="2" />
+<text  x="114.72" y="687.5" ></text>
 </g>
 <g >
-<title>tcp_push (113 samples, 28.83%)</title><rect x="289.9" y="629" width="340.2" height="15.0" fill="rgb(236,73,40)" rx="2" ry="2" />
-<text  x="292.95" y="639.5" >tcp_push</text>
+<title>cmpxchg_double_slab.isra.33 (1 samples, 0.19%)</title><rect x="355.9" y="149" width="2.2" height="15.0" fill="rgb(209,161,7)" rx="2" ry="2" />
+<text  x="358.86" y="159.5" ></text>
 </g>
 <g >
-<title>_addReplyToBuffer (1 samples, 0.26%)</title><rect x="654.2" y="821" width="3.0" height="15.0" fill="rgb(244,76,54)" rx="2" ry="2" />
-<text  x="657.18" y="831.5" ></text>
+<title>ttwu_do_activate (7 samples, 1.34%)</title><rect x="371.7" y="117" width="15.8" height="15.0" fill="rgb(206,224,24)" rx="2" ry="2" />
+<text  x="374.69" y="127.5" ></text>
 </g>
 <g >
-<title>processMultibulkBuffer (1 samples, 0.26%)</title><rect x="1153.9" y="837" width="3.0" height="15.0" fill="rgb(237,116,40)" rx="2" ry="2" />
-<text  x="1156.88" y="847.5" ></text>
+<title>x86_pmu_enable (8 samples, 1.53%)</title><rect x="1124.4" y="629" width="18.1" height="15.0" fill="rgb(225,38,32)" rx="2" ry="2" />
+<text  x="1127.44" y="639.5" ></text>
 </g>
 <g >
-<title>tcp_v4_rcv (46 samples, 11.73%)</title><rect x="425.4" y="293" width="138.5" height="15.0" fill="rgb(225,4,25)" rx="2" ry="2" />
-<text  x="428.41" y="303.5" >tcp_v4_rcv</text>
+<title>mempool_alloc_slab (1 samples, 0.19%)</title><rect x="213.4" y="549" width="2.3" height="15.0" fill="rgb(246,192,23)" rx="2" ry="2" />
+<text  x="216.45" y="559.5" ></text>
 </g>
 <g >
-<title>new_sync_write (159 samples, 40.56%)</title><rect x="160.5" y="725" width="478.6" height="15.0" fill="rgb(237,217,18)" rx="2" ry="2" />
-<text  x="163.51" y="735.5" >new_sync_write</text>
+<title>pollwake (11 samples, 2.11%)</title><rect x="364.9" y="165" width="24.9" height="15.0" fill="rgb(249,78,8)" rx="2" ry="2" />
+<text  x="367.90" y="175.5" >p..</text>
 </g>
 <g >
-<title>__fget_light (2 samples, 0.51%)</title><rect x="73.2" y="741" width="6.0" height="15.0" fill="rgb(217,72,44)" rx="2" ry="2" />
-<text  x="76.21" y="751.5" ></text>
+<title>do_softirq.part.17 (44 samples, 8.43%)</title><rect x="310.7" y="469" width="99.4" height="15.0" fill="rgb(215,23,49)" rx="2" ry="2" />
+<text  x="313.65" y="479.5" >do_softirq.p..</text>
 </g>
 <g >
-<title>ipv4_helper (1 samples, 0.26%)</title><rect x="563.9" y="309" width="3.0" height="15.0" fill="rgb(206,114,16)" rx="2" ry="2" />
-<text  x="566.88" y="319.5" ></text>
+<title>ll2string (1 samples, 0.19%)</title><rect x="902.9" y="821" width="2.3" height="15.0" fill="rgb(206,205,23)" rx="2" ry="2" />
+<text  x="905.91" y="831.5" ></text>
 </g>
 <g >
-<title>__ext4_journal_get_write_access (1 samples, 0.26%)</title><rect x="229.7" y="581" width="3.1" height="15.0" fill="rgb(226,34,45)" rx="2" ry="2" />
-<text  x="232.74" y="591.5" ></text>
+<title>__fdget_pos (1 samples, 0.19%)</title><rect x="73.3" y="757" width="2.3" height="15.0" fill="rgb(226,184,39)" rx="2" ry="2" />
+<text  x="76.30" y="767.5" ></text>
 </g>
 <g >
-<title>path_openat (2 samples, 0.51%)</title><rect x="1045.5" y="741" width="6.0" height="15.0" fill="rgb(248,116,49)" rx="2" ry="2" />
-<text  x="1048.51" y="751.5" ></text>
+<title>cpus_share_cache (1 samples, 0.19%)</title><rect x="367.2" y="101" width="2.2" height="15.0" fill="rgb(213,18,14)" rx="2" ry="2" />
+<text  x="370.16" y="111.5" ></text>
 </g>
 <g >
-<title>getname (1 samples, 0.26%)</title><rect x="1054.5" y="757" width="3.1" height="15.0" fill="rgb(215,134,28)" rx="2" ry="2" />
-<text  x="1057.54" y="767.5" ></text>
+<title>sock_def_readable (11 samples, 2.11%)</title><rect x="364.9" y="229" width="24.9" height="15.0" fill="rgb(234,217,51)" rx="2" ry="2" />
+<text  x="367.90" y="239.5" >s..</text>
 </g>
 <g >
-<title>x86_pmu_enable (9 samples, 2.30%)</title><rect x="982.3" y="645" width="27.1" height="15.0" fill="rgb(235,89,38)" rx="2" ry="2" />
-<text  x="985.30" y="655.5" >x..</text>
+<title>sys_epoll_ctl (1 samples, 0.19%)</title><rect x="1045.3" y="805" width="2.3" height="15.0" fill="rgb(223,206,25)" rx="2" ry="2" />
+<text  x="1048.33" y="815.5" ></text>
 </g>
 <g >
-<title>__close (1 samples, 0.26%)</title><rect x="1018.4" y="837" width="3.0" height="15.0" fill="rgb(228,116,15)" rx="2" ry="2" />
-<text  x="1021.42" y="847.5" ></text>
+<title>generic_permission (1 samples, 0.19%)</title><rect x="943.6" y="677" width="2.3" height="15.0" fill="rgb(231,214,32)" rx="2" ry="2" />
+<text  x="946.60" y="687.5" ></text>
 </g>
 <g >
-<title>start_this_handle (3 samples, 0.77%)</title><rect x="214.7" y="613" width="9.0" height="15.0" fill="rgb(240,143,34)" rx="2" ry="2" />
-<text  x="217.69" y="623.5" ></text>
+<title>intel_pmu_handle_irq (5 samples, 0.96%)</title><rect x="636.2" y="597" width="11.3" height="15.0" fill="rgb(222,163,37)" rx="2" ry="2" />
+<text  x="639.17" y="607.5" ></text>
 </g>
 <g >
-<title>tcp_small_queue_check.isra.29 (1 samples, 0.26%)</title><rect x="299.0" y="597" width="3.0" height="15.0" fill="rgb(208,65,44)" rx="2" ry="2" />
-<text  x="301.98" y="607.5" ></text>
+<title>__wake_up_common_lock (14 samples, 2.68%)</title><rect x="1061.1" y="677" width="31.7" height="15.0" fill="rgb(213,80,46)" rx="2" ry="2" />
+<text  x="1064.15" y="687.5" >__..</text>
 </g>
 <g >
-<title>__raise_softirq_irqoff (1 samples, 0.26%)</title><rect x="606.0" y="373" width="3.0" height="15.0" fill="rgb(210,189,0)" rx="2" ry="2" />
-<text  x="609.02" y="383.5" ></text>
+<title>addReply (4 samples, 0.77%)</title><rect x="464.4" y="821" width="9.0" height="15.0" fill="rgb(243,79,12)" rx="2" ry="2" />
+<text  x="467.37" y="831.5" ></text>
 </g>
 <g >
-<title>update_curr (2 samples, 0.51%)</title><rect x="789.6" y="629" width="6.1" height="15.0" fill="rgb(222,48,3)" rx="2" ry="2" />
-<text  x="792.64" y="639.5" ></text>
+<title>skb_entail (1 samples, 0.19%)</title><rect x="258.7" y="629" width="2.2" height="15.0" fill="rgb(252,3,45)" rx="2" ry="2" />
+<text  x="261.66" y="639.5" ></text>
 </g>
 <g >
-<title>ip_rcv (60 samples, 15.31%)</title><rect x="407.3" y="357" width="180.7" height="15.0" fill="rgb(214,106,53)" rx="2" ry="2" />
-<text  x="410.35" y="367.5" >ip_rcv</text>
+<title>entry_SYSCALL_64 (2 samples, 0.38%)</title><rect x="493.8" y="805" width="4.5" height="15.0" fill="rgb(250,136,49)" rx="2" ry="2" />
+<text  x="496.75" y="815.5" ></text>
 </g>
 <g >
-<title>crc32c_pcl_intel_update (1 samples, 0.26%)</title><rect x="253.8" y="549" width="3.0" height="15.0" fill="rgb(223,74,10)" rx="2" ry="2" />
-<text  x="256.83" y="559.5" ></text>
+<title>ext4_iomap_begin (9 samples, 1.72%)</title><rect x="197.6" y="661" width="20.4" height="15.0" fill="rgb(209,54,44)" rx="2" ry="2" />
+<text  x="200.62" y="671.5" ></text>
 </g>
 <g >
-<title>acpi_os_read_memory (1 samples, 0.26%)</title><rect x="813.7" y="597" width="3.0" height="15.0" fill="rgb(241,147,1)" rx="2" ry="2" />
-<text  x="816.72" y="607.5" ></text>
+<title>sched_clock (1 samples, 0.19%)</title><rect x="1088.3" y="565" width="2.2" height="15.0" fill="rgb(207,59,51)" rx="2" ry="2" />
+<text  x="1091.28" y="575.5" ></text>
 </g>
 <g >
-<title>iptable_filter_hook (3 samples, 0.77%)</title><rect x="347.1" y="501" width="9.1" height="15.0" fill="rgb(245,109,8)" rx="2" ry="2" />
-<text  x="350.14" y="511.5" ></text>
+<title>ext4_mark_inode_dirty (9 samples, 1.72%)</title><rect x="220.2" y="645" width="20.4" height="15.0" fill="rgb(233,107,35)" rx="2" ry="2" />
+<text  x="223.23" y="655.5" ></text>
 </g>
 <g >
-<title>seq_put_decimal_ull (1 samples, 0.26%)</title><rect x="130.4" y="661" width="3.0" height="15.0" fill="rgb(237,67,34)" rx="2" ry="2" />
-<text  x="133.41" y="671.5" ></text>
+<title>read_tsc (1 samples, 0.19%)</title><rect x="880.3" y="725" width="2.3" height="15.0" fill="rgb(217,110,17)" rx="2" ry="2" />
+<text  x="883.31" y="735.5" ></text>
 </g>
 <g >
-<title>add_transaction_credits (1 samples, 0.26%)</title><rect x="220.7" y="597" width="3.0" height="15.0" fill="rgb(249,34,44)" rx="2" ry="2" />
-<text  x="223.71" y="607.5" ></text>
+<title>sock_sendmsg (91 samples, 17.43%)</title><rect x="242.8" y="693" width="205.7" height="15.0" fill="rgb(254,192,53)" rx="2" ry="2" />
+<text  x="245.84" y="703.5" >sock_sendmsg</text>
 </g>
 <g >
-<title>je_arena_ralloc (1 samples, 0.26%)</title><rect x="964.2" y="821" width="3.0" height="15.0" fill="rgb(228,19,39)" rx="2" ry="2" />
-<text  x="967.23" y="831.5" ></text>
+<title>processInputBuffer (1 samples, 0.19%)</title><rect x="1167.4" y="837" width="2.3" height="15.0" fill="rgb(213,19,14)" rx="2" ry="2" />
+<text  x="1170.39" y="847.5" ></text>
 </g>
 <g >
-<title>enqueue_hrtimer (2 samples, 0.51%)</title><rect x="759.5" y="693" width="6.1" height="15.0" fill="rgb(237,194,23)" rx="2" ry="2" />
-<text  x="762.54" y="703.5" ></text>
+<title>schedule_hrtimeout_range (139 samples, 26.63%)</title><rect x="561.6" y="741" width="314.2" height="15.0" fill="rgb(253,161,40)" rx="2" ry="2" />
+<text  x="564.57" y="751.5" >schedule_hrtimeout_range</text>
 </g>
 <g >
-<title>all (392 samples, 100%)</title><rect x="10.0" y="869" width="1180.0" height="15.0" fill="rgb(243,157,40)" rx="2" ry="2" />
+<title>mempool_alloc (1 samples, 0.19%)</title><rect x="211.2" y="549" width="2.2" height="15.0" fill="rgb(247,162,39)" rx="2" ry="2" />
+<text  x="214.19" y="559.5" ></text>
+</g>
+<g >
+<title>__tcp_push_pending_frames (77 samples, 14.75%)</title><rect x="263.2" y="613" width="174.0" height="15.0" fill="rgb(224,17,17)" rx="2" ry="2" />
+<text  x="266.18" y="623.5" >__tcp_push_pending_fra..</text>
+</g>
+<g >
+<title>ext4_reserve_inode_write (1 samples, 0.19%)</title><rect x="240.6" y="629" width="2.2" height="15.0" fill="rgb(242,111,27)" rx="2" ry="2" />
+<text  x="243.57" y="639.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (36 samples, 6.90%)</title><rect x="73.3" y="789" width="81.4" height="15.0" fill="rgb(224,165,4)" rx="2" ry="2" />
+<text  x="76.30" y="799.5" >do_syscal..</text>
+</g>
+<g >
+<title>deactivate_task (7 samples, 1.34%)</title><rect x="577.4" y="677" width="15.8" height="15.0" fill="rgb(226,44,44)" rx="2" ry="2" />
+<text  x="580.39" y="687.5" ></text>
+</g>
+<g >
+<title>ext4_do_update_inode (5 samples, 0.96%)</title><rect x="220.2" y="613" width="11.3" height="15.0" fill="rgb(221,56,17)" rx="2" ry="2" />
+<text  x="223.23" y="623.5" ></text>
+</g>
+<g >
+<title>sdsMakeRoomFor (2 samples, 0.38%)</title><rect x="1176.4" y="837" width="4.6" height="15.0" fill="rgb(216,78,29)" rx="2" ry="2" />
+<text  x="1179.44" y="847.5" ></text>
+</g>
+<g >
+<title>schedule_hrtimeout_range_clock (139 samples, 26.63%)</title><rect x="561.6" y="725" width="314.2" height="15.0" fill="rgb(246,204,25)" rx="2" ry="2" />
+<text  x="564.57" y="735.5" >schedule_hrtimeout_range_clock</text>
+</g>
+<g >
+<title>select_estimate_accuracy (3 samples, 0.57%)</title><rect x="875.8" y="741" width="6.8" height="15.0" fill="rgb(215,118,4)" rx="2" ry="2" />
+<text  x="878.79" y="751.5" ></text>
+</g>
+<g >
+<title>_raw_spin_unlock_irqrestore (1 samples, 0.19%)</title><rect x="507.3" y="757" width="2.3" height="15.0" fill="rgb(236,153,40)" rx="2" ry="2" />
+<text  x="510.32" y="767.5" ></text>
+</g>
+<g >
+<title>update_curr_fair (1 samples, 0.19%)</title><rect x="141.1" y="613" width="2.3" height="15.0" fill="rgb(249,209,17)" rx="2" ry="2" />
+<text  x="144.11" y="623.5" ></text>
+</g>
+<g >
+<title>prepareClientToWrite (1 samples, 0.19%)</title><rect x="905.2" y="821" width="2.2" height="15.0" fill="rgb(250,135,44)" rx="2" ry="2" />
+<text  x="908.17" y="831.5" ></text>
+</g>
+<g >
+<title>tcp_sendmsg_locked (1 samples, 0.19%)</title><rect x="446.3" y="661" width="2.2" height="15.0" fill="rgb(212,195,7)" rx="2" ry="2" />
+<text  x="449.28" y="671.5" ></text>
+</g>
+<g >
+<title>ktime_get_ts64 (2 samples, 0.38%)</title><rect x="554.8" y="741" width="4.5" height="15.0" fill="rgb(247,22,33)" rx="2" ry="2" />
+<text  x="557.79" y="751.5" ></text>
+</g>
+<g >
+<title>inet_recvmsg (15 samples, 2.87%)</title><rect x="77.8" y="677" width="33.9" height="15.0" fill="rgb(245,23,10)" rx="2" ry="2" />
+<text  x="80.82" y="687.5" >in..</text>
+</g>
+<g >
+<title>strncpy_from_user (1 samples, 0.19%)</title><rect x="959.4" y="725" width="2.3" height="15.0" fill="rgb(246,148,50)" rx="2" ry="2" />
+<text  x="962.43" y="735.5" ></text>
+</g>
+<g >
+<title>ext4_map_blocks (2 samples, 0.38%)</title><rect x="211.2" y="645" width="4.5" height="15.0" fill="rgb(215,123,18)" rx="2" ry="2" />
+<text  x="214.19" y="655.5" ></text>
+</g>
+<g >
+<title>iptable_filter_hook (1 samples, 0.19%)</title><rect x="398.8" y="309" width="2.3" height="15.0" fill="rgb(241,184,6)" rx="2" ry="2" />
+<text  x="401.81" y="319.5" ></text>
+</g>
+<g >
+<title>__memmove_avx_unaligned_erms (4 samples, 0.77%)</title><rect x="927.8" y="837" width="9.0" height="15.0" fill="rgb(250,13,12)" rx="2" ry="2" />
+<text  x="930.78" y="847.5" ></text>
+</g>
+<g >
+<title>inet_sendmsg (91 samples, 17.43%)</title><rect x="242.8" y="677" width="205.7" height="15.0" fill="rgb(233,7,29)" rx="2" ry="2" />
+<text  x="245.84" y="687.5" >inet_sendmsg</text>
+</g>
+<g >
+<title>ip_output (50 samples, 9.58%)</title><rect x="308.4" y="533" width="113.0" height="15.0" fill="rgb(224,27,11)" rx="2" ry="2" />
+<text  x="311.39" y="543.5" >ip_output</text>
+</g>
+<g >
+<title>__ext4_journal_start_sb (6 samples, 1.15%)</title><rect x="197.6" y="645" width="13.6" height="15.0" fill="rgb(228,6,31)" rx="2" ry="2" />
+<text  x="200.62" y="655.5" ></text>
+</g>
+<g >
+<title>__jbd2_journal_file_buffer (1 samples, 0.19%)</title><rect x="222.5" y="565" width="2.3" height="15.0" fill="rgb(217,89,2)" rx="2" ry="2" />
+<text  x="225.49" y="575.5" ></text>
+</g>
+<g >
+<title>smp_apic_timer_interrupt (1 samples, 0.19%)</title><rect x="855.4" y="645" width="2.3" height="15.0" fill="rgb(211,179,2)" rx="2" ry="2" />
+<text  x="858.44" y="655.5" ></text>
+</g>
+<g >
+<title>dput (1 samples, 0.19%)</title><rect x="918.7" y="725" width="2.3" height="15.0" fill="rgb(224,48,53)" rx="2" ry="2" />
+<text  x="921.74" y="735.5" ></text>
+</g>
+<g >
+<title>tcp_get_timeouts (1 samples, 0.19%)</title><rect x="306.1" y="485" width="2.3" height="15.0" fill="rgb(207,57,13)" rx="2" ry="2" />
+<text  x="309.13" y="495.5" ></text>
+</g>
+<g >
+<title>task_work_run (3 samples, 0.57%)</title><rect x="914.2" y="773" width="6.8" height="15.0" fill="rgb(211,22,43)" rx="2" ry="2" />
+<text  x="917.21" y="783.5" ></text>
+</g>
+<g >
+<title>__task_pid_nr_ns (1 samples, 0.19%)</title><rect x="125.3" y="661" width="2.2" height="15.0" fill="rgb(244,74,14)" rx="2" ry="2" />
+<text  x="128.29" y="671.5" ></text>
+</g>
+<g >
+<title>vfs_read (35 samples, 6.70%)</title><rect x="75.6" y="757" width="79.1" height="15.0" fill="rgb(229,92,0)" rx="2" ry="2" />
+<text  x="78.56" y="767.5" >vfs_read</text>
+</g>
+<g >
+<title>free_pages (1 samples, 0.19%)</title><rect x="595.5" y="629" width="2.2" height="15.0" fill="rgb(221,106,5)" rx="2" ry="2" />
+<text  x="598.48" y="639.5" ></text>
+</g>
+<g >
+<title>copy_user_generic_unrolled (3 samples, 0.57%)</title><rect x="104.9" y="613" width="6.8" height="15.0" fill="rgb(247,208,7)" rx="2" ry="2" />
+<text  x="107.94" y="623.5" ></text>
+</g>
+<g >
+<title>tcp_current_mss (1 samples, 0.19%)</title><rect x="441.8" y="613" width="2.2" height="15.0" fill="rgb(216,42,39)" rx="2" ry="2" />
+<text  x="444.76" y="623.5" ></text>
+</g>
+<g >
+<title>ext4_mark_iloc_dirty (5 samples, 0.96%)</title><rect x="220.2" y="629" width="11.3" height="15.0" fill="rgb(220,99,50)" rx="2" ry="2" />
+<text  x="223.23" y="639.5" ></text>
+</g>
+<g >
+<title>memcg_kmem_get_cache (2 samples, 0.38%)</title><rect x="936.8" y="693" width="4.5" height="15.0" fill="rgb(252,112,1)" rx="2" ry="2" />
+<text  x="939.82" y="703.5" ></text>
+</g>
+<g >
+<title>do_filp_open (9 samples, 1.72%)</title><rect x="936.8" y="757" width="20.4" height="15.0" fill="rgb(250,130,8)" rx="2" ry="2" />
+<text  x="939.82" y="767.5" ></text>
+</g>
+<g >
+<title>pmem_copy_from_iter (2 samples, 0.38%)</title><rect x="170.5" y="629" width="4.5" height="15.0" fill="rgb(221,158,1)" rx="2" ry="2" />
+<text  x="173.50" y="639.5" ></text>
+</g>
+<g >
+<title>ipv4_mtu (1 samples, 0.19%)</title><rect x="439.5" y="613" width="2.3" height="15.0" fill="rgb(226,28,35)" rx="2" ry="2" />
+<text  x="442.50" y="623.5" ></text>
+</g>
+<g >
+<title>net_rx_action (43 samples, 8.24%)</title><rect x="312.9" y="421" width="97.2" height="15.0" fill="rgb(233,134,30)" rx="2" ry="2" />
+<text  x="315.91" y="431.5" >net_rx_action</text>
+</g>
+<g >
+<title>vfs_fsync_range (37 samples, 7.09%)</title><rect x="1058.9" y="757" width="83.6" height="15.0" fill="rgb(250,150,3)" rx="2" ry="2" />
+<text  x="1061.89" y="767.5" >vfs_fsync..</text>
+</g>
+<g >
+<title>tcp_poll (3 samples, 0.57%)</title><rect x="541.2" y="677" width="6.8" height="15.0" fill="rgb(225,11,0)" rx="2" ry="2" />
+<text  x="544.23" y="687.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64 (1 samples, 0.19%)</title><rect x="1015.9" y="821" width="2.3" height="15.0" fill="rgb(217,62,50)" rx="2" ry="2" />
+<text  x="1018.94" y="831.5" ></text>
+</g>
+<g >
+<title>jbd2_journal_dirty_metadata (1 samples, 0.19%)</title><rect x="222.5" y="581" width="2.3" height="15.0" fill="rgb(250,12,31)" rx="2" ry="2" />
+<text  x="225.49" y="591.5" ></text>
+</g>
+<g >
+<title>enqueue_entity (5 samples, 0.96%)</title><rect x="376.2" y="69" width="11.3" height="15.0" fill="rgb(208,128,1)" rx="2" ry="2" />
+<text  x="379.21" y="79.5" ></text>
+</g>
+<g >
+<title>enqueue_task_fair (3 samples, 0.57%)</title><rect x="1079.2" y="565" width="6.8" height="15.0" fill="rgb(248,36,2)" rx="2" ry="2" />
+<text  x="1082.23" y="575.5" ></text>
+</g>
+<g >
+<title>apparmor_file_permission (2 samples, 0.38%)</title><rect x="450.8" y="725" width="4.5" height="15.0" fill="rgb(248,82,25)" rx="2" ry="2" />
+<text  x="453.80" y="735.5" ></text>
+</g>
+<g >
+<title>tcp_in_window (1 samples, 0.19%)</title><rect x="299.3" y="469" width="2.3" height="15.0" fill="rgb(215,31,20)" rx="2" ry="2" />
+<text  x="302.35" y="479.5" ></text>
+</g>
+<g >
+<title>ip_local_deliver_finish (2 samples, 0.38%)</title><rect x="405.6" y="325" width="4.5" height="15.0" fill="rgb(238,133,37)" rx="2" ry="2" />
+<text  x="408.59" y="335.5" ></text>
+</g>
+<g >
+<title>all (522 samples, 100%)</title><rect x="10.0" y="869" width="1180.0" height="15.0" fill="rgb(241,177,29)" rx="2" ry="2" />
 <text  x="13.00" y="879.5" ></text>
 </g>
 <g >
-<title>dax_iomap_actor (14 samples, 3.57%)</title><rect x="166.5" y="661" width="42.2" height="15.0" fill="rgb(250,29,9)" rx="2" ry="2" />
-<text  x="169.53" y="671.5" >dax..</text>
+<title>account_entity_enqueue (1 samples, 0.19%)</title><rect x="1079.2" y="549" width="2.3" height="15.0" fill="rgb(243,17,5)" rx="2" ry="2" />
+<text  x="1082.23" y="559.5" ></text>
 </g>
 <g >
-<title>may_open (1 samples, 0.26%)</title><rect x="1048.5" y="725" width="3.0" height="15.0" fill="rgb(217,108,26)" rx="2" ry="2" />
-<text  x="1051.52" y="735.5" ></text>
+<title>__copy_user_nocache (2 samples, 0.38%)</title><rect x="170.5" y="597" width="4.5" height="15.0" fill="rgb(236,46,52)" rx="2" ry="2" />
+<text  x="173.50" y="607.5" ></text>
 </g>
 <g >
-<title>zmalloc_get_rss (1 samples, 0.26%)</title><rect x="1187.0" y="837" width="3.0" height="15.0" fill="rgb(250,169,51)" rx="2" ry="2" />
-<text  x="1189.99" y="847.5" ></text>
+<title>__srcu_read_unlock (10 samples, 1.92%)</title><rect x="175.0" y="629" width="22.6" height="15.0" fill="rgb(242,221,48)" rx="2" ry="2" />
+<text  x="178.02" y="639.5" >_..</text>
 </g>
 <g >
-<title>je_free (1 samples, 0.26%)</title><rect x="1135.8" y="837" width="3.0" height="15.0" fill="rgb(241,178,31)" rx="2" ry="2" />
-<text  x="1138.82" y="847.5" ></text>
+<title>tcp_sendmsg (90 samples, 17.24%)</title><rect x="242.8" y="661" width="203.5" height="15.0" fill="rgb(246,109,21)" rx="2" ry="2" />
+<text  x="245.84" y="671.5" >tcp_sendmsg</text>
 </g>
 <g >
-<title>sched_clock_cpu (1 samples, 0.26%)</title><rect x="115.4" y="629" width="3.0" height="15.0" fill="rgb(236,12,54)" rx="2" ry="2" />
-<text  x="118.36" y="639.5" ></text>
+<title>__fget (1 samples, 0.19%)</title><rect x="505.1" y="725" width="2.2" height="15.0" fill="rgb(235,3,23)" rx="2" ry="2" />
+<text  x="508.06" y="735.5" ></text>
 </g>
 <g >
-<title>zmalloc (2 samples, 0.51%)</title><rect x="1181.0" y="837" width="6.0" height="15.0" fill="rgb(253,81,45)" rx="2" ry="2" />
-<text  x="1183.97" y="847.5" ></text>
+<title>__tcp_transmit_skb (69 samples, 13.22%)</title><rect x="272.2" y="581" width="156.0" height="15.0" fill="rgb(213,15,17)" rx="2" ry="2" />
+<text  x="275.22" y="591.5" >__tcp_transmit_skb</text>
 </g>
 <g >
-<title>dequeue_task_fair (6 samples, 1.53%)</title><rect x="783.6" y="661" width="18.1" height="15.0" fill="rgb(250,55,3)" rx="2" ry="2" />
-<text  x="786.62" y="671.5" ></text>
+<title>sdsIncrLen (1 samples, 0.19%)</title><rect x="1174.2" y="837" width="2.2" height="15.0" fill="rgb(250,211,44)" rx="2" ry="2" />
+<text  x="1177.18" y="847.5" ></text>
 </g>
 <g >
-<title>tcp_rcv_space_adjust (1 samples, 0.26%)</title><rect x="115.4" y="645" width="3.0" height="15.0" fill="rgb(228,229,28)" rx="2" ry="2" />
-<text  x="118.36" y="655.5" ></text>
+<title>pgd_free (1 samples, 0.19%)</title><rect x="595.5" y="645" width="2.2" height="15.0" fill="rgb(242,77,5)" rx="2" ry="2" />
+<text  x="598.48" y="655.5" ></text>
 </g>
 <g >
-<title>ipv4_conntrack_local (11 samples, 2.81%)</title><rect x="356.2" y="501" width="33.1" height="15.0" fill="rgb(240,109,1)" rx="2" ry="2" />
-<text  x="359.17" y="511.5" >ip..</text>
+<title>addHashIteratorCursorToReply (1 samples, 0.19%)</title><rect x="979.8" y="837" width="2.2" height="15.0" fill="rgb(213,110,44)" rx="2" ry="2" />
+<text  x="982.77" y="847.5" ></text>
 </g>
 <g >
-<title>ip_local_deliver (52 samples, 13.27%)</title><rect x="422.4" y="325" width="156.5" height="15.0" fill="rgb(242,60,19)" rx="2" ry="2" />
-<text  x="425.40" y="335.5" >ip_local_deliver</text>
+<title>mutex_lock (1 samples, 0.19%)</title><rect x="1040.8" y="773" width="2.3" height="15.0" fill="rgb(235,154,8)" rx="2" ry="2" />
+<text  x="1043.80" y="783.5" ></text>
 </g>
 <g >
-<title>nf_hook_slow (3 samples, 0.77%)</title><rect x="566.9" y="309" width="9.0" height="15.0" fill="rgb(233,30,44)" rx="2" ry="2" />
-<text  x="569.89" y="319.5" ></text>
+<title>calloc@plt (1 samples, 0.19%)</title><rect x="973.0" y="821" width="2.2" height="15.0" fill="rgb(234,204,52)" rx="2" ry="2" />
+<text  x="975.99" y="831.5" ></text>
 </g>
 <g >
-<title>_raw_spin_lock_bh (2 samples, 0.51%)</title><rect x="94.3" y="629" width="6.0" height="15.0" fill="rgb(251,211,52)" rx="2" ry="2" />
-<text  x="97.29" y="639.5" ></text>
+<title>tcp_packet (2 samples, 0.38%)</title><rect x="301.6" y="469" width="4.5" height="15.0" fill="rgb(217,39,39)" rx="2" ry="2" />
+<text  x="304.61" y="479.5" ></text>
 </g>
 <g >
-<title>dev_queue_xmit (7 samples, 1.79%)</title><rect x="594.0" y="485" width="21.1" height="15.0" fill="rgb(219,73,0)" rx="2" ry="2" />
-<text  x="596.98" y="495.5" ></text>
+<title>__fdget_pos (1 samples, 0.19%)</title><rect x="156.9" y="757" width="2.3" height="15.0" fill="rgb(214,29,20)" rx="2" ry="2" />
+<text  x="159.93" y="767.5" ></text>
 </g>
 <g >
-<title>dictFind (6 samples, 1.53%)</title><rect x="10.0" y="789" width="18.1" height="15.0" fill="rgb(238,198,30)" rx="2" ry="2" />
-<text  x="13.00" y="799.5" ></text>
+<title>__wake_up_common_lock (11 samples, 2.11%)</title><rect x="364.9" y="197" width="24.9" height="15.0" fill="rgb(241,21,53)" rx="2" ry="2" />
+<text  x="367.90" y="207.5" >_..</text>
 </g>
 <g >
-<title>tcp_ack (5 samples, 1.28%)</title><rect x="455.5" y="245" width="15.1" height="15.0" fill="rgb(246,114,16)" rx="2" ry="2" />
-<text  x="458.51" y="255.5" ></text>
+<title>enqueue_to_backlog (1 samples, 0.19%)</title><rect x="414.6" y="389" width="2.3" height="15.0" fill="rgb(207,134,9)" rx="2" ry="2" />
+<text  x="417.64" y="399.5" ></text>
 </g>
 <g >
-<title>ext4_iomap_begin (1 samples, 0.26%)</title><rect x="163.5" y="677" width="3.0" height="15.0" fill="rgb(206,51,11)" rx="2" ry="2" />
-<text  x="166.52" y="687.5" ></text>
+<title>__intel_pmu_enable_all.constprop.23 (7 samples, 1.34%)</title><rect x="1124.4" y="597" width="15.9" height="15.0" fill="rgb(241,80,23)" rx="2" ry="2" />
+<text  x="1127.44" y="607.5" ></text>
 </g>
 <g >
-<title>processInputBuffer (1 samples, 0.26%)</title><rect x="1150.9" y="837" width="3.0" height="15.0" fill="rgb(240,97,19)" rx="2" ry="2" />
-<text  x="1153.87" y="847.5" ></text>
+<title>next_bio (2 samples, 0.38%)</title><rect x="211.2" y="581" width="4.5" height="15.0" fill="rgb(254,145,25)" rx="2" ry="2" />
+<text  x="214.19" y="591.5" ></text>
 </g>
 <g >
-<title>ext4_iomap_end (5 samples, 1.28%)</title><rect x="241.8" y="661" width="15.0" height="15.0" fill="rgb(246,115,34)" rx="2" ry="2" />
-<text  x="244.79" y="671.5" ></text>
+<title>path_init (1 samples, 0.19%)</title><rect x="950.4" y="725" width="2.2" height="15.0" fill="rgb(219,56,54)" rx="2" ry="2" />
+<text  x="953.38" y="735.5" ></text>
 </g>
 <g >
-<title>timerqueue_add (2 samples, 0.51%)</title><rect x="759.5" y="677" width="6.1" height="15.0" fill="rgb(219,72,38)" rx="2" ry="2" />
-<text  x="762.54" y="687.5" ></text>
+<title>ext4_issue_zeroout (2 samples, 0.38%)</title><rect x="211.2" y="629" width="4.5" height="15.0" fill="rgb(233,215,36)" rx="2" ry="2" />
+<text  x="214.19" y="639.5" ></text>
 </g>
 <g >
-<title>tcp_in_window (1 samples, 0.26%)</title><rect x="386.3" y="453" width="3.0" height="15.0" fill="rgb(239,174,24)" rx="2" ry="2" />
-<text  x="389.28" y="463.5" ></text>
+<title>tcp_send_mss (3 samples, 0.57%)</title><rect x="437.2" y="629" width="6.8" height="15.0" fill="rgb(240,162,19)" rx="2" ry="2" />
+<text  x="440.24" y="639.5" ></text>
 </g>
 <g >
-<title>__strcasecmp_l_avx (1 samples, 0.26%)</title><rect x="651.2" y="821" width="3.0" height="15.0" fill="rgb(215,199,30)" rx="2" ry="2" />
-<text  x="654.17" y="831.5" ></text>
+<title>_raw_spin_lock (1 samples, 0.19%)</title><rect x="957.2" y="725" width="2.2" height="15.0" fill="rgb(251,192,26)" rx="2" ry="2" />
+<text  x="960.16" y="735.5" ></text>
 </g>
 <g >
-<title>lock_sock_nested (2 samples, 0.51%)</title><rect x="94.3" y="645" width="6.0" height="15.0" fill="rgb(247,196,54)" rx="2" ry="2" />
-<text  x="97.29" y="655.5" ></text>
+<title>ipv4_get_l4proto (1 samples, 0.19%)</title><rect x="290.3" y="469" width="2.3" height="15.0" fill="rgb(245,15,48)" rx="2" ry="2" />
+<text  x="293.31" y="479.5" ></text>
 </g>
 <g >
-<title>ep_poll (88 samples, 22.45%)</title><rect x="696.3" y="757" width="264.9" height="15.0" fill="rgb(219,127,5)" rx="2" ry="2" />
-<text  x="699.33" y="767.5" >ep_poll</text>
+<title>strncpy (1 samples, 0.19%)</title><rect x="120.8" y="645" width="2.2" height="15.0" fill="rgb(251,155,26)" rx="2" ry="2" />
+<text  x="123.77" y="655.5" ></text>
 </g>
 <g >
-<title>get_empty_filp (1 samples, 0.26%)</title><rect x="1045.5" y="725" width="3.0" height="15.0" fill="rgb(212,152,31)" rx="2" ry="2" />
-<text  x="1048.51" y="735.5" ></text>
+<title>sys_openat (12 samples, 2.30%)</title><rect x="936.8" y="789" width="27.1" height="15.0" fill="rgb(235,203,39)" rx="2" ry="2" />
+<text  x="939.82" y="799.5" >s..</text>
 </g>
 <g >
-<title>intel_pmu_enable_all (41 samples, 10.46%)</title><rect x="807.7" y="629" width="123.4" height="15.0" fill="rgb(241,213,51)" rx="2" ry="2" />
-<text  x="810.70" y="639.5" >intel_pmu_enabl..</text>
+<title>__fget_light (3 samples, 0.57%)</title><rect x="1027.2" y="757" width="6.8" height="15.0" fill="rgb(245,15,17)" rx="2" ry="2" />
+<text  x="1030.24" y="767.5" ></text>
 </g>
 <g >
-<title>do_task_stat (4 samples, 1.02%)</title><rect x="121.4" y="677" width="12.0" height="15.0" fill="rgb(240,142,21)" rx="2" ry="2" />
-<text  x="124.38" y="687.5" ></text>
+<title>__ext4_journal_get_write_access (2 samples, 0.38%)</title><rect x="236.1" y="613" width="4.5" height="15.0" fill="rgb(210,68,31)" rx="2" ry="2" />
+<text  x="239.05" y="623.5" ></text>
 </g>
 <g >
-<title>dax_copy_from_iter (1 samples, 0.26%)</title><rect x="166.5" y="645" width="3.0" height="15.0" fill="rgb(205,155,36)" rx="2" ry="2" />
-<text  x="169.53" y="655.5" ></text>
+<title>jbd2__journal_start (5 samples, 0.96%)</title><rect x="197.6" y="629" width="11.3" height="15.0" fill="rgb(222,195,31)" rx="2" ry="2" />
+<text  x="200.62" y="639.5" ></text>
 </g>
 <g >
-<title>trackInstantaneousMetric (1 samples, 0.26%)</title><rect x="1015.4" y="821" width="3.0" height="15.0" fill="rgb(206,202,31)" rx="2" ry="2" />
-<text  x="1018.41" y="831.5" ></text>
+<title>memcpy@plt (1 samples, 0.19%)</title><rect x="1160.6" y="837" width="2.3" height="15.0" fill="rgb(215,213,7)" rx="2" ry="2" />
+<text  x="1163.61" y="847.5" ></text>
 </g>
 <g >
-<title>pick_next_task_fair (7 samples, 1.79%)</title><rect x="931.1" y="677" width="21.1" height="15.0" fill="rgb(249,113,48)" rx="2" ry="2" />
-<text  x="934.12" y="687.5" ></text>
+<title>_raw_spin_lock_irqsave (1 samples, 0.19%)</title><rect x="1095.1" y="677" width="2.2" height="15.0" fill="rgb(241,94,9)" rx="2" ry="2" />
+<text  x="1098.06" y="687.5" ></text>
 </g>
 <g >
-<title>tcp_sendmsg (123 samples, 31.38%)</title><rect x="265.9" y="661" width="370.2" height="15.0" fill="rgb(207,165,32)" rx="2" ry="2" />
-<text  x="268.87" y="671.5" >tcp_sendmsg</text>
+<title>nmi_cpu_backtrace (1 samples, 0.19%)</title><rect x="850.9" y="597" width="2.3" height="15.0" fill="rgb(234,160,26)" rx="2" ry="2" />
+<text  x="853.92" y="607.5" ></text>
 </g>
 <g >
-<title>iptable_filter_hook (3 samples, 0.77%)</title><rect x="566.9" y="293" width="9.0" height="15.0" fill="rgb(227,99,14)" rx="2" ry="2" />
-<text  x="569.89" y="303.5" ></text>
+<title>[[vdso]] (1 samples, 0.19%)</title><rect x="988.8" y="805" width="2.3" height="15.0" fill="rgb(245,42,27)" rx="2" ry="2" />
+<text  x="991.81" y="815.5" ></text>
 </g>
 <g >
-<title>sys_read (27 samples, 6.89%)</title><rect x="73.2" y="773" width="81.3" height="15.0" fill="rgb(248,139,42)" rx="2" ry="2" />
-<text  x="76.21" y="783.5" >sys_read</text>
+<title>tcp_write_xmit (76 samples, 14.56%)</title><rect x="265.4" y="597" width="171.8" height="15.0" fill="rgb(227,155,4)" rx="2" ry="2" />
+<text  x="268.44" y="607.5" >tcp_write_xmit</text>
 </g>
 <g >
-<title>cpuacct_charge (1 samples, 0.26%)</title><rect x="783.6" y="629" width="3.0" height="15.0" fill="rgb(235,22,5)" rx="2" ry="2" />
-<text  x="786.62" y="639.5" ></text>
+<title>__wake_up_sync_key (11 samples, 2.11%)</title><rect x="364.9" y="213" width="24.9" height="15.0" fill="rgb(241,209,43)" rx="2" ry="2" />
+<text  x="367.90" y="223.5" >_..</text>
 </g>
 <g >
-<title>nf_ct_deliver_cached_events (2 samples, 0.51%)</title><rect x="618.1" y="485" width="6.0" height="15.0" fill="rgb(208,221,37)" rx="2" ry="2" />
-<text  x="621.06" y="495.5" ></text>
+<title>_raw_spin_unlock_irqrestore (1 samples, 0.19%)</title><rect x="529.9" y="725" width="2.3" height="15.0" fill="rgb(216,200,12)" rx="2" ry="2" />
+<text  x="532.92" y="735.5" ></text>
 </g>
 <g >
-<title>ipv4_conntrack_local (1 samples, 0.26%)</title><rect x="341.1" y="517" width="3.0" height="15.0" fill="rgb(212,190,7)" rx="2" ry="2" />
-<text  x="344.12" y="527.5" ></text>
+<title>update_curr (1 samples, 0.19%)</title><rect x="1117.7" y="613" width="2.2" height="15.0" fill="rgb(239,134,17)" rx="2" ry="2" />
+<text  x="1120.66" y="623.5" ></text>
 </g>
 <g >
-<title>cpumask_next_and (1 samples, 0.26%)</title><rect x="940.2" y="629" width="3.0" height="15.0" fill="rgb(226,161,19)" rx="2" ry="2" />
-<text  x="943.15" y="639.5" ></text>
+<title>fput (3 samples, 0.57%)</title><rect x="882.6" y="757" width="6.7" height="15.0" fill="rgb(236,180,46)" rx="2" ry="2" />
+<text  x="885.57" y="767.5" ></text>
 </g>
 <g >
-<title>dictRehash (2 samples, 0.51%)</title><rect x="52.1" y="805" width="6.1" height="15.0" fill="rgb(240,213,14)" rx="2" ry="2" />
-<text  x="55.14" y="815.5" ></text>
+<title>ip_rcv (38 samples, 7.28%)</title><rect x="324.2" y="357" width="85.9" height="15.0" fill="rgb(238,115,4)" rx="2" ry="2" />
+<text  x="327.21" y="367.5" >ip_rcv</text>
 </g>
 <g >
-<title>native_sched_clock (1 samples, 0.26%)</title><rect x="777.6" y="597" width="3.0" height="15.0" fill="rgb(230,4,28)" rx="2" ry="2" />
-<text  x="780.60" y="607.5" ></text>
+<title>__fdget (3 samples, 0.57%)</title><rect x="1027.2" y="773" width="6.8" height="15.0" fill="rgb(229,54,9)" rx="2" ry="2" />
+<text  x="1030.24" y="783.5" ></text>
 </g>
 <g >
-<title>addReplyBulkLen (5 samples, 1.28%)</title><rect x="666.2" y="821" width="15.1" height="15.0" fill="rgb(240,58,10)" rx="2" ry="2" />
-<text  x="669.22" y="831.5" ></text>
+<title>do_syscall_64 (172 samples, 32.95%)</title><rect x="502.8" y="789" width="388.8" height="15.0" fill="rgb(249,160,30)" rx="2" ry="2" />
+<text  x="505.80" y="799.5" >do_syscall_64</text>
 </g>
 <g >
-<title>down_write (1 samples, 0.26%)</title><rect x="244.8" y="645" width="3.0" height="15.0" fill="rgb(220,117,41)" rx="2" ry="2" />
-<text  x="247.80" y="655.5" ></text>
+<title>_raw_read_lock (3 samples, 0.57%)</title><rect x="199.9" y="597" width="6.8" height="15.0" fill="rgb(223,3,53)" rx="2" ry="2" />
+<text  x="202.89" y="607.5" ></text>
 </g>
 <g >
-<title>strncpy_from_user (1 samples, 0.26%)</title><rect x="1054.5" y="725" width="3.1" height="15.0" fill="rgb(233,198,43)" rx="2" ry="2" />
-<text  x="1057.54" y="735.5" ></text>
+<title>mutex_lock (1 samples, 0.19%)</title><rect x="552.5" y="725" width="2.3" height="15.0" fill="rgb(218,33,29)" rx="2" ry="2" />
+<text  x="555.53" y="735.5" ></text>
 </g>
 <g >
-<title>futex_wait (11 samples, 2.81%)</title><rect x="979.3" y="741" width="33.1" height="15.0" fill="rgb(218,37,54)" rx="2" ry="2" />
-<text  x="982.29" y="751.5" >fu..</text>
+<title>__softirqentry_text_start (43 samples, 8.24%)</title><rect x="312.9" y="437" width="97.2" height="15.0" fill="rgb(228,187,17)" rx="2" ry="2" />
+<text  x="315.91" y="447.5" >__softirqen..</text>
 </g>
 <g >
-<title>tcp_update_pacing_rate (1 samples, 0.26%)</title><rect x="467.6" y="229" width="3.0" height="15.0" fill="rgb(235,185,35)" rx="2" ry="2" />
-<text  x="470.55" y="239.5" ></text>
+<title>kmem_cache_alloc (3 samples, 0.57%)</title><rect x="936.8" y="709" width="6.8" height="15.0" fill="rgb(235,10,14)" rx="2" ry="2" />
+<text  x="939.82" y="719.5" ></text>
 </g>
 <g >
-<title>nmi_cpu_backtrace (1 samples, 0.26%)</title><rect x="925.1" y="597" width="3.0" height="15.0" fill="rgb(231,191,2)" rx="2" ry="2" />
-<text  x="928.10" y="607.5" ></text>
+<title>finish_wait (1 samples, 0.19%)</title><rect x="1095.1" y="693" width="2.2" height="15.0" fill="rgb(242,102,29)" rx="2" ry="2" />
+<text  x="1098.06" y="703.5" ></text>
 </g>
 <g >
-<title>iomap_apply (30 samples, 7.65%)</title><rect x="166.5" y="677" width="90.3" height="15.0" fill="rgb(213,195,22)" rx="2" ry="2" />
-<text  x="169.53" y="687.5" >iomap_apply</text>
+<title>__alloc_skb (4 samples, 0.77%)</title><rect x="249.6" y="613" width="9.1" height="15.0" fill="rgb(205,81,5)" rx="2" ry="2" />
+<text  x="252.62" y="623.5" ></text>
 </g>
 <g >
-<title>process_backlog (63 samples, 16.07%)</title><rect x="404.3" y="405" width="189.7" height="15.0" fill="rgb(209,54,50)" rx="2" ry="2" />
-<text  x="407.34" y="415.5" >process_backlog</text>
+<title>__intel_pmu_enable_all.constprop.23 (1 samples, 0.19%)</title><rect x="604.5" y="597" width="2.3" height="15.0" fill="rgb(206,4,18)" rx="2" ry="2" />
+<text  x="607.52" y="607.5" ></text>
 </g>
 <g >
-<title>kernel_fpu_begin (1 samples, 0.26%)</title><rect x="235.8" y="565" width="3.0" height="15.0" fill="rgb(214,13,2)" rx="2" ry="2" />
-<text  x="238.77" y="575.5" ></text>
+<title>je_malloc_usable_size (2 samples, 0.38%)</title><rect x="1153.8" y="837" width="4.6" height="15.0" fill="rgb(230,62,11)" rx="2" ry="2" />
+<text  x="1156.83" y="847.5" ></text>
 </g>
 <g >
-<title>activeExpireCycle (2 samples, 0.51%)</title><rect x="1063.6" y="837" width="6.0" height="15.0" fill="rgb(246,137,11)" rx="2" ry="2" />
-<text  x="1066.57" y="847.5" ></text>
+<title>cgroup_cpu_stat_updated (1 samples, 0.19%)</title><rect x="1117.7" y="581" width="2.2" height="15.0" fill="rgb(240,15,42)" rx="2" ry="2" />
+<text  x="1120.66" y="591.5" ></text>
 </g>
 <g >
-<title>native_sched_clock (2 samples, 0.51%)</title><rect x="825.8" y="597" width="6.0" height="15.0" fill="rgb(238,54,6)" rx="2" ry="2" />
-<text  x="828.77" y="607.5" ></text>
+<title>ep_poll (165 samples, 31.61%)</title><rect x="509.6" y="757" width="373.0" height="15.0" fill="rgb(220,101,46)" rx="2" ry="2" />
+<text  x="512.58" y="767.5" >ep_poll</text>
 </g>
 <g >
-<title>proc_single_show (4 samples, 1.02%)</title><rect x="121.4" y="709" width="12.0" height="15.0" fill="rgb(230,157,24)" rx="2" ry="2" />
-<text  x="124.38" y="719.5" ></text>
+<title>skb_release_all (1 samples, 0.19%)</title><rect x="358.1" y="197" width="2.3" height="15.0" fill="rgb(251,37,2)" rx="2" ry="2" />
+<text  x="361.12" y="207.5" ></text>
 </g>
 <g >
-<title>nf_hook_slow (1 samples, 0.26%)</title><rect x="584.9" y="341" width="3.1" height="15.0" fill="rgb(239,21,21)" rx="2" ry="2" />
-<text  x="587.95" y="351.5" ></text>
+<title>__local_bh_enable_ip (44 samples, 8.43%)</title><rect x="310.7" y="485" width="99.4" height="15.0" fill="rgb(251,98,54)" rx="2" ry="2" />
+<text  x="313.65" y="495.5" >__local_bh_e..</text>
 </g>
 <g >
-<title>je_malloc_usable_size (1 samples, 0.26%)</title><rect x="61.2" y="805" width="3.0" height="15.0" fill="rgb(220,51,2)" rx="2" ry="2" />
-<text  x="64.17" y="815.5" ></text>
+<title>rb_insert_color (1 samples, 0.19%)</title><rect x="566.1" y="661" width="2.3" height="15.0" fill="rgb(215,171,49)" rx="2" ry="2" />
+<text  x="569.09" y="671.5" ></text>
 </g>
 <g >
-<title>__sb_end_write (1 samples, 0.26%)</title><rect x="157.5" y="757" width="3.0" height="15.0" fill="rgb(217,102,11)" rx="2" ry="2" />
-<text  x="160.50" y="767.5" ></text>
+<title>lock_sock_nested (1 samples, 0.19%)</title><rect x="91.4" y="645" width="2.2" height="15.0" fill="rgb(251,226,38)" rx="2" ry="2" />
+<text  x="94.38" y="655.5" ></text>
 </g>
 <g >
-<title>account_entity_enqueue (1 samples, 0.26%)</title><rect x="515.7" y="53" width="3.0" height="15.0" fill="rgb(218,19,3)" rx="2" ry="2" />
-<text  x="518.71" y="63.5" ></text>
+<title>__free_pages (1 samples, 0.19%)</title><rect x="595.5" y="597" width="2.2" height="15.0" fill="rgb(205,31,40)" rx="2" ry="2" />
+<text  x="598.48" y="607.5" ></text>
 </g>
 <g >
-<title>ipv4_mtu (2 samples, 0.51%)</title><rect x="630.1" y="613" width="6.0" height="15.0" fill="rgb(254,153,46)" rx="2" ry="2" />
-<text  x="633.10" y="623.5" ></text>
+<title>beforeSleep (1 samples, 0.19%)</title><rect x="55.2" y="805" width="2.3" height="15.0" fill="rgb(223,106,7)" rx="2" ry="2" />
+<text  x="58.21" y="815.5" ></text>
 </g>
 <g >
-<title>addReply (3 samples, 0.77%)</title><rect x="657.2" y="821" width="9.0" height="15.0" fill="rgb(205,172,43)" rx="2" ry="2" />
-<text  x="660.19" y="831.5" ></text>
+<title>__libc_read (36 samples, 6.90%)</title><rect x="73.3" y="821" width="81.4" height="15.0" fill="rgb(247,27,35)" rx="2" ry="2" />
+<text  x="76.30" y="831.5" >__libc_read</text>
 </g>
 <g >
-<title>do_syscall_64 (162 samples, 41.33%)</title><rect x="154.5" y="789" width="487.6" height="15.0" fill="rgb(245,160,33)" rx="2" ry="2" />
-<text  x="157.49" y="799.5" >do_syscall_64</text>
+<title>path_openat (9 samples, 1.72%)</title><rect x="936.8" y="741" width="20.4" height="15.0" fill="rgb(252,193,47)" rx="2" ry="2" />
+<text  x="939.82" y="751.5" ></text>
 </g>
 <g >
-<title>_raw_read_lock (1 samples, 0.26%)</title><rect x="241.8" y="597" width="3.0" height="15.0" fill="rgb(223,77,44)" rx="2" ry="2" />
-<text  x="244.79" y="607.5" ></text>
+<title>default_do_nmi (3 samples, 0.57%)</title><rect x="615.8" y="597" width="6.8" height="15.0" fill="rgb(234,120,50)" rx="2" ry="2" />
+<text  x="618.82" y="607.5" ></text>
 </g>
 <g >
-<title>__wake_up_common_lock (22 samples, 5.61%)</title><rect x="488.6" y="197" width="66.2" height="15.0" fill="rgb(249,24,16)" rx="2" ry="2" />
-<text  x="491.62" y="207.5" >__wake_..</text>
+<title>mempool_alloc_slab (1 samples, 0.19%)</title><rect x="211.2" y="533" width="2.2" height="15.0" fill="rgb(232,86,2)" rx="2" ry="2" />
+<text  x="214.19" y="543.5" ></text>
 </g>
 <g >
-<title>update_rq_clock (2 samples, 0.51%)</title><rect x="548.8" y="117" width="6.0" height="15.0" fill="rgb(224,226,36)" rx="2" ry="2" />
-<text  x="551.83" y="127.5" ></text>
+<title>__vfs_write (127 samples, 24.33%)</title><rect x="161.5" y="741" width="287.0" height="15.0" fill="rgb(209,199,23)" rx="2" ry="2" />
+<text  x="164.46" y="751.5" >__vfs_write</text>
 </g>
 <g >
-<title>ext4_do_update_inode (2 samples, 0.51%)</title><rect x="250.8" y="613" width="6.0" height="15.0" fill="rgb(234,152,10)" rx="2" ry="2" />
-<text  x="253.82" y="623.5" ></text>
+<title>aeProcessEvents (3 samples, 0.57%)</title><rect x="48.4" y="805" width="6.8" height="15.0" fill="rgb(231,191,34)" rx="2" ry="2" />
+<text  x="51.43" y="815.5" ></text>
 </g>
 <g >
-<title>ext4_superblock_csum_set (1 samples, 0.26%)</title><rect x="235.8" y="613" width="3.0" height="15.0" fill="rgb(226,100,14)" rx="2" ry="2" />
-<text  x="238.77" y="623.5" ></text>
+<title>do_syscall_64 (133 samples, 25.48%)</title><rect x="156.9" y="789" width="300.7" height="15.0" fill="rgb(228,53,21)" rx="2" ry="2" />
+<text  x="159.93" y="799.5" >do_syscall_64</text>
 </g>
 <g >
-<title>skb_copy_datagram_iter (3 samples, 0.77%)</title><rect x="103.3" y="645" width="9.0" height="15.0" fill="rgb(207,57,48)" rx="2" ry="2" />
-<text  x="106.32" y="655.5" ></text>
+<title>decrRefCount (1 samples, 0.19%)</title><rect x="482.5" y="821" width="2.2" height="15.0" fill="rgb(228,10,28)" rx="2" ry="2" />
+<text  x="485.45" y="831.5" ></text>
 </g>
 <g >
-<title>entry_SYSCALL_64_after_hwframe (4 samples, 1.02%)</title><rect x="1045.5" y="821" width="12.1" height="15.0" fill="rgb(229,198,3)" rx="2" ry="2" />
-<text  x="1048.51" y="831.5" ></text>
+<title>default_do_nmi (1 samples, 0.19%)</title><rect x="1124.4" y="581" width="2.3" height="15.0" fill="rgb(240,119,42)" rx="2" ry="2" />
+<text  x="1127.44" y="591.5" ></text>
 </g>
 <g >
-<title>inet_recvmsg (12 samples, 3.06%)</title><rect x="82.2" y="677" width="36.2" height="15.0" fill="rgb(223,42,16)" rx="2" ry="2" />
-<text  x="85.24" y="687.5" >ine..</text>
+<title>kmem_cache_alloc (1 samples, 0.19%)</title><rect x="197.6" y="613" width="2.3" height="15.0" fill="rgb(236,23,41)" rx="2" ry="2" />
+<text  x="200.62" y="623.5" ></text>
 </g>
 <g >
-<title>_raw_spin_unlock_irqrestore (1 samples, 0.26%)</title><rect x="723.4" y="725" width="3.0" height="15.0" fill="rgb(221,220,1)" rx="2" ry="2" />
-<text  x="726.42" y="735.5" ></text>
+<title>tcp_clean_rtx_queue (4 samples, 0.77%)</title><rect x="351.3" y="229" width="9.1" height="15.0" fill="rgb(209,64,39)" rx="2" ry="2" />
+<text  x="354.34" y="239.5" ></text>
 </g>
 <g >
-<title>__alloc_fd (1 samples, 0.26%)</title><rect x="1051.5" y="741" width="3.0" height="15.0" fill="rgb(233,80,50)" rx="2" ry="2" />
-<text  x="1054.53" y="751.5" ></text>
+<title>dictFind (1 samples, 0.19%)</title><rect x="28.1" y="789" width="2.2" height="15.0" fill="rgb(232,56,22)" rx="2" ry="2" />
+<text  x="31.08" y="799.5" ></text>
 </g>
 <g >
-<title>do_syscall_64 (4 samples, 1.02%)</title><rect x="1045.5" y="805" width="12.1" height="15.0" fill="rgb(217,99,8)" rx="2" ry="2" />
-<text  x="1048.51" y="815.5" ></text>
+<title>dictEncObjKeyCompare (1 samples, 0.19%)</title><rect x="484.7" y="821" width="2.3" height="15.0" fill="rgb(212,7,37)" rx="2" ry="2" />
+<text  x="487.71" y="831.5" ></text>
 </g>
 <g >
-<title>ext4_file_write_iter (35 samples, 8.93%)</title><rect x="160.5" y="709" width="105.4" height="15.0" fill="rgb(239,192,36)" rx="2" ry="2" />
-<text  x="163.51" y="719.5" >ext4_file_wr..</text>
+<title>ep_scan_ready_list.constprop.17 (14 samples, 2.68%)</title><rect x="523.1" y="741" width="31.7" height="15.0" fill="rgb(252,50,38)" rx="2" ry="2" />
+<text  x="526.14" y="751.5" >ep..</text>
 </g>
 <g >
-<title>entry_SYSCALL_64 (1 samples, 0.26%)</title><rect x="1111.7" y="821" width="3.0" height="15.0" fill="rgb(249,207,26)" rx="2" ry="2" />
-<text  x="1114.73" y="831.5" ></text>
+<title>task_sched_runtime (1 samples, 0.19%)</title><rect x="141.1" y="629" width="2.3" height="15.0" fill="rgb(218,83,14)" rx="2" ry="2" />
+<text  x="144.11" y="639.5" ></text>
 </g>
 <g >
-<title>sched_clock (1 samples, 0.26%)</title><rect x="115.4" y="613" width="3.0" height="15.0" fill="rgb(211,208,38)" rx="2" ry="2" />
-<text  x="118.36" y="623.5" ></text>
+<title>do_task_stat (11 samples, 2.11%)</title><rect x="118.5" y="677" width="24.9" height="15.0" fill="rgb(241,8,11)" rx="2" ry="2" />
+<text  x="121.51" y="687.5" >d..</text>
 </g>
 <g >
-<title>_raw_spin_lock (1 samples, 0.26%)</title><rect x="780.6" y="677" width="3.0" height="15.0" fill="rgb(211,101,38)" rx="2" ry="2" />
-<text  x="783.61" y="687.5" ></text>
+<title>hmsetCommand (1 samples, 0.19%)</title><rect x="898.4" y="821" width="2.3" height="15.0" fill="rgb(219,172,26)" rx="2" ry="2" />
+<text  x="901.39" y="831.5" ></text>
 </g>
 <g >
-<title>schedule (11 samples, 2.81%)</title><rect x="979.3" y="709" width="33.1" height="15.0" fill="rgb(221,155,8)" rx="2" ry="2" />
-<text  x="982.29" y="719.5" >sc..</text>
+<title>__perf_event_task_sched_in (8 samples, 1.53%)</title><rect x="1124.4" y="645" width="18.1" height="15.0" fill="rgb(240,202,47)" rx="2" ry="2" />
+<text  x="1127.44" y="655.5" ></text>
 </g>
 <g >
-<title>__wake_up_sync_key (23 samples, 5.87%)</title><rect x="485.6" y="213" width="69.2" height="15.0" fill="rgb(225,91,8)" rx="2" ry="2" />
-<text  x="488.61" y="223.5" >__wake_..</text>
+<title>enqueue_task_fair (6 samples, 1.15%)</title><rect x="373.9" y="85" width="13.6" height="15.0" fill="rgb(239,77,10)" rx="2" ry="2" />
+<text  x="376.95" y="95.5" ></text>
 </g>
 <g >
-<title>entry_SYSCALL_64_after_hwframe (162 samples, 41.33%)</title><rect x="154.5" y="805" width="487.6" height="15.0" fill="rgb(225,178,28)" rx="2" ry="2" />
-<text  x="157.49" y="815.5" >entry_SYSCALL_64_after_hwframe</text>
+<title>do_syscall_64 (12 samples, 2.30%)</title><rect x="1018.2" y="805" width="27.1" height="15.0" fill="rgb(252,223,33)" rx="2" ry="2" />
+<text  x="1021.20" y="815.5" >d..</text>
 </g>
 <g >
-<title>native_sched_clock (1 samples, 0.26%)</title><rect x="449.5" y="229" width="3.0" height="15.0" fill="rgb(206,154,51)" rx="2" ry="2" />
-<text  x="452.49" y="239.5" ></text>
+<title>jbd2_journal_add_journal_head (1 samples, 0.19%)</title><rect x="238.3" y="581" width="2.3" height="15.0" fill="rgb(207,173,16)" rx="2" ry="2" />
+<text  x="241.31" y="591.5" ></text>
 </g>
 <g >
-<title>prefetch_freepointer (1 samples, 0.26%)</title><rect x="283.9" y="581" width="3.0" height="15.0" fill="rgb(220,28,47)" rx="2" ry="2" />
-<text  x="286.93" y="591.5" ></text>
+<title>getname_flags (1 samples, 0.19%)</title><rect x="959.4" y="741" width="2.3" height="15.0" fill="rgb(217,24,15)" rx="2" ry="2" />
+<text  x="962.43" y="751.5" ></text>
 </g>
 <g >
-<title>proc_single_show (1 samples, 0.26%)</title><rect x="118.4" y="725" width="3.0" height="15.0" fill="rgb(214,34,16)" rx="2" ry="2" />
-<text  x="121.37" y="735.5" ></text>
+<title>crypto_shash_update (3 samples, 0.57%)</title><rect x="224.8" y="565" width="6.7" height="15.0" fill="rgb(228,186,30)" rx="2" ry="2" />
+<text  x="227.75" y="575.5" ></text>
 </g>
 <g >
-<title>__vfs_read (19 samples, 4.85%)</title><rect x="79.2" y="741" width="57.2" height="15.0" fill="rgb(248,228,15)" rx="2" ry="2" />
-<text  x="82.23" y="751.5" >__vfs_..</text>
+<title>[[vdso]] (2 samples, 0.38%)</title><rect x="43.9" y="773" width="4.5" height="15.0" fill="rgb(253,66,38)" rx="2" ry="2" />
+<text  x="46.91" y="783.5" ></text>
 </g>
 <g >
-<title>entry_SYSCALL_64_after_hwframe (28 samples, 7.14%)</title><rect x="70.2" y="805" width="84.3" height="15.0" fill="rgb(205,27,35)" rx="2" ry="2" />
-<text  x="73.20" y="815.5" >entry_SYS..</text>
+<title>entry_SYSCALL_64_after_hwframe (3 samples, 0.57%)</title><rect x="914.2" y="821" width="6.8" height="15.0" fill="rgb(226,102,9)" rx="2" ry="2" />
+<text  x="917.21" y="831.5" ></text>
 </g>
 <g >
-<title>sock_write_iter (124 samples, 31.63%)</title><rect x="265.9" y="709" width="373.2" height="15.0" fill="rgb(246,106,14)" rx="2" ry="2" />
-<text  x="268.87" y="719.5" >sock_write_iter</text>
+<title>do_syscall_64 (39 samples, 7.47%)</title><rect x="1054.4" y="805" width="88.1" height="15.0" fill="rgb(250,40,49)" rx="2" ry="2" />
+<text  x="1057.37" y="815.5" >do_syscall..</text>
 </g>
 <g >
-<title>sock_recvmsg (12 samples, 3.06%)</title><rect x="82.2" y="693" width="36.2" height="15.0" fill="rgb(254,81,26)" rx="2" ry="2" />
-<text  x="85.24" y="703.5" >soc..</text>
+<title>ipt_do_table (1 samples, 0.19%)</title><rect x="285.8" y="485" width="2.2" height="15.0" fill="rgb(251,160,16)" rx="2" ry="2" />
+<text  x="288.79" y="495.5" ></text>
 </g>
 <g >
-<title>__vdso_time (1 samples, 0.26%)</title><rect x="34.1" y="805" width="3.0" height="15.0" fill="rgb(247,209,13)" rx="2" ry="2" />
-<text  x="37.08" y="815.5" ></text>
+<title>common_file_perm (1 samples, 0.19%)</title><rect x="455.3" y="693" width="2.3" height="15.0" fill="rgb(237,128,25)" rx="2" ry="2" />
+<text  x="458.33" y="703.5" ></text>
 </g>
 <g >
-<title>__intel_pmu_enable_all.constprop.23 (41 samples, 10.46%)</title><rect x="807.7" y="613" width="123.4" height="15.0" fill="rgb(217,40,37)" rx="2" ry="2" />
-<text  x="810.70" y="623.5" >__intel_pmu_ena..</text>
+<title>ip_local_deliver (34 samples, 6.51%)</title><rect x="328.7" y="325" width="76.9" height="15.0" fill="rgb(205,24,52)" rx="2" ry="2" />
+<text  x="331.74" y="335.5" >ip_local..</text>
 </g>
 <g >
-<title>tcp_queue_rcv (1 samples, 0.26%)</title><rect x="554.8" y="229" width="3.1" height="15.0" fill="rgb(219,215,39)" rx="2" ry="2" />
-<text  x="557.85" y="239.5" ></text>
+<title>_raw_spin_unlock_irqrestore (1 samples, 0.19%)</title><rect x="1099.6" y="677" width="2.2" height="15.0" fill="rgb(247,54,1)" rx="2" ry="2" />
+<text  x="1102.58" y="687.5" ></text>
 </g>
 <g >
-<title>hrtimer_start_range_ns (1 samples, 0.26%)</title><rect x="753.5" y="725" width="3.0" height="15.0" fill="rgb(239,3,44)" rx="2" ry="2" />
-<text  x="756.52" y="735.5" ></text>
+<title>tcp_validate_incoming (1 samples, 0.19%)</title><rect x="396.6" y="245" width="2.2" height="15.0" fill="rgb(221,69,40)" rx="2" ry="2" />
+<text  x="399.55" y="255.5" ></text>
 </g>
 <g >
-<title>kmem_cache_alloc_node (2 samples, 0.51%)</title><rect x="280.9" y="597" width="6.0" height="15.0" fill="rgb(214,2,32)" rx="2" ry="2" />
-<text  x="283.92" y="607.5" ></text>
+<title>[[vdso]] (1 samples, 0.19%)</title><rect x="53.0" y="773" width="2.2" height="15.0" fill="rgb(249,56,13)" rx="2" ry="2" />
+<text  x="55.95" y="783.5" ></text>
 </g>
 <g >
-<title>skb_clone (2 samples, 0.51%)</title><rect x="624.1" y="565" width="6.0" height="15.0" fill="rgb(221,136,21)" rx="2" ry="2" />
-<text  x="627.08" y="575.5" ></text>
+<title>dax_iomap_actor (1 samples, 0.19%)</title><rect x="166.0" y="677" width="2.2" height="15.0" fill="rgb(218,135,0)" rx="2" ry="2" />
+<text  x="168.98" y="687.5" ></text>
 </g>
 <g >
-<title>dictGetIterator (1 samples, 0.26%)</title><rect x="681.3" y="821" width="3.0" height="15.0" fill="rgb(205,217,42)" rx="2" ry="2" />
-<text  x="684.28" y="831.5" ></text>
+<title>activeExpireCycle (2 samples, 0.38%)</title><rect x="975.2" y="837" width="4.6" height="15.0" fill="rgb(242,142,49)" rx="2" ry="2" />
+<text  x="978.25" y="847.5" ></text>
 </g>
 <g >
-<title>native_sched_clock (1 samples, 0.26%)</title><rect x="115.4" y="597" width="3.0" height="15.0" fill="rgb(225,92,27)" rx="2" ry="2" />
-<text  x="118.36" y="607.5" ></text>
+<title>intel_pmu_enable_all (8 samples, 1.53%)</title><rect x="1124.4" y="613" width="18.1" height="15.0" fill="rgb(249,145,12)" rx="2" ry="2" />
+<text  x="1127.44" y="623.5" ></text>
 </g>
 <g >
-<title>do_syscall_64 (11 samples, 2.81%)</title><rect x="979.3" y="789" width="33.1" height="15.0" fill="rgb(237,135,40)" rx="2" ry="2" />
-<text  x="982.29" y="799.5" >do..</text>
+<title>__dev_queue_xmit (4 samples, 0.77%)</title><rect x="410.1" y="469" width="9.1" height="15.0" fill="rgb(253,105,19)" rx="2" ry="2" />
+<text  x="413.11" y="479.5" ></text>
 </g>
 <g >
-<title>copy_user_enhanced_fast_string (1 samples, 0.26%)</title><rect x="103.3" y="613" width="3.0" height="15.0" fill="rgb(228,217,46)" rx="2" ry="2" />
-<text  x="106.32" y="623.5" ></text>
+<title>in_group_p (1 samples, 0.19%)</title><rect x="943.6" y="661" width="2.3" height="15.0" fill="rgb(211,37,8)" rx="2" ry="2" />
+<text  x="946.60" y="671.5" ></text>
 </g>
 <g >
-<title>native_flush_tlb_one_user (2 samples, 0.51%)</title><rect x="819.7" y="597" width="6.1" height="15.0" fill="rgb(235,114,42)" rx="2" ry="2" />
-<text  x="822.74" y="607.5" ></text>
+<title>ext4_file_write_iter (34 samples, 6.51%)</title><rect x="166.0" y="709" width="76.8" height="15.0" fill="rgb(211,130,34)" rx="2" ry="2" />
+<text  x="168.98" y="719.5" >ext4_fil..</text>
 </g>
 <g >
-<title>vfs_read (25 samples, 6.38%)</title><rect x="79.2" y="757" width="75.3" height="15.0" fill="rgb(254,116,7)" rx="2" ry="2" />
-<text  x="82.23" y="767.5" >vfs_read</text>
+<title>task_ctx_sched_out (1 samples, 0.19%)</title><rect x="1110.9" y="645" width="2.2" height="15.0" fill="rgb(217,101,35)" rx="2" ry="2" />
+<text  x="1113.88" y="655.5" ></text>
 </g>
 <g >
-<title>copy_user_enhanced_fast_string (1 samples, 0.26%)</title><rect x="1114.7" y="773" width="3.1" height="15.0" fill="rgb(240,9,42)" rx="2" ry="2" />
-<text  x="1117.74" y="783.5" ></text>
+<title>dax_read_unlock (10 samples, 1.92%)</title><rect x="175.0" y="645" width="22.6" height="15.0" fill="rgb(232,55,50)" rx="2" ry="2" />
+<text  x="178.02" y="655.5" >d..</text>
 </g>
 <g >
-<title>jbd2_journal_stop (1 samples, 0.26%)</title><rect x="238.8" y="645" width="3.0" height="15.0" fill="rgb(236,215,13)" rx="2" ry="2" />
-<text  x="241.78" y="655.5" ></text>
+<title>vsnprintf (2 samples, 0.38%)</title><rect x="127.5" y="629" width="4.6" height="15.0" fill="rgb(221,108,19)" rx="2" ry="2" />
+<text  x="130.55" y="639.5" ></text>
 </g>
 <g >
-<title>file_update_time (1 samples, 0.26%)</title><rect x="256.8" y="693" width="3.0" height="15.0" fill="rgb(250,18,37)" rx="2" ry="2" />
-<text  x="259.84" y="703.5" ></text>
+<title>bio_alloc_bioset (2 samples, 0.38%)</title><rect x="211.2" y="565" width="4.5" height="15.0" fill="rgb(231,213,4)" rx="2" ry="2" />
+<text  x="214.19" y="575.5" ></text>
 </g>
 <g >
-<title>run_rebalance_domains (1 samples, 0.26%)</title><rect x="1009.4" y="597" width="3.0" height="15.0" fill="rgb(227,220,7)" rx="2" ry="2" />
-<text  x="1012.39" y="607.5" ></text>
+<title>autoremove_wake_function (13 samples, 2.49%)</title><rect x="1061.1" y="645" width="29.4" height="15.0" fill="rgb(245,226,23)" rx="2" ry="2" />
+<text  x="1064.15" y="655.5" >au..</text>
 </g>
 <g >
-<title>native_write_cr2 (1 samples, 0.26%)</title><rect x="831.8" y="597" width="3.0" height="15.0" fill="rgb(245,169,10)" rx="2" ry="2" />
-<text  x="834.79" y="607.5" ></text>
+<title>ttwu_do_activate (4 samples, 0.77%)</title><rect x="1079.2" y="597" width="9.1" height="15.0" fill="rgb(212,178,38)" rx="2" ry="2" />
+<text  x="1082.23" y="607.5" ></text>
 </g>
 <g >
-<title>task_ctx_sched_out (1 samples, 0.26%)</title><rect x="777.6" y="661" width="3.0" height="15.0" fill="rgb(211,90,37)" rx="2" ry="2" />
-<text  x="780.60" y="671.5" ></text>
+<title>ipv4_confirm (1 samples, 0.19%)</title><rect x="419.2" y="517" width="2.2" height="15.0" fill="rgb(224,131,51)" rx="2" ry="2" />
+<text  x="422.16" y="527.5" ></text>
 </g>
 <g >
-<title>skb_release_head_state (1 samples, 0.26%)</title><rect x="91.3" y="613" width="3.0" height="15.0" fill="rgb(228,113,21)" rx="2" ry="2" />
-<text  x="94.28" y="623.5" ></text>
+<title>tcp_grow_window.isra.24 (1 samples, 0.19%)</title><rect x="392.0" y="213" width="2.3" height="15.0" fill="rgb(239,35,45)" rx="2" ry="2" />
+<text  x="395.03" y="223.5" ></text>
 </g>
 <g >
-<title>rebalance_domains (1 samples, 0.26%)</title><rect x="1009.4" y="581" width="3.0" height="15.0" fill="rgb(252,150,21)" rx="2" ry="2" />
-<text  x="1012.39" y="591.5" ></text>
+<title>entry_SYSCALL_64_after_hwframe (13 samples, 2.49%)</title><rect x="1018.2" y="821" width="29.4" height="15.0" fill="rgb(215,3,50)" rx="2" ry="2" />
+<text  x="1021.20" y="831.5" >en..</text>
 </g>
 <g >
-<title>tcp_update_pacing_rate (1 samples, 0.26%)</title><rect x="557.9" y="245" width="3.0" height="15.0" fill="rgb(217,144,6)" rx="2" ry="2" />
-<text  x="560.86" y="255.5" ></text>
+<title>thread_group_cputime (1 samples, 0.19%)</title><rect x="141.1" y="645" width="2.3" height="15.0" fill="rgb(235,65,23)" rx="2" ry="2" />
+<text  x="144.11" y="655.5" ></text>
 </g>
 <g >
-<title>je_arena_ralloc (1 samples, 0.26%)</title><rect x="1132.8" y="837" width="3.0" height="15.0" fill="rgb(248,120,45)" rx="2" ry="2" />
-<text  x="1135.81" y="847.5" ></text>
+<title>tcp_sendmsg_locked (89 samples, 17.05%)</title><rect x="242.8" y="645" width="201.2" height="15.0" fill="rgb(245,115,0)" rx="2" ry="2" />
+<text  x="245.84" y="655.5" >tcp_sendmsg_locked</text>
 </g>
 <g >
-<title>tcp_poll (1 samples, 0.26%)</title><rect x="735.5" y="677" width="3.0" height="15.0" fill="rgb(242,109,8)" rx="2" ry="2" />
-<text  x="738.46" y="687.5" ></text>
+<title>ip_local_out (63 samples, 12.07%)</title><rect x="279.0" y="549" width="142.4" height="15.0" fill="rgb(234,190,24)" rx="2" ry="2" />
+<text  x="282.00" y="559.5" >ip_local_out</text>
 </g>
 <g >
-<title>ll2string (1 samples, 0.26%)</title><rect x="1147.9" y="837" width="3.0" height="15.0" fill="rgb(251,155,3)" rx="2" ry="2" />
-<text  x="1150.86" y="847.5" ></text>
+<title>__strcasecmp_l_avx (1 samples, 0.19%)</title><rect x="459.8" y="821" width="2.3" height="15.0" fill="rgb(215,22,12)" rx="2" ry="2" />
+<text  x="462.85" y="831.5" ></text>
 </g>
 <g >
-<title>sys_openat (4 samples, 1.02%)</title><rect x="1045.5" y="789" width="12.1" height="15.0" fill="rgb(213,116,12)" rx="2" ry="2" />
-<text  x="1048.51" y="799.5" ></text>
+<title>ip_finish_output2 (49 samples, 9.39%)</title><rect x="308.4" y="501" width="110.8" height="15.0" fill="rgb(223,190,23)" rx="2" ry="2" />
+<text  x="311.39" y="511.5" >ip_finish_out..</text>
 </g>
 <g >
-<title>decrRefCount (2 samples, 0.51%)</title><rect x="1081.6" y="837" width="6.1" height="15.0" fill="rgb(232,179,22)" rx="2" ry="2" />
-<text  x="1084.63" y="847.5" ></text>
+<title>dequeue_entity (6 samples, 1.15%)</title><rect x="579.7" y="645" width="13.5" height="15.0" fill="rgb(250,202,8)" rx="2" ry="2" />
+<text  x="582.66" y="655.5" ></text>
 </g>
 <g >
-<title>ip_local_deliver_finish (46 samples, 11.73%)</title><rect x="425.4" y="309" width="138.5" height="15.0" fill="rgb(230,21,44)" rx="2" ry="2" />
-<text  x="428.41" y="319.5" >ip_local_deliver_..</text>
+<title>enqueue_hrtimer (2 samples, 0.38%)</title><rect x="563.8" y="693" width="4.6" height="15.0" fill="rgb(222,51,46)" rx="2" ry="2" />
+<text  x="566.83" y="703.5" ></text>
 </g>
 <g >
-<title>__wake_up_common (22 samples, 5.61%)</title><rect x="488.6" y="181" width="66.2" height="15.0" fill="rgb(249,19,46)" rx="2" ry="2" />
-<text  x="491.62" y="191.5" >__wake_..</text>
+<title>nf_ct_get_tuple (1 samples, 0.19%)</title><rect x="294.8" y="469" width="2.3" height="15.0" fill="rgb(237,197,49)" rx="2" ry="2" />
+<text  x="297.83" y="479.5" ></text>
 </g>
 <g >
-<title>ep_send_events_proc (5 samples, 1.28%)</title><rect x="726.4" y="725" width="15.1" height="15.0" fill="rgb(213,149,47)" rx="2" ry="2" />
-<text  x="729.43" y="735.5" ></text>
+<title>call (1 samples, 0.19%)</title><rect x="993.3" y="837" width="2.3" height="15.0" fill="rgb(227,59,19)" rx="2" ry="2" />
+<text  x="996.33" y="847.5" ></text>
 </g>
 <g >
-<title>enqueue_to_backlog (1 samples, 0.26%)</title><rect x="603.0" y="405" width="3.0" height="15.0" fill="rgb(246,144,16)" rx="2" ry="2" />
-<text  x="606.01" y="415.5" ></text>
+<title>__netif_receive_skb_core (41 samples, 7.85%)</title><rect x="317.4" y="373" width="92.7" height="15.0" fill="rgb(233,5,21)" rx="2" ry="2" />
+<text  x="320.43" y="383.5" >__netif_rec..</text>
 </g>
 <g >
-<title>epoll_ctl (6 samples, 1.53%)</title><rect x="1108.7" y="837" width="18.1" height="15.0" fill="rgb(245,163,54)" rx="2" ry="2" />
-<text  x="1111.72" y="847.5" ></text>
+<title>security_file_permission (1 samples, 0.19%)</title><rect x="455.3" y="725" width="2.3" height="15.0" fill="rgb(237,44,13)" rx="2" ry="2" />
+<text  x="458.33" y="735.5" ></text>
 </g>
 <g >
-<title>ip_queue_xmit (99 samples, 25.26%)</title><rect x="326.1" y="565" width="298.0" height="15.0" fill="rgb(226,229,33)" rx="2" ry="2" />
-<text  x="329.07" y="575.5" >ip_queue_xmit</text>
+<title>__wake_up_common (13 samples, 2.49%)</title><rect x="1061.1" y="661" width="29.4" height="15.0" fill="rgb(250,75,7)" rx="2" ry="2" />
+<text  x="1064.15" y="671.5" >__..</text>
 </g>
 <g >
-<title>do_softirq_own_stack (64 samples, 16.33%)</title><rect x="401.3" y="453" width="192.7" height="15.0" fill="rgb(225,131,41)" rx="2" ry="2" />
-<text  x="404.33" y="463.5" >do_softirq_own_stack</text>
+<title>memcg_kmem_uncharge (1 samples, 0.19%)</title><rect x="595.5" y="565" width="2.2" height="15.0" fill="rgb(222,72,23)" rx="2" ry="2" />
+<text  x="598.48" y="575.5" ></text>
 </g>
 <g >
-<title>syscall_return_via_sysret (2 samples, 0.51%)</title><rect x="642.1" y="805" width="6.1" height="15.0" fill="rgb(212,205,23)" rx="2" ry="2" />
-<text  x="645.14" y="815.5" ></text>
+<title>__calc_delta (1 samples, 0.19%)</title><rect x="591.0" y="613" width="2.2" height="15.0" fill="rgb(209,218,2)" rx="2" ry="2" />
+<text  x="593.96" y="623.5" ></text>
 </g>
 <g >
-<title>entry_SYSCALL_64_after_hwframe (11 samples, 2.81%)</title><rect x="979.3" y="805" width="33.1" height="15.0" fill="rgb(219,115,22)" rx="2" ry="2" />
-<text  x="982.29" y="815.5" >en..</text>
+<title>do_softirq_own_stack (43 samples, 8.24%)</title><rect x="312.9" y="453" width="97.2" height="15.0" fill="rgb(247,228,29)" rx="2" ry="2" />
+<text  x="315.91" y="463.5" >do_softirq_..</text>
 </g>
 <g >
-<title>skb_release_all (1 samples, 0.26%)</title><rect x="91.3" y="629" width="3.0" height="15.0" fill="rgb(234,18,42)" rx="2" ry="2" />
-<text  x="94.28" y="639.5" ></text>
+<title>__sched_text_start (1 samples, 0.19%)</title><rect x="1092.8" y="693" width="2.3" height="15.0" fill="rgb(209,21,30)" rx="2" ry="2" />
+<text  x="1095.80" y="703.5" ></text>
 </g>
 <g >
-<title>__fput (1 samples, 0.26%)</title><rect x="1018.4" y="741" width="3.0" height="15.0" fill="rgb(219,100,38)" rx="2" ry="2" />
-<text  x="1021.42" y="751.5" ></text>
+<title>finish_task_switch (117 samples, 22.41%)</title><rect x="593.2" y="677" width="264.5" height="15.0" fill="rgb(250,20,22)" rx="2" ry="2" />
+<text  x="596.22" y="687.5" >finish_task_switch</text>
 </g>
 <g >
-<title>tcp_v4_do_rcv (41 samples, 10.46%)</title><rect x="440.5" y="277" width="123.4" height="15.0" fill="rgb(231,113,3)" rx="2" ry="2" />
-<text  x="443.46" y="287.5" >tcp_v4_do_rcv</text>
+<title>ip_output (2 samples, 0.38%)</title><rect x="421.4" y="549" width="4.5" height="15.0" fill="rgb(230,208,29)" rx="2" ry="2" />
+<text  x="424.42" y="559.5" ></text>
 </g>
 <g >
-<title>_raw_spin_lock_irqsave (3 samples, 0.77%)</title><rect x="714.4" y="725" width="9.0" height="15.0" fill="rgb(205,98,11)" rx="2" ry="2" />
-<text  x="717.39" y="735.5" ></text>
+<title>__slab_free (1 samples, 0.19%)</title><rect x="355.9" y="165" width="2.2" height="15.0" fill="rgb(205,160,22)" rx="2" ry="2" />
+<text  x="358.86" y="175.5" ></text>
 </g>
 <g >
-<title>apparmor_file_permission (3 samples, 0.77%)</title><rect x="145.5" y="709" width="9.0" height="15.0" fill="rgb(236,94,23)" rx="2" ry="2" />
-<text  x="148.46" y="719.5" ></text>
+<title>entry_SYSCALL_64_after_hwframe (12 samples, 2.30%)</title><rect x="936.8" y="821" width="27.1" height="15.0" fill="rgb(214,33,49)" rx="2" ry="2" />
+<text  x="939.82" y="831.5" >e..</text>
 </g>
 <g >
-<title>_raw_spin_lock_irqsave (4 samples, 1.02%)</title><rect x="702.3" y="741" width="12.1" height="15.0" fill="rgb(225,175,32)" rx="2" ry="2" />
-<text  x="705.35" y="751.5" ></text>
+<title>schedule (135 samples, 25.86%)</title><rect x="570.6" y="709" width="305.2" height="15.0" fill="rgb(219,45,35)" rx="2" ry="2" />
+<text  x="573.61" y="719.5" >schedule</text>
 </g>
 <g >
-<title>jbd2__journal_start (4 samples, 1.02%)</title><rect x="211.7" y="629" width="12.0" height="15.0" fill="rgb(246,186,32)" rx="2" ry="2" />
-<text  x="214.68" y="639.5" ></text>
+<title>read_tsc (1 samples, 0.19%)</title><rect x="557.0" y="725" width="2.3" height="15.0" fill="rgb(241,113,14)" rx="2" ry="2" />
+<text  x="560.05" y="735.5" ></text>
 </g>
 <g >
-<title>ttwu_do_activate (16 samples, 4.08%)</title><rect x="500.7" y="117" width="48.1" height="15.0" fill="rgb(210,157,54)" rx="2" ry="2" />
-<text  x="503.66" y="127.5" >ttwu..</text>
+<title>je_free (1 samples, 0.19%)</title><rect x="1149.3" y="837" width="2.3" height="15.0" fill="rgb(246,38,38)" rx="2" ry="2" />
+<text  x="1152.31" y="847.5" ></text>
 </g>
 <g >
-<title>sys_epoll_ctl (1 samples, 0.26%)</title><rect x="1114.7" y="789" width="3.1" height="15.0" fill="rgb(222,169,30)" rx="2" ry="2" />
-<text  x="1117.74" y="799.5" ></text>
+<title>tcp_stream_memory_free (1 samples, 0.19%)</title><rect x="548.0" y="677" width="2.3" height="15.0" fill="rgb(227,1,2)" rx="2" ry="2" />
+<text  x="551.01" y="687.5" ></text>
 </g>
 <g >
-<title>dictRehash (2 samples, 0.51%)</title><rect x="1102.7" y="837" width="6.0" height="15.0" fill="rgb(214,180,16)" rx="2" ry="2" />
-<text  x="1105.70" y="847.5" ></text>
+<title>dax_iomap_rw (34 samples, 6.51%)</title><rect x="166.0" y="693" width="76.8" height="15.0" fill="rgb(206,183,22)" rx="2" ry="2" />
+<text  x="168.98" y="703.5" >dax_ioma..</text>
 </g>
 <g >
-<title>ksize (1 samples, 0.26%)</title><rect x="286.9" y="597" width="3.0" height="15.0" fill="rgb(251,222,25)" rx="2" ry="2" />
-<text  x="289.94" y="607.5" ></text>
+<title>epoll_ctl (16 samples, 3.07%)</title><rect x="1013.7" y="837" width="36.1" height="15.0" fill="rgb(205,146,16)" rx="2" ry="2" />
+<text  x="1016.68" y="847.5" >epo..</text>
 </g>
 <g >
-<title>do_get_write_access (1 samples, 0.26%)</title><rect x="229.7" y="549" width="3.1" height="15.0" fill="rgb(243,113,7)" rx="2" ry="2" />
-<text  x="232.74" y="559.5" ></text>
+<title>prefetch_freepointer (1 samples, 0.19%)</title><rect x="941.3" y="693" width="2.3" height="15.0" fill="rgb(222,119,52)" rx="2" ry="2" />
+<text  x="944.34" y="703.5" ></text>
 </g>
 <g >
-<title>security_file_permission (3 samples, 0.77%)</title><rect x="145.5" y="725" width="9.0" height="15.0" fill="rgb(221,16,2)" rx="2" ry="2" />
-<text  x="148.46" y="735.5" ></text>
+<title>_raw_spin_lock (2 samples, 0.38%)</title><rect x="1067.9" y="597" width="4.6" height="15.0" fill="rgb(237,207,50)" rx="2" ry="2" />
+<text  x="1070.93" y="607.5" ></text>
 </g>
 <g >
-<title>proc_tgid_stat (4 samples, 1.02%)</title><rect x="121.4" y="693" width="12.0" height="15.0" fill="rgb(233,111,30)" rx="2" ry="2" />
-<text  x="124.38" y="703.5" ></text>
+<title>activeExpireCycle (4 samples, 0.77%)</title><rect x="39.4" y="805" width="9.0" height="15.0" fill="rgb(250,54,2)" rx="2" ry="2" />
+<text  x="42.39" y="815.5" ></text>
 </g>
 <g >
-<title>aeDeleteFileEvent (1 samples, 0.26%)</title><rect x="1069.6" y="837" width="3.0" height="15.0" fill="rgb(248,9,43)" rx="2" ry="2" />
-<text  x="1072.59" y="847.5" ></text>
+<title>account_entity_dequeue (1 samples, 0.19%)</title><rect x="1113.1" y="629" width="2.3" height="15.0" fill="rgb(241,61,33)" rx="2" ry="2" />
+<text  x="1116.14" y="639.5" ></text>
 </g>
 <g >
-<title>exit_to_usermode_loop (1 samples, 0.26%)</title><rect x="1018.4" y="789" width="3.0" height="15.0" fill="rgb(219,42,21)" rx="2" ry="2" />
-<text  x="1021.42" y="799.5" ></text>
+<title>fput (1 samples, 0.19%)</title><rect x="1056.6" y="757" width="2.3" height="15.0" fill="rgb(240,128,21)" rx="2" ry="2" />
+<text  x="1059.63" y="767.5" ></text>
 </g>
 <g >
-<title>dst_release (1 samples, 0.26%)</title><rect x="473.6" y="229" width="3.0" height="15.0" fill="rgb(225,143,15)" rx="2" ry="2" />
-<text  x="476.57" y="239.5" ></text>
+<title>slowlogPushEntryIfNeeded (1 samples, 0.19%)</title><rect x="1183.2" y="837" width="2.3" height="15.0" fill="rgb(225,127,20)" rx="2" ry="2" />
+<text  x="1186.22" y="847.5" ></text>
 </g>
 <g >
-<title>update_cfs_group (1 samples, 0.26%)</title><rect x="786.6" y="629" width="3.0" height="15.0" fill="rgb(224,174,42)" rx="2" ry="2" />
-<text  x="789.63" y="639.5" ></text>
+<title>put_prev_entity (1 samples, 0.19%)</title><rect x="871.3" y="645" width="2.2" height="15.0" fill="rgb(244,15,30)" rx="2" ry="2" />
+<text  x="874.26" y="655.5" ></text>
 </g>
 <g >
-<title>__kfree_skb_flush (1 samples, 0.26%)</title><rect x="401.3" y="405" width="3.0" height="15.0" fill="rgb(254,216,44)" rx="2" ry="2" />
-<text  x="404.33" y="415.5" ></text>
+<title>__perf_event_task_sched_in (114 samples, 21.84%)</title><rect x="597.7" y="661" width="257.7" height="15.0" fill="rgb(228,23,44)" rx="2" ry="2" />
+<text  x="600.74" y="671.5" >__perf_event_task_sched_in</text>
 </g>
 <g >
-<title>ext4_iomap_begin (11 samples, 2.81%)</title><rect x="208.7" y="661" width="33.1" height="15.0" fill="rgb(209,196,2)" rx="2" ry="2" />
-<text  x="211.67" y="671.5" >ex..</text>
+<title>tcp_recvmsg (14 samples, 2.68%)</title><rect x="80.1" y="661" width="31.6" height="15.0" fill="rgb(244,192,7)" rx="2" ry="2" />
+<text  x="83.08" y="671.5" >tc..</text>
 </g>
 <g >
-<title>dax_iomap_rw (32 samples, 8.16%)</title><rect x="160.5" y="693" width="96.3" height="15.0" fill="rgb(238,36,0)" rx="2" ry="2" />
-<text  x="163.51" y="703.5" >dax_iomap_rw</text>
+<title>iomap_apply (33 samples, 6.32%)</title><rect x="168.2" y="677" width="74.6" height="15.0" fill="rgb(215,200,38)" rx="2" ry="2" />
+<text  x="171.24" y="687.5" >iomap_ap..</text>
 </g>
 <g >
-<title>ktime_get_ts64 (1 samples, 0.26%)</title><rect x="958.2" y="725" width="3.0" height="15.0" fill="rgb(254,95,40)" rx="2" ry="2" />
-<text  x="961.21" y="735.5" ></text>
+<title>__virt_addr_valid (2 samples, 0.38%)</title><rect x="95.9" y="613" width="4.5" height="15.0" fill="rgb(236,59,48)" rx="2" ry="2" />
+<text  x="98.90" y="623.5" ></text>
 </g>
 <g >
-<title>native_write_msr (30 samples, 7.65%)</title><rect x="834.8" y="597" width="90.3" height="15.0" fill="rgb(243,149,31)" rx="2" ry="2" />
-<text  x="837.80" y="607.5" >native_wri..</text>
+<title>__check_heap_object (1 samples, 0.19%)</title><rect x="93.6" y="613" width="2.3" height="15.0" fill="rgb(246,44,17)" rx="2" ry="2" />
+<text  x="96.64" y="623.5" ></text>
 </g>
 <g >
-<title>select_idle_sibling (1 samples, 0.26%)</title><rect x="497.7" y="101" width="3.0" height="15.0" fill="rgb(245,70,49)" rx="2" ry="2" />
-<text  x="500.65" y="111.5" ></text>
+<title>number (1 samples, 0.19%)</title><rect x="129.8" y="613" width="2.3" height="15.0" fill="rgb(224,51,23)" rx="2" ry="2" />
+<text  x="132.81" y="623.5" ></text>
 </g>
 <g >
-<title>__perf_event_task_sched_in (10 samples, 2.55%)</title><rect x="979.3" y="661" width="30.1" height="15.0" fill="rgb(247,28,27)" rx="2" ry="2" />
-<text  x="982.29" y="671.5" >__..</text>
+<title>__jbd2_log_start_commit (14 samples, 2.68%)</title><rect x="1061.1" y="709" width="31.7" height="15.0" fill="rgb(237,49,49)" rx="2" ry="2" />
+<text  x="1064.15" y="719.5" >__..</text>
 </g>
 <g >
-<title>apparmor_file_permission (2 samples, 0.51%)</title><rect x="136.4" y="725" width="6.0" height="15.0" fill="rgb(220,78,29)" rx="2" ry="2" />
-<text  x="139.43" y="735.5" ></text>
+<title>syscall_return_via_sysret (2 samples, 0.38%)</title><rect x="891.6" y="805" width="4.5" height="15.0" fill="rgb(216,91,49)" rx="2" ry="2" />
+<text  x="894.61" y="815.5" ></text>
 </g>
 <g >
-<title>__ip_local_out (20 samples, 5.10%)</title><rect x="329.1" y="533" width="60.2" height="15.0" fill="rgb(249,133,51)" rx="2" ry="2" />
-<text  x="332.08" y="543.5" >__ip_l..</text>
+<title>__perf_event_task_sched_out (1 samples, 0.19%)</title><rect x="572.9" y="677" width="2.2" height="15.0" fill="rgb(225,64,32)" rx="2" ry="2" />
+<text  x="575.87" y="687.5" ></text>
 </g>
 <g >
-<title>genericHgetallCommand (1 samples, 0.26%)</title><rect x="1129.8" y="837" width="3.0" height="15.0" fill="rgb(245,88,4)" rx="2" ry="2" />
-<text  x="1132.80" y="847.5" ></text>
+<title>copy_user_generic_unrolled (2 samples, 0.38%)</title><rect x="1034.0" y="773" width="4.5" height="15.0" fill="rgb(235,177,29)" rx="2" ry="2" />
+<text  x="1037.02" y="783.5" ></text>
 </g>
 <g >
-<title>tcp_data_queue (29 samples, 7.40%)</title><rect x="470.6" y="245" width="87.3" height="15.0" fill="rgb(226,107,6)" rx="2" ry="2" />
-<text  x="473.56" y="255.5" >tcp_data_q..</text>
+<title>update_cfs_group (2 samples, 0.38%)</title><rect x="581.9" y="629" width="4.5" height="15.0" fill="rgb(209,140,54)" rx="2" ry="2" />
+<text  x="584.92" y="639.5" ></text>
 </g>
 <g >
-<title>num_to_str (1 samples, 0.26%)</title><rect x="127.4" y="645" width="3.0" height="15.0" fill="rgb(227,221,23)" rx="2" ry="2" />
-<text  x="130.40" y="655.5" ></text>
+<title>__fget_light (1 samples, 0.19%)</title><rect x="505.1" y="741" width="2.2" height="15.0" fill="rgb(232,44,31)" rx="2" ry="2" />
+<text  x="508.06" y="751.5" ></text>
 </g>
 <g >
-<title>do_sys_open (4 samples, 1.02%)</title><rect x="1045.5" y="773" width="12.1" height="15.0" fill="rgb(210,24,27)" rx="2" ry="2" />
-<text  x="1048.51" y="783.5" ></text>
+<title>addReplyBulkLen (2 samples, 0.38%)</title><rect x="473.4" y="821" width="4.5" height="15.0" fill="rgb(247,23,51)" rx="2" ry="2" />
+<text  x="476.41" y="831.5" ></text>
 </g>
 <g >
-<title>__indirect_thunk_start (1 samples, 0.26%)</title><rect x="250.8" y="565" width="3.0" height="15.0" fill="rgb(209,151,35)" rx="2" ry="2" />
-<text  x="253.82" y="575.5" ></text>
+<title>arena_avail_tree_insert (1 samples, 0.19%)</title><rect x="991.1" y="837" width="2.2" height="15.0" fill="rgb(224,185,54)" rx="2" ry="2" />
+<text  x="994.07" y="847.5" ></text>
 </g>
 <g >
-<title>tcp_data_queue (1 samples, 0.26%)</title><rect x="440.5" y="261" width="3.0" height="15.0" fill="rgb(240,85,36)" rx="2" ry="2" />
-<text  x="443.46" y="271.5" ></text>
+<title>update_blocked_averages (1 samples, 0.19%)</title><rect x="855.4" y="565" width="2.3" height="15.0" fill="rgb(239,16,49)" rx="2" ry="2" />
+<text  x="858.44" y="575.5" ></text>
 </g>
 <g >
-<title>inet_sendmsg (123 samples, 31.38%)</title><rect x="265.9" y="677" width="370.2" height="15.0" fill="rgb(222,9,53)" rx="2" ry="2" />
-<text  x="268.87" y="687.5" >inet_sendmsg</text>
+<title>select_task_rq_fair (2 samples, 0.38%)</title><rect x="367.2" y="117" width="4.5" height="15.0" fill="rgb(234,19,49)" rx="2" ry="2" />
+<text  x="370.16" y="127.5" ></text>
 </g>
 <g >
-<title>read_tsc (1 samples, 0.26%)</title><rect x="750.5" y="725" width="3.0" height="15.0" fill="rgb(222,202,31)" rx="2" ry="2" />
-<text  x="753.51" y="735.5" ></text>
+<title>__local_bh_enable_ip (1 samples, 0.19%)</title><rect x="283.5" y="485" width="2.3" height="15.0" fill="rgb(220,90,23)" rx="2" ry="2" />
+<text  x="286.52" y="495.5" ></text>
 </g>
 <g >
-<title>__libc_write (164 samples, 41.84%)</title><rect x="154.5" y="821" width="493.7" height="15.0" fill="rgb(254,181,43)" rx="2" ry="2" />
-<text  x="157.49" y="831.5" >__libc_write</text>
+<title>apparmor_file_permission (1 samples, 0.19%)</title><rect x="455.3" y="709" width="2.3" height="15.0" fill="rgb(234,71,25)" rx="2" ry="2" />
+<text  x="458.33" y="719.5" ></text>
 </g>
 <g >
-<title>start_this_handle (1 samples, 0.26%)</title><rect x="241.8" y="613" width="3.0" height="15.0" fill="rgb(217,81,53)" rx="2" ry="2" />
-<text  x="244.79" y="623.5" ></text>
+<title>x86_pmu_disable (1 samples, 0.19%)</title><rect x="1110.9" y="629" width="2.2" height="15.0" fill="rgb(240,134,29)" rx="2" ry="2" />
+<text  x="1113.88" y="639.5" ></text>
 </g>
 <g >
-<title>pthread_cond_wait@@GLIBC_2.3.2 (11 samples, 2.81%)</title><rect x="979.3" y="821" width="33.1" height="15.0" fill="rgb(216,139,46)" rx="2" ry="2" />
-<text  x="982.29" y="831.5" >pt..</text>
+<title>raw_local_deliver (1 samples, 0.19%)</title><rect x="328.7" y="293" width="2.3" height="15.0" fill="rgb(217,54,4)" rx="2" ry="2" />
+<text  x="331.74" y="303.5" ></text>
 </g>
 <g >
-<title>ipv4_get_l4proto (1 samples, 0.26%)</title><rect x="380.3" y="469" width="3.0" height="15.0" fill="rgb(214,53,15)" rx="2" ry="2" />
-<text  x="383.26" y="479.5" ></text>
+<title>resched_curr (1 samples, 0.19%)</title><rect x="1086.0" y="549" width="2.3" height="15.0" fill="rgb(244,102,2)" rx="2" ry="2" />
+<text  x="1089.02" y="559.5" ></text>
 </g>
 <g >
-<title>__ext4_journal_start_sb (5 samples, 1.28%)</title><rect x="208.7" y="645" width="15.0" height="15.0" fill="rgb(207,129,13)" rx="2" ry="2" />
-<text  x="211.67" y="655.5" ></text>
+<title>seq_read (13 samples, 2.49%)</title><rect x="116.2" y="725" width="29.4" height="15.0" fill="rgb(230,98,41)" rx="2" ry="2" />
+<text  x="119.25" y="735.5" >se..</text>
 </g>
 <g >
-<title>__copy_user_flushcache (1 samples, 0.26%)</title><rect x="166.5" y="597" width="3.0" height="15.0" fill="rgb(236,111,14)" rx="2" ry="2" />
-<text  x="169.53" y="607.5" ></text>
+<title>new_sync_write (126 samples, 24.14%)</title><rect x="163.7" y="725" width="284.8" height="15.0" fill="rgb(234,81,31)" rx="2" ry="2" />
+<text  x="166.72" y="735.5" >new_sync_write</text>
 </g>
 <g >
-<title>__softirqentry_text_start (1 samples, 0.26%)</title><rect x="1009.4" y="613" width="3.0" height="15.0" fill="rgb(216,31,52)" rx="2" ry="2" />
-<text  x="1012.39" y="623.5" ></text>
+<title>syscall_return_via_sysret (1 samples, 0.19%)</title><rect x="1142.5" y="821" width="2.3" height="15.0" fill="rgb(242,150,12)" rx="2" ry="2" />
+<text  x="1145.53" y="831.5" ></text>
 </g>
 <g >
-<title>sched_clock (1 samples, 0.26%)</title><rect x="1006.4" y="597" width="3.0" height="15.0" fill="rgb(250,68,33)" rx="2" ry="2" />
-<text  x="1009.38" y="607.5" ></text>
+<title>schedule_hrtimeout_range (1 samples, 0.19%)</title><rect x="889.3" y="757" width="2.3" height="15.0" fill="rgb(246,8,0)" rx="2" ry="2" />
+<text  x="892.35" y="767.5" ></text>
 </g>
 <g >
-<title>dev_hard_start_xmit (6 samples, 1.53%)</title><rect x="597.0" y="453" width="18.1" height="15.0" fill="rgb(241,76,13)" rx="2" ry="2" />
-<text  x="599.99" y="463.5" ></text>
+<title>native_write_msr (81 samples, 15.52%)</title><rect x="667.8" y="597" width="183.1" height="15.0" fill="rgb(213,91,29)" rx="2" ry="2" />
+<text  x="670.82" y="607.5" >native_write_msr</text>
 </g>
 <g >
-<title>update_curr (1 samples, 0.26%)</title><rect x="798.7" y="645" width="3.0" height="15.0" fill="rgb(237,49,53)" rx="2" ry="2" />
-<text  x="801.67" y="655.5" ></text>
+<title>__sched_text_start (135 samples, 25.86%)</title><rect x="570.6" y="693" width="305.2" height="15.0" fill="rgb(240,6,49)" rx="2" ry="2" />
+<text  x="573.61" y="703.5" >__sched_text_start</text>
 </g>
 <g >
-<title>__pthread_mutex_lock (1 samples, 0.26%)</title><rect x="648.2" y="821" width="3.0" height="15.0" fill="rgb(235,229,40)" rx="2" ry="2" />
-<text  x="651.16" y="831.5" ></text>
+<title>seq_printf (2 samples, 0.38%)</title><rect x="127.5" y="661" width="4.6" height="15.0" fill="rgb(216,162,23)" rx="2" ry="2" />
+<text  x="130.55" y="671.5" ></text>
 </g>
 <g >
-<title>syscall_return_via_sysret (1 samples, 0.26%)</title><rect x="961.2" y="805" width="3.0" height="15.0" fill="rgb(218,51,26)" rx="2" ry="2" />
-<text  x="964.22" y="815.5" ></text>
+<title>__vsnprintf_chk (1 samples, 0.19%)</title><rect x="973.0" y="837" width="2.2" height="15.0" fill="rgb(226,171,32)" rx="2" ry="2" />
+<text  x="975.99" y="847.5" ></text>
 </g>
 <g >
-<title>ip_local_out (98 samples, 25.00%)</title><rect x="329.1" y="549" width="295.0" height="15.0" fill="rgb(218,122,1)" rx="2" ry="2" />
-<text  x="332.08" y="559.5" >ip_local_out</text>
+<title>default_wake_function (11 samples, 2.11%)</title><rect x="364.9" y="149" width="24.9" height="15.0" fill="rgb(229,82,14)" rx="2" ry="2" />
+<text  x="367.90" y="159.5" >d..</text>
 </g>
 <g >
-<title>security_file_alloc (1 samples, 0.26%)</title><rect x="1045.5" y="709" width="3.0" height="15.0" fill="rgb(210,89,11)" rx="2" ry="2" />
-<text  x="1048.51" y="719.5" ></text>
+<title>kmem_cache_alloc (1 samples, 0.19%)</title><rect x="211.2" y="517" width="2.2" height="15.0" fill="rgb(231,13,29)" rx="2" ry="2" />
+<text  x="214.19" y="527.5" ></text>
 </g>
 <g >
-<title>ext4_orphan_add (1 samples, 0.26%)</title><rect x="235.8" y="645" width="3.0" height="15.0" fill="rgb(230,49,36)" rx="2" ry="2" />
-<text  x="238.77" y="655.5" ></text>
+<title>proc_tgid_stat (12 samples, 2.30%)</title><rect x="118.5" y="693" width="27.1" height="15.0" fill="rgb(231,179,16)" rx="2" ry="2" />
+<text  x="121.51" y="703.5" >p..</text>
 </g>
 <g >
-<title>[unknown] (18 samples, 4.59%)</title><rect x="10.0" y="821" width="54.2" height="15.0" fill="rgb(233,58,8)" rx="2" ry="2" />
-<text  x="13.00" y="831.5" >[unkn..</text>
+<title>__free_pages_ok (1 samples, 0.19%)</title><rect x="595.5" y="581" width="2.2" height="15.0" fill="rgb(243,16,51)" rx="2" ry="2" />
+<text  x="598.48" y="591.5" ></text>
 </g>
 <g >
-<title>je_malloc_usable_size (1 samples, 0.26%)</title><rect x="1144.8" y="837" width="3.1" height="15.0" fill="rgb(214,29,46)" rx="2" ry="2" />
-<text  x="1147.85" y="847.5" ></text>
+<title>sys_epoll_wait (171 samples, 32.76%)</title><rect x="505.1" y="773" width="386.5" height="15.0" fill="rgb(220,211,27)" rx="2" ry="2" />
+<text  x="508.06" y="783.5" >sys_epoll_wait</text>
 </g>
 <g >
-<title>__sched_text_start (11 samples, 2.81%)</title><rect x="979.3" y="693" width="33.1" height="15.0" fill="rgb(221,45,38)" rx="2" ry="2" />
-<text  x="982.29" y="703.5" >__..</text>
+<title>__vdso_gettimeofday (1 samples, 0.19%)</title><rect x="988.8" y="821" width="2.3" height="15.0" fill="rgb(209,71,6)" rx="2" ry="2" />
+<text  x="991.81" y="831.5" ></text>
 </g>
 <g >
-<title>rw_verify_area (6 samples, 1.53%)</title><rect x="136.4" y="741" width="18.1" height="15.0" fill="rgb(234,16,2)" rx="2" ry="2" />
-<text  x="139.43" y="751.5" ></text>
+<title>sched_clock_cpu (1 samples, 0.19%)</title><rect x="349.1" y="245" width="2.2" height="15.0" fill="rgb(207,130,11)" rx="2" ry="2" />
+<text  x="352.08" y="255.5" ></text>
 </g>
 <g >
-<title>__ext4_journal_start_sb (1 samples, 0.26%)</title><rect x="241.8" y="645" width="3.0" height="15.0" fill="rgb(222,174,9)" rx="2" ry="2" />
-<text  x="244.79" y="655.5" ></text>
+<title>loopback_xmit (3 samples, 0.57%)</title><rect x="410.1" y="437" width="6.8" height="15.0" fill="rgb(227,222,6)" rx="2" ry="2" />
+<text  x="413.11" y="447.5" ></text>
 </g>
 <g >
-<title>__kfree_skb (1 samples, 0.26%)</title><rect x="91.3" y="645" width="3.0" height="15.0" fill="rgb(235,222,19)" rx="2" ry="2" />
-<text  x="94.28" y="655.5" ></text>
+<title>jbd2_journal_get_write_access (2 samples, 0.38%)</title><rect x="236.1" y="597" width="4.5" height="15.0" fill="rgb(225,25,34)" rx="2" ry="2" />
+<text  x="239.05" y="607.5" ></text>
 </g>
 <g >
-<title>irq_exit (1 samples, 0.26%)</title><rect x="1009.4" y="629" width="3.0" height="15.0" fill="rgb(206,47,43)" rx="2" ry="2" />
-<text  x="1012.39" y="639.5" ></text>
+<title>__close (3 samples, 0.57%)</title><rect x="914.2" y="837" width="6.8" height="15.0" fill="rgb(237,27,12)" rx="2" ry="2" />
+<text  x="917.21" y="847.5" ></text>
+</g>
+<g >
+<title>skb_clone (1 samples, 0.19%)</title><rect x="425.9" y="565" width="2.3" height="15.0" fill="rgb(238,105,14)" rx="2" ry="2" />
+<text  x="428.94" y="575.5" ></text>
+</g>
+<g >
+<title>__open64 (12 samples, 2.30%)</title><rect x="936.8" y="837" width="27.1" height="15.0" fill="rgb(217,228,0)" rx="2" ry="2" />
+<text  x="939.82" y="847.5" >_..</text>
+</g>
+<g >
+<title>errseq_sample (1 samples, 0.19%)</title><rect x="954.9" y="709" width="2.3" height="15.0" fill="rgb(212,144,46)" rx="2" ry="2" />
+<text  x="957.90" y="719.5" ></text>
+</g>
+<g >
+<title>link_path_walk (3 samples, 0.57%)</title><rect x="943.6" y="725" width="6.8" height="15.0" fill="rgb(244,91,18)" rx="2" ry="2" />
+<text  x="946.60" y="735.5" ></text>
+</g>
+<g >
+<title>__fput (3 samples, 0.57%)</title><rect x="914.2" y="741" width="6.8" height="15.0" fill="rgb(209,23,7)" rx="2" ry="2" />
+<text  x="917.21" y="751.5" ></text>
+</g>
+<g >
+<title>blkdev_issue_zeroout (2 samples, 0.38%)</title><rect x="211.2" y="613" width="4.5" height="15.0" fill="rgb(228,144,42)" rx="2" ry="2" />
+<text  x="214.19" y="623.5" ></text>
+</g>
+<g >
+<title>__getblk_gfp (2 samples, 0.38%)</title><rect x="231.5" y="597" width="4.6" height="15.0" fill="rgb(206,42,25)" rx="2" ry="2" />
+<text  x="234.53" y="607.5" ></text>
+</g>
+<g >
+<title>syscall_return_via_sysret (1 samples, 0.19%)</title><rect x="1047.6" y="821" width="2.2" height="15.0" fill="rgb(244,118,25)" rx="2" ry="2" />
+<text  x="1050.59" y="831.5" ></text>
+</g>
+<g >
+<title>idle_cpu (1 samples, 0.19%)</title><rect x="369.4" y="85" width="2.3" height="15.0" fill="rgb(216,126,31)" rx="2" ry="2" />
+<text  x="372.43" y="95.5" ></text>
+</g>
+<g >
+<title>update_load_avg (1 samples, 0.19%)</title><rect x="1083.8" y="533" width="2.2" height="15.0" fill="rgb(219,151,21)" rx="2" ry="2" />
+<text  x="1086.75" y="543.5" ></text>
+</g>
+<g >
+<title>native_write_msr (6 samples, 1.15%)</title><rect x="1126.7" y="581" width="13.6" height="15.0" fill="rgb(248,64,34)" rx="2" ry="2" />
+<text  x="1129.70" y="591.5" ></text>
+</g>
+<g >
+<title>sock_poll (4 samples, 0.77%)</title><rect x="541.2" y="693" width="9.1" height="15.0" fill="rgb(216,213,48)" rx="2" ry="2" />
+<text  x="544.23" y="703.5" ></text>
+</g>
+<g >
+<title>call (1 samples, 0.19%)</title><rect x="997.9" y="821" width="2.2" height="15.0" fill="rgb(220,165,30)" rx="2" ry="2" />
+<text  x="1000.85" y="831.5" ></text>
+</g>
+<g >
+<title>unlock_buffer (1 samples, 0.19%)</title><rect x="236.1" y="565" width="2.2" height="15.0" fill="rgb(253,138,50)" rx="2" ry="2" />
+<text  x="239.05" y="575.5" ></text>
+</g>
+<g >
+<title>ip_rcv_finish (38 samples, 7.28%)</title><rect x="324.2" y="341" width="85.9" height="15.0" fill="rgb(215,162,36)" rx="2" ry="2" />
+<text  x="327.21" y="351.5" >ip_rcv_fin..</text>
+</g>
+<g >
+<title>__GI_____strtoll_l_internal (1 samples, 0.19%)</title><rect x="912.0" y="837" width="2.2" height="15.0" fill="rgb(222,201,26)" rx="2" ry="2" />
+<text  x="914.95" y="847.5" ></text>
+</g>
+<g >
+<title>task_vsize (1 samples, 0.19%)</title><rect x="143.4" y="677" width="2.2" height="15.0" fill="rgb(252,211,34)" rx="2" ry="2" />
+<text  x="146.37" y="687.5" ></text>
+</g>
+<g >
+<title>kmem_cache_free (1 samples, 0.19%)</title><rect x="355.9" y="181" width="2.2" height="15.0" fill="rgb(234,43,27)" rx="2" ry="2" />
+<text  x="358.86" y="191.5" ></text>
+</g>
+<g >
+<title>update_rq_clock (1 samples, 0.19%)</title><rect x="387.5" y="117" width="2.3" height="15.0" fill="rgb(212,80,39)" rx="2" ry="2" />
+<text  x="390.51" y="127.5" ></text>
+</g>
+<g >
+<title>fsnotify (1 samples, 0.19%)</title><rect x="448.5" y="741" width="2.3" height="15.0" fill="rgb(237,15,43)" rx="2" ry="2" />
+<text  x="451.54" y="751.5" ></text>
+</g>
+<g >
+<title>__wake_up (14 samples, 2.68%)</title><rect x="1061.1" y="693" width="31.7" height="15.0" fill="rgb(235,144,22)" rx="2" ry="2" />
+<text  x="1064.15" y="703.5" >__..</text>
+</g>
+<g >
+<title>zmalloc (1 samples, 0.19%)</title><rect x="1187.7" y="837" width="2.3" height="15.0" fill="rgb(246,39,8)" rx="2" ry="2" />
+<text  x="1190.74" y="847.5" ></text>
+</g>
+<g >
+<title>__skb_clone (1 samples, 0.19%)</title><rect x="425.9" y="549" width="2.3" height="15.0" fill="rgb(245,138,32)" rx="2" ry="2" />
+<text  x="428.94" y="559.5" ></text>
+</g>
+<g >
+<title>nf_conntrack_in (8 samples, 1.53%)</title><rect x="288.0" y="485" width="18.1" height="15.0" fill="rgb(205,131,23)" rx="2" ry="2" />
+<text  x="291.05" y="495.5" ></text>
+</g>
+<g >
+<title>__sched_text_start (17 samples, 3.26%)</title><rect x="1104.1" y="677" width="38.4" height="15.0" fill="rgb(222,196,33)" rx="2" ry="2" />
+<text  x="1107.10" y="687.5" >__s..</text>
+</g>
+<g >
+<title>__inode_permission (2 samples, 0.38%)</title><rect x="943.6" y="693" width="4.5" height="15.0" fill="rgb(252,205,42)" rx="2" ry="2" />
+<text  x="946.60" y="703.5" ></text>
+</g>
+<g >
+<title>je_malloc (1 samples, 0.19%)</title><rect x="1151.6" y="837" width="2.2" height="15.0" fill="rgb(216,104,2)" rx="2" ry="2" />
+<text  x="1154.57" y="847.5" ></text>
+</g>
+<g >
+<title>reweight_entity (3 samples, 0.57%)</title><rect x="378.5" y="37" width="6.7" height="15.0" fill="rgb(238,167,2)" rx="2" ry="2" />
+<text  x="381.47" y="47.5" ></text>
+</g>
+<g >
+<title>sendReplyToClient (1 samples, 0.19%)</title><rect x="1181.0" y="837" width="2.2" height="15.0" fill="rgb(245,184,28)" rx="2" ry="2" />
+<text  x="1183.96" y="847.5" ></text>
+</g>
+<g >
+<title>proc_pid_permission (1 samples, 0.19%)</title><rect x="945.9" y="677" width="2.2" height="15.0" fill="rgb(232,17,52)" rx="2" ry="2" />
+<text  x="948.86" y="687.5" ></text>
+</g>
+<g >
+<title>nmi_handle (1 samples, 0.19%)</title><rect x="853.2" y="597" width="2.2" height="15.0" fill="rgb(224,128,52)" rx="2" ry="2" />
+<text  x="856.18" y="607.5" ></text>
+</g>
+<g >
+<title>update_load_avg (1 samples, 0.19%)</title><rect x="385.2" y="53" width="2.3" height="15.0" fill="rgb(230,182,20)" rx="2" ry="2" />
+<text  x="388.25" y="63.5" ></text>
+</g>
+<g >
+<title>ip_finish_output (49 samples, 9.39%)</title><rect x="308.4" y="517" width="110.8" height="15.0" fill="rgb(247,171,52)" rx="2" ry="2" />
+<text  x="311.39" y="527.5" >ip_finish_out..</text>
+</g>
+<g >
+<title>_raw_spin_lock_bh (1 samples, 0.19%)</title><rect x="91.4" y="629" width="2.2" height="15.0" fill="rgb(249,210,51)" rx="2" ry="2" />
+<text  x="94.38" y="639.5" ></text>
+</g>
+<g >
+<title>tcp_stream_memory_free (1 samples, 0.19%)</title><rect x="444.0" y="645" width="2.3" height="15.0" fill="rgb(254,118,31)" rx="2" ry="2" />
+<text  x="447.02" y="655.5" ></text>
+</g>
+<g >
+<title>nf_hook_slow (2 samples, 0.38%)</title><rect x="401.1" y="309" width="4.5" height="15.0" fill="rgb(241,174,9)" rx="2" ry="2" />
+<text  x="404.07" y="319.5" ></text>
+</g>
+<g >
+<title>time@plt (1 samples, 0.19%)</title><rect x="64.3" y="805" width="2.2" height="15.0" fill="rgb(254,125,36)" rx="2" ry="2" />
+<text  x="67.25" y="815.5" ></text>
+</g>
+<g >
+<title>idle_cpu (1 samples, 0.19%)</title><rect x="1077.0" y="565" width="2.2" height="15.0" fill="rgb(242,158,22)" rx="2" ry="2" />
+<text  x="1079.97" y="575.5" ></text>
+</g>
+<g >
+<title>__find_get_block (2 samples, 0.38%)</title><rect x="231.5" y="581" width="4.6" height="15.0" fill="rgb(222,17,26)" rx="2" ry="2" />
+<text  x="234.53" y="591.5" ></text>
+</g>
+<g >
+<title>update_curr (3 samples, 0.57%)</title><rect x="586.4" y="629" width="6.8" height="15.0" fill="rgb(232,35,12)" rx="2" ry="2" />
+<text  x="589.44" y="639.5" ></text>
+</g>
+<g >
+<title>update_curr (1 samples, 0.19%)</title><rect x="141.1" y="597" width="2.3" height="15.0" fill="rgb(236,156,33)" rx="2" ry="2" />
+<text  x="144.11" y="607.5" ></text>
+</g>
+<g >
+<title>__vdso_time (1 samples, 0.19%)</title><rect x="37.1" y="805" width="2.3" height="15.0" fill="rgb(228,98,7)" rx="2" ry="2" />
+<text  x="40.13" y="815.5" ></text>
+</g>
+<g >
+<title>copy_user_enhanced_fast_string (2 samples, 0.38%)</title><rect x="100.4" y="613" width="4.5" height="15.0" fill="rgb(248,28,49)" rx="2" ry="2" />
+<text  x="103.42" y="623.5" ></text>
+</g>
+<g >
+<title>legitimize_mnt (1 samples, 0.19%)</title><rect x="948.1" y="693" width="2.3" height="15.0" fill="rgb(233,140,41)" rx="2" ry="2" />
+<text  x="951.12" y="703.5" ></text>
+</g>
+<g >
+<title>ext4_file_write_iter (1 samples, 0.19%)</title><rect x="161.5" y="725" width="2.2" height="15.0" fill="rgb(253,208,31)" rx="2" ry="2" />
+<text  x="164.46" y="735.5" ></text>
+</g>
+<g >
+<title>tcp_ack (4 samples, 0.77%)</title><rect x="351.3" y="245" width="9.1" height="15.0" fill="rgb(210,164,53)" rx="2" ry="2" />
+<text  x="354.34" y="255.5" ></text>
+</g>
+<g >
+<title>__kmalloc_node_track_caller (1 samples, 0.19%)</title><rect x="251.9" y="581" width="2.2" height="15.0" fill="rgb(222,84,21)" rx="2" ry="2" />
+<text  x="254.88" y="591.5" ></text>
+</g>
+<g >
+<title>dev_queue_xmit (4 samples, 0.77%)</title><rect x="410.1" y="485" width="9.1" height="15.0" fill="rgb(230,32,5)" rx="2" ry="2" />
+<text  x="413.11" y="495.5" ></text>
+</g>
+<g >
+<title>do_syscall_64 (12 samples, 2.30%)</title><rect x="936.8" y="805" width="27.1" height="15.0" fill="rgb(252,13,47)" rx="2" ry="2" />
+<text  x="939.82" y="815.5" >d..</text>
+</g>
+<g >
+<title>native_sched_clock (1 samples, 0.19%)</title><rect x="1088.3" y="549" width="2.2" height="15.0" fill="rgb(213,180,45)" rx="2" ry="2" />
+<text  x="1091.28" y="559.5" ></text>
+</g>
+<g >
+<title>__indirect_thunk_start (1 samples, 0.19%)</title><rect x="500.5" y="789" width="2.3" height="15.0" fill="rgb(222,31,10)" rx="2" ry="2" />
+<text  x="503.54" y="799.5" ></text>
+</g>
+<g >
+<title>proc_single_show (12 samples, 2.30%)</title><rect x="118.5" y="709" width="27.1" height="15.0" fill="rgb(238,110,41)" rx="2" ry="2" />
+<text  x="121.51" y="719.5" >p..</text>
+</g>
+<g >
+<title>pick_next_task_fair (6 samples, 1.15%)</title><rect x="857.7" y="677" width="13.6" height="15.0" fill="rgb(226,55,2)" rx="2" ry="2" />
+<text  x="860.70" y="687.5" ></text>
+</g>
+<g >
+<title>load_balance (3 samples, 0.57%)</title><rect x="862.2" y="661" width="6.8" height="15.0" fill="rgb(232,9,30)" rx="2" ry="2" />
+<text  x="865.22" y="671.5" ></text>
+</g>
+<g >
+<title>gettimeofday@plt (1 samples, 0.19%)</title><rect x="1147.0" y="837" width="2.3" height="15.0" fill="rgb(233,106,34)" rx="2" ry="2" />
+<text  x="1150.05" y="847.5" ></text>
+</g>
+<g >
+<title>ghes_notify_nmi (2 samples, 0.38%)</title><rect x="624.9" y="597" width="4.5" height="15.0" fill="rgb(206,57,39)" rx="2" ry="2" />
+<text  x="627.87" y="607.5" ></text>
+</g>
+<g >
+<title>page_counter_cancel (1 samples, 0.19%)</title><rect x="595.5" y="533" width="2.2" height="15.0" fill="rgb(250,55,9)" rx="2" ry="2" />
+<text  x="598.48" y="543.5" ></text>
+</g>
+<g >
+<title>dax_copy_from_iter (2 samples, 0.38%)</title><rect x="170.5" y="645" width="4.5" height="15.0" fill="rgb(212,53,51)" rx="2" ry="2" />
+<text  x="173.50" y="655.5" ></text>
+</g>
+<g >
+<title>tcp_v4_rcv (30 samples, 5.75%)</title><rect x="331.0" y="293" width="67.8" height="15.0" fill="rgb(220,137,39)" rx="2" ry="2" />
+<text  x="334.00" y="303.5" >tcp_v4_..</text>
+</g>
+<g >
+<title>select_task_rq_fair (3 samples, 0.57%)</title><rect x="1072.5" y="597" width="6.7" height="15.0" fill="rgb(247,44,33)" rx="2" ry="2" />
+<text  x="1075.45" y="607.5" ></text>
+</g>
+<g >
+<title>common_file_perm (1 samples, 0.19%)</title><rect x="152.4" y="709" width="2.3" height="15.0" fill="rgb(234,72,49)" rx="2" ry="2" />
+<text  x="155.41" y="719.5" ></text>
+</g>
+<g >
+<title>__wake_up_common (11 samples, 2.11%)</title><rect x="364.9" y="181" width="24.9" height="15.0" fill="rgb(248,132,51)" rx="2" ry="2" />
+<text  x="367.90" y="191.5" >_..</text>
+</g>
+<g >
+<title>finish_task_switch (8 samples, 1.53%)</title><rect x="1124.4" y="661" width="18.1" height="15.0" fill="rgb(216,4,47)" rx="2" ry="2" />
+<text  x="1127.44" y="671.5" ></text>
+</g>
+<g >
+<title>read_tsc (1 samples, 0.19%)</title><rect x="559.3" y="741" width="2.3" height="15.0" fill="rgb(250,223,1)" rx="2" ry="2" />
+<text  x="562.31" y="751.5" ></text>
+</g>
+<g >
+<title>calloc@plt (1 samples, 0.19%)</title><rect x="71.0" y="789" width="2.3" height="15.0" fill="rgb(251,189,50)" rx="2" ry="2" />
+<text  x="74.03" y="799.5" ></text>
+</g>
+<g >
+<title>dictFind (2 samples, 0.38%)</title><rect x="487.0" y="821" width="4.5" height="15.0" fill="rgb(225,69,10)" rx="2" ry="2" />
+<text  x="489.97" y="831.5" ></text>
+</g>
+<g >
+<title>dictFingerprint (1 samples, 0.19%)</title><rect x="1000.1" y="837" width="2.3" height="15.0" fill="rgb(212,100,38)" rx="2" ry="2" />
+<text  x="1003.11" y="847.5" ></text>
+</g>
+<g >
+<title>__vdso_gettimeofday (1 samples, 0.19%)</title><rect x="997.9" y="805" width="2.2" height="15.0" fill="rgb(209,10,47)" rx="2" ry="2" />
+<text  x="1000.85" y="815.5" ></text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_hwframe (133 samples, 25.48%)</title><rect x="156.9" y="805" width="300.7" height="15.0" fill="rgb(249,150,35)" rx="2" ry="2" />
+<text  x="159.93" y="815.5" >entry_SYSCALL_64_after_hwframe</text>
+</g>
+<g >
+<title>dictFind (1 samples, 0.19%)</title><rect x="997.9" y="837" width="2.2" height="15.0" fill="rgb(231,32,33)" rx="2" ry="2" />
+<text  x="1000.85" y="847.5" ></text>
+</g>
+<g >
+<title>walk_component (1 samples, 0.19%)</title><rect x="948.1" y="709" width="2.3" height="15.0" fill="rgb(212,166,12)" rx="2" ry="2" />
+<text  x="951.12" y="719.5" ></text>
+</g>
+<g >
+<title>decrRefCount (1 samples, 0.19%)</title><rect x="995.6" y="837" width="2.3" height="15.0" fill="rgb(211,135,27)" rx="2" ry="2" />
+<text  x="998.59" y="847.5" ></text>
+</g>
+<g >
+<title>native_write_msr (1 samples, 0.19%)</title><rect x="1140.3" y="597" width="2.2" height="15.0" fill="rgb(248,65,35)" rx="2" ry="2" />
+<text  x="1143.27" y="607.5" ></text>
+</g>
+<g >
+<title>select_idle_sibling (1 samples, 0.19%)</title><rect x="369.4" y="101" width="2.3" height="15.0" fill="rgb(207,14,1)" rx="2" ry="2" />
+<text  x="372.43" y="111.5" ></text>
+</g>
+<g >
+<title>ip_send_check (1 samples, 0.19%)</title><rect x="281.3" y="517" width="2.2" height="15.0" fill="rgb(224,33,40)" rx="2" ry="2" />
+<text  x="284.26" y="527.5" ></text>
+</g>
+<g >
+<title>sock_poll (1 samples, 0.19%)</title><rect x="550.3" y="709" width="2.2" height="15.0" fill="rgb(227,129,35)" rx="2" ry="2" />
+<text  x="553.27" y="719.5" ></text>
+</g>
+<g >
+<title>free_pages.part.91 (1 samples, 0.19%)</title><rect x="595.5" y="613" width="2.2" height="15.0" fill="rgb(214,6,14)" rx="2" ry="2" />
+<text  x="598.48" y="623.5" ></text>
+</g>
+<g >
+<title>processMultibulkBuffer (1 samples, 0.19%)</title><rect x="1169.7" y="837" width="2.2" height="15.0" fill="rgb(229,136,50)" rx="2" ry="2" />
+<text  x="1172.66" y="847.5" ></text>
+</g>
+<g >
+<title>seq_put_decimal_ull (4 samples, 0.77%)</title><rect x="132.1" y="661" width="9.0" height="15.0" fill="rgb(223,214,51)" rx="2" ry="2" />
+<text  x="135.07" y="671.5" ></text>
+</g>
+<g >
+<title>strncpy_from_user (1 samples, 0.19%)</title><rect x="961.7" y="741" width="2.2" height="15.0" fill="rgb(211,139,52)" rx="2" ry="2" />
+<text  x="964.69" y="751.5" ></text>
+</g>
+<g >
+<title>iptable_filter_hook (2 samples, 0.38%)</title><rect x="401.1" y="293" width="4.5" height="15.0" fill="rgb(246,105,42)" rx="2" ry="2" />
+<text  x="404.07" y="303.5" ></text>
+</g>
+<g >
+<title>dax_iomap_actor (12 samples, 2.30%)</title><rect x="170.5" y="661" width="27.1" height="15.0" fill="rgb(235,211,15)" rx="2" ry="2" />
+<text  x="173.50" y="671.5" >d..</text>
+</g>
+<g >
+<title>fdatasync (42 samples, 8.05%)</title><rect x="1049.8" y="837" width="95.0" height="15.0" fill="rgb(210,128,30)" rx="2" ry="2" />
+<text  x="1052.85" y="847.5" >fdatasync</text>
+</g>
+<g >
+<title>_copy_from_iter_flushcache (2 samples, 0.38%)</title><rect x="170.5" y="613" width="4.5" height="15.0" fill="rgb(209,107,26)" rx="2" ry="2" />
+<text  x="173.50" y="623.5" ></text>
+</g>
+<g >
+<title>hash_conntrack_raw (1 samples, 0.19%)</title><rect x="288.0" y="469" width="2.3" height="15.0" fill="rgb(228,129,13)" rx="2" ry="2" />
+<text  x="291.05" y="479.5" ></text>
+</g>
+<g >
+<title>ext4_inode_csum_set (3 samples, 0.57%)</title><rect x="224.8" y="597" width="6.7" height="15.0" fill="rgb(210,114,16)" rx="2" ry="2" />
+<text  x="227.75" y="607.5" ></text>
+</g>
+<g >
+<title>call (1 samples, 0.19%)</title><rect x="480.2" y="821" width="2.3" height="15.0" fill="rgb(226,57,12)" rx="2" ry="2" />
+<text  x="483.19" y="831.5" ></text>
+</g>
+<g >
+<title>__ip_local_out (13 samples, 2.49%)</title><rect x="279.0" y="533" width="29.4" height="15.0" fill="rgb(234,199,39)" rx="2" ry="2" />
+<text  x="282.00" y="543.5" >__..</text>
+</g>
+<g >
+<title>put_dec (2 samples, 0.38%)</title><rect x="136.6" y="629" width="4.5" height="15.0" fill="rgb(251,154,5)" rx="2" ry="2" />
+<text  x="139.59" y="639.5" ></text>
+</g>
+<g >
+<title>find_busiest_group (2 samples, 0.38%)</title><rect x="864.5" y="645" width="4.5" height="15.0" fill="rgb(236,146,1)" rx="2" ry="2" />
+<text  x="867.48" y="655.5" ></text>
+</g>
+<g >
+<title>ipv4_pkt_to_tuple (1 samples, 0.19%)</title><rect x="292.6" y="469" width="2.2" height="15.0" fill="rgb(214,95,14)" rx="2" ry="2" />
+<text  x="295.57" y="479.5" ></text>
+</g>
+<g >
+<title>start_this_handle (1 samples, 0.19%)</title><rect x="208.9" y="629" width="2.3" height="15.0" fill="rgb(222,94,20)" rx="2" ry="2" />
+<text  x="211.93" y="639.5" ></text>
 </g>
 </g>
 </svg>
