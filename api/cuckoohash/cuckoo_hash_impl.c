@@ -362,7 +362,7 @@ cuckoo_hash_update(const struct cuckoo_hash *hash, paddr_t key, uint32_t size)
 
         elem = lookup(hash, key, h1, h2);
         if (!elem) { 
-            _xabort(-1);
+            _xabort(1);
             return -ENOENT;
         }
 
@@ -407,7 +407,7 @@ cuckoo_hash_remove(struct cuckoo_hash *hash, paddr_t key, paddr_t *value,
     if ((status = _xbegin ()) == _XBEGIN_STARTED) {
         elem = lookup(hash, key, h1, h2);
         if (!elem) {
-            _xabort(-1);
+            _xabort(1);
             return -ENOENT;
         }
 
@@ -580,7 +580,7 @@ cuckoo_hash_insert(struct cuckoo_hash *hash, paddr_t key, paddr_t value,
     if ((status = _xbegin ()) == _XBEGIN_STARTED) {
         struct cuckoo_hash_elem *elem = lookup(hash, key, h1, h2);
         if (elem) {
-            _xabort(-1);
+            _xabort(1);
             return 0;
         }
 
@@ -588,7 +588,7 @@ cuckoo_hash_insert(struct cuckoo_hash *hash, paddr_t key, paddr_t value,
             _xend();
             return 1;
         }
-        _xabort(-1);
+        _xabort(1);
     } else {
         pmlock_wr_lock(&hash->meta->rwlock);
 
