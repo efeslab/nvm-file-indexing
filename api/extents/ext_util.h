@@ -26,6 +26,7 @@ uint32_t crc32c(uint32_t crc, const void *buf, size_t size);
 #define EXTMETA(i, n) ext_meta_t *(n) = (ext_meta_t*)(i)->idx_metadata
 #define EXTHDR(m, n)  extent_header_t *(n) = (extent_header_t*)((m)->et_direct_data)
 
+
 #define EXT_MAGIC (0xf30a)
 
 #define EXTENT_TAIL_OFFSET(hdr)                 \
@@ -194,7 +195,7 @@ static inline int read_ext_direct_data(const idx_struct_t *ext_idx)
 
         memset(ext_meta->prev_path, 0, sizeof(*ext_meta->prev_path) * MAX_DEPTH);
         memset(ext_meta->path, 0, sizeof(*ext_meta->path) * MAX_DEPTH);
-    } else if (!ext_meta->et_direct_data || ext_meta->reread_meta) {
+    } else if (!ext_meta->et_direct_data) {
         int err = CB(ext_idx, cb_get_addr, ext_meta->et_direct_range.pr_start,
                                     ext_meta->et_direct_range.pr_blk_offset,
                                     (char**)&(ext_meta->et_direct_data));
@@ -205,6 +206,53 @@ static inline int read_ext_direct_data(const idx_struct_t *ext_idx)
     }
 
     return 0;
+}
+
+static inline 
+void read_lock(idx_struct_t *ext_idx) {
+    EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, ext_hdr);
+    if_then_panic(ext_hdr->eh_magic != EXT_MAGIC, 
+            "locking an uninitialized header lock!");
+    pmlock_rd_lock(&ext_hdr->eh_lock);
+    if (ext_meta->et_cached) {
+        if_then_panic(write_ext_direct_data(ext_idx), "could not write!");
+    }
+}
+
+static inline 
+void read_unlock(idx_struct_t *ext_idx) {
+    EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, ext_hdr);
+    if_then_panic(ext_hdr->eh_magic != EXT_MAGIC, 
+            "locking an uninitialized header lock!");
+    pmlock_rd_unlock(&ext_hdr->eh_lock);
+    if (ext_meta->et_cached) {
+        if_then_panic(write_ext_direct_data(ext_idx), "could not write!");
+    }
+}
+
+static inline 
+void write_lock(idx_struct_t *ext_idx) {
+    EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, ext_hdr);
+    //if (ext_hdr->eh_magic != EXT_MAGIC) return;
+
+    if_then_panic(ext_hdr->eh_magic != EXT_MAGIC, 
+            "locking an uninitialized header lock!");
+    pmlock_wr_lock(&ext_hdr->eh_lock);
+    if (ext_meta->et_cached) {
+        if_then_panic(write_ext_direct_data(ext_idx), "could not write!");
+    }
+}
+
+static inline 
+void write_unlock(idx_struct_t *ext_idx) {
+    EXTMETA(ext_idx, ext_meta); EXTHDR(ext_meta, ext_hdr);
+    //if (ext_hdr->eh_magic != EXT_MAGIC) return;
+    if_then_panic(ext_hdr->eh_magic != EXT_MAGIC, 
+            "locking an uninitialized header lock!");
+    pmlock_wr_unlock(&ext_hdr->eh_lock);
+    if (ext_meta->et_cached) {
+        if_then_panic(write_ext_direct_data(ext_idx), "could not write!");
+    }
 }
 
 static inline extent_header_t *ext_header_from_block(char *buf)
@@ -345,7 +393,7 @@ static inline void idx_store_pblock(extent_branch_t *ix,
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
 #define in_range(b, first, len) \
-    ((b) >= (first) && (b) <= (first) + (len) - 1)
+    ((len) > 0 && (b) >= (first) && (b) <= (first) + (len) - 1)
 
 #define ext_dirty(ext_idx, path)  \
     __ext_dirty(__func__, __LINE__, (ext_idx), (path))

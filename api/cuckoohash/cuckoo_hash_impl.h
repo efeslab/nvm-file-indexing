@@ -20,8 +20,10 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <immintrin.h>
 
 #include "common/common.h"
+#include "common/hash_functions.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,16 +34,29 @@ extern "C" {
 
 
 typedef struct cuckoo_hash_item {
+    // 8
     paddr_t key;
-    paddr_t value;
-    uint32_t index;
-    uint32_t range;
+    // 2
+    uint8_t index;
+    uint8_t range;
+    // 6
+    uint16_t value_hi;
+    uint32_t value_lo;
 } cuckoo_item_t;
 
 typedef struct cuckoo_hash_elem {
-    cuckoo_item_t hash_item;
-    uint32_t hash1;
-    uint32_t hash2;
+    //cuckoo_item_t hash_item;
+    // 8
+    //uint32_t hash1;
+    //uint32_t hash2;
+    // 8
+    paddr_t key;
+    // 2
+    uint8_t index;
+    uint8_t range;
+    // 6
+    uint16_t value_hi;
+    uint32_t value_lo;
 } cuckoo_elem_t;
 
 #define sz sizeof(cuckoo_elem_t)
@@ -56,18 +71,26 @@ typedef struct cuckoo_meta {
     uint32_t magic;
     paddr_t elem_start_blk;
     size_t max_size;
+    pmlock_t rwlock;
 } nvm_cuckoo_metadata_t;
 
 typedef struct cuckoo_hash {
-    nvm_cuckoo_metadata_t meta;
+    nvm_cuckoo_metadata_t *meta;
     cuckoo_elem_t *table;
     bool do_stats;
+    bool compact_idx;
 } nvm_cuckoo_idx_t;
 
 typedef struct cuckoo_hash_stats {
     uint64_t ncachelines_written;
     uint64_t nblocks_inserted;
     uint64_t nwrites;
+    STAT_FIELD(compute_hash);
+    STAT_FIELD(non_conflict_time);
+    STAT_FIELD(conflict_time);
+    uint64_t nlookups;
+    uint64_t nbuckets_checked;
+    uint64_t nconflicts;
 } nvm_cuckoo_stats_t;
 
 extern nvm_cuckoo_stats_t cstats;
@@ -101,9 +124,8 @@ cuckoo_hash_destroy(const struct cuckoo_hash *hash);
 */
 static inline
 size_t
-cuckoo_hash_count(struct cuckoo_hash *hash)
-{
-  return 0;
+cuckoo_hash_count(struct cuckoo_hash *hash) {
+    return 0;
 }
 
 
@@ -136,6 +158,9 @@ int
 cuckoo_hash_lookup(const struct cuckoo_hash *hash,
                    paddr_t key, paddr_t *value, uint32_t *size);
 
+int
+cuckoo_hash_lookup_parallel(const struct cuckoo_hash *hash,
+                            paddr_t key, paddr_t *values, size_t nr);
 /*
   cuckoo_hash_lookup(hash, key, key_len):
 

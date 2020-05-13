@@ -57,9 +57,6 @@ uint64_t blocks;
 
 #define HASH_TABLE_MIN_SHIFT 3  /* 1 << 3 == 8 buckets */
 
-#define TRUE 1
-#define FALSE 0
-
 /* Each table size has an associated prime modulo (the first prime
  * lower than the table size) used to find the initial bucket. Probing
  * then works modulo 2^n. The prime modulo is necessary to get a
@@ -188,7 +185,13 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
   hash_ent_t *buffer;
   hash_ent_t *cur;
 
+  DECLARE_TIMING();
+  if (hash_table->enable_stats) START_TIMING();
   hash_value = hash_table->hash_func(key);
+  if (hash_table->compact) {
+      hash_value = (uint32_t)(key % hash_table->mod);
+  }
+  if (hash_table->enable_stats) UPDATE_TIMING(&hash_table->stats, compute_hash);
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
@@ -212,7 +215,6 @@ nvm_hash_table_lookup_node (nvm_hash_idx_t    *hash_table,
 
     count++;
 
-    DECLARE_TIMING();
     START_TIMING();
 #if 0
   if (HASH_ENT_IS_EMPTY(*cur)) goto end;
@@ -495,7 +497,13 @@ nvm_hash_table_lookup_node_simd (nvm_hash_idx_t *hash_table,
     uint32_t hash_value;
     hash_ent_t *cur;
 
-    hash_value = hash_table->hash_func(key);
+  DECLARE_TIMING();
+  if (hash_table->enable_stats) START_TIMING();
+  hash_value = hash_table->hash_func(key);
+  if (hash_table->compact) {
+      hash_value = (uint32_t)(key % hash_table->mod);
+  }
+  if (hash_table->enable_stats) UPDATE_TIMING(&hash_table->stats, compute_hash);
 #if 0
     if (unlikely (!HASH_IS_REAL (hash_value))) {
         hash_value = 2;
@@ -732,7 +740,13 @@ int nvm_hash_table_update(nvm_hash_idx_t *hash_table,
   hash_ent_t *buffer;
   hash_ent_t *cur;
 
+  DECLARE_TIMING();
+  if (hash_table->enable_stats) START_TIMING();
   hash_value = hash_table->hash_func(key);
+  if (hash_table->compact) {
+      hash_value = (uint32_t)(key % hash_table->mod);
+  }
+  if (hash_table->enable_stats) UPDATE_TIMING(&hash_table->stats, compute_hash);
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
@@ -1098,7 +1112,13 @@ nvm_hash_table_insert_internal (nvm_hash_idx_t *hash_table,
 
   assert (hash_table->ref_count > 0);
 
+  DECLARE_TIMING();
+  if (hash_table->enable_stats) START_TIMING();
   hash_value = hash_table->hash_func(key);
+  if (hash_table->compact) {
+      hash_value = (uint32_t)(key % hash_table->mod);
+  }
+  if (hash_table->enable_stats) UPDATE_TIMING(&hash_table->stats, compute_hash);
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;
@@ -1216,7 +1236,13 @@ nvm_hash_table_remove_internal (nvm_hash_idx_t *hash_table,
 
   assert (hash_table->ref_count > 0);
 
+  DECLARE_TIMING();
+  if (hash_table->enable_stats) START_TIMING();
   hash_value = hash_table->hash_func(key);
+  if (hash_table->compact) {
+      hash_value = (uint32_t)(key % hash_table->mod);
+  }
+  if (hash_table->enable_stats) UPDATE_TIMING(&hash_table->stats, compute_hash);
 #if 0
   if (unlikely (!HASH_IS_REAL (hash_value))) {
     hash_value = 2;

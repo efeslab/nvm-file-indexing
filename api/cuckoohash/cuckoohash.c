@@ -3,7 +3,8 @@
 
 int cuckoohash_initialize(const idx_spec_t *idx_spec,
                          idx_struct_t *idx_struct,
-                         paddr_t *location) {
+                         paddr_t *location) 
+{
 
     if_then_panic(!idx_spec, "idx_spec cannot be null!");
     if_then_panic(!idx_struct, "idx_struct cannot be null!");
@@ -49,23 +50,45 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
         return -EINVAL;
     } else if (nalloc == 0) {
         return -ENOMEM;
-    }
+    } 
 
-    for (size_t blkno = 0; blkno < nalloc; ++blkno) {
-        hash_key_t k = MAKEKEY(inum, laddr + blkno);
-        // Range: how many more logical blocks are contiguous after this one?
-        uint32_t range = (uint32_t)(nalloc - blkno);
-        // Index: how many more logical blocks are contiguous before this one?
-        uint32_t index = (uint32_t)blkno;
-        int err = cuckoo_hash_insert(ht, k, (*paddr) + blkno, index, range);
+    for (size_t chunk = 0; chunk < nalloc; chunk += UINT8_MAX) {
+        size_t chunk_sz = nalloc - chunk;
+        chunk_sz = chunk_sz > UINT8_MAX ? UINT8_MAX : chunk_sz;
 
-        if (!err) {
-            ssize_t dealloc = CB(idx_struct, cb_dealloc_data, nalloc, *paddr);
-            if_then_panic(nalloc != dealloc, "could not free data blocks!\n");
-            *paddr = 0;
-            return -EEXIST;
+        size_t prev_sz = 0;
+        for (size_t blkno = 0; blkno < chunk_sz; ++blkno) {
+            hash_key_t k = MAKECUCKOOKEY(inum, laddr + blkno + chunk);
+            // Range: how many more logical blocks are contiguous after this one?
+            uint32_t range = (uint32_t)(chunk_sz - blkno);
+            // Index: how many more logical blocks are contiguous before this one?
+            uint32_t index = (uint32_t)(blkno + prev_sz) % UINT8_MAX;
+
+            // See if we can coalesce with previous entries
+            if (blkno == 0 && chunk == 0 && laddr > 0) {
+                hash_key_t p = MAKECUCKOOKEY(inum, laddr - 1);
+                paddr_t prev; uint32_t sz;
+                int err = cuckoo_hash_lookup(ht, p, &prev, &sz);
+                if (!err && prev == *paddr - 1 && prev_sz < UINT8_MAX) {
+                    prev_sz = sz;
+                    index = (uint32_t)(blkno + prev_sz) % UINT8_MAX;
+                    size_t new_size = prev_sz + chunk_sz > UINT8_MAX ? UINT8_MAX : prev_sz + chunk_sz;
+                    err = cuckoo_hash_update(ht, p, new_size);
+                    if (err) return -ENOENT;
+                }
+            }
+
+            int err = cuckoo_hash_insert(ht, k, (*paddr) + blkno + chunk, index, range);
+
+            if (!err) {
+                ssize_t dealloc = CB(idx_struct, cb_dealloc_data, nalloc, *paddr);
+                if_then_panic(nalloc != dealloc, "could not free data blocks!\n");
+                *paddr = 0;
+                return -EEXIST;
+            }
         }
     }
+
 
     if (ht->do_stats) {
         INCR_STAT(&cstats, nwrites);
@@ -78,11 +101,25 @@ ssize_t cuckoohash_create(idx_struct_t *idx_struct, inum_t inum,
 /*
  * Returns 0 if found, or -errno otherwise.
  */
+ssize_t cuckoohash_lookup_parallel(idx_struct_t *idx_struct, inum_t inum,
+                         laddr_t laddr, size_t max, paddr_t* paddr) {
+    CUCKOOHASH(idx_struct, ht);
+
+    hash_key_t k = MAKECUCKOOKEY(inum, laddr);
+    int err = cuckoo_hash_lookup_parallel(ht, k, paddr, 8);
+    if (err) return err;
+
+    return -ENOENT;
+}
+
+/*
+ * Returns 0 if found, or -errno otherwise.
+ */
 ssize_t cuckoohash_lookup(idx_struct_t *idx_struct, inum_t inum,
                          laddr_t laddr, size_t max, paddr_t* paddr) {
     CUCKOOHASH(idx_struct, ht);
 
-    hash_key_t k = MAKEKEY(inum, laddr);
+    hash_key_t k = MAKECUCKOOKEY(inum, laddr);
     uint32_t size;
     int err = cuckoo_hash_lookup(ht, k, paddr, &size);
     if (err) return err;
@@ -108,7 +145,7 @@ ssize_t cuckoohash_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
     size_t new_size;
     laddr_t range_start;
     for (laddr_t lblk = laddr; lblk < laddr + size; ++lblk) {
-        hash_key_t k = MAKEKEY(inum, lblk);
+        hash_key_t k = MAKECUCKOOKEY(inum, lblk);
         paddr_t removed;
         uint32_t index, range;
         int err = cuckoo_hash_remove(ht, k, &removed, &index, &range);
@@ -135,7 +172,7 @@ ssize_t cuckoohash_remove(idx_struct_t *idx_struct, inum_t inum, laddr_t laddr,
 
     if (new_size > 0) {
         for (laddr_t lblk = range_start; lblk < smallest_lblk; ++lblk) {
-            hash_key_t k = MAKEKEY(inum, lblk);
+            hash_key_t k = MAKECUCKOOKEY(inum, lblk);
             size_t new_range = new_size - lblk;
             if_then_panic(new_range == 0, "Cannot insert with size 0!");
             int uerr = cuckoo_hash_update(ht, k, new_range);
@@ -168,7 +205,7 @@ int cuckoohash_invalidate_caches(idx_struct_t *idx_struct) {
 
 void cuckoohash_set_stats(idx_struct_t *idx_struct, bool enable) {
     CUCKOOHASH(idx_struct, ht);
-    ht->do_stats = enable;
+    ht->do_stats = false;//enable;
 }
 
 void cuckoohash_print_stats(idx_struct_t *idx_struct) {
@@ -183,16 +220,36 @@ void cuckoohash_print_global_stats(void) {
     printf("\tInserts: %.1f cachelines per op (%lu / %lu)\n",
         (float)cstats.ncachelines_written / (float)cstats.nwrites, 
         cstats.ncachelines_written, cstats.nwrites);
+    printf("\tBuckets per lookup: %.1f (%lu / %lu)\n",
+        (float)cstats.nbuckets_checked / (float)cstats.nlookups,
+        cstats.nbuckets_checked, cstats.nlookups);
+    printf("\tConflicts per lookup: %.2f (%lu / %lu)\n",
+            (float)cstats.nconflicts / (float)cstats.nlookups,
+            cstats.nconflicts, cstats.nlookups);
+    PFIELD(&cstats, compute_hash);
+    PFIELD(&cstats, conflict_time);
+    PFIELD(&cstats, non_conflict_time);
 }
 
 void cuckoohash_clean_global_stats(void) {
     memset(&cstats, 0, sizeof(cstats));
 }
 
+void cuckoohash_add_global_to_json(json_object *root) {
+   js_add_int64(root, "compute_tsc", cstats.compute_hash_tsc); 
+   js_add_int64(root, "compute_nr", cstats.compute_hash_nr); 
+   js_add_int64(root, "nlookups", cstats.nlookups);
+   js_add_int64(root, "nconflicts", cstats.nconflicts);
+   js_add_int64(root, "nbuckets_checked", cstats.nbuckets_checked);
+   js_add_double(root, "nbuckets_per_lookup", (double)cstats.nbuckets_checked / (double)cstats.nlookups);
+   js_add_double(root, "nconflicts_per_lookup", (double)cstats.nconflicts / (double)cstats.nlookups);
+}
+
 idx_fns_t cuckoohash_fns = {
     .im_init               = cuckoohash_initialize,
     .im_init_prealloc      = NULL,
     .im_lookup             = cuckoohash_lookup,
+    .im_lookup_parallel    = cuckoohash_lookup_parallel,
     .im_create             = cuckoohash_create,
     .im_remove             = cuckoohash_remove,
 
@@ -204,5 +261,6 @@ idx_fns_t cuckoohash_fns = {
     .im_set_stats          = cuckoohash_set_stats,
     .im_print_stats        = cuckoohash_print_stats,
     .im_print_global_stats = cuckoohash_print_global_stats,
-    .im_clean_global_stats = cuckoohash_clean_global_stats
+    .im_clean_global_stats = cuckoohash_clean_global_stats,
+    .im_add_global_to_json = cuckoohash_add_global_to_json,
 };

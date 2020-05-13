@@ -10,7 +10,8 @@ INSTANTIATE_TEST_CASE_P(AllStructures,
                                           &hash_fns, 
                                           &cuckoohash_fns,
                                           &levelhash_fns,
-                                          &radixtree_fns));
+                                          &radixtree_fns,
+                                          &cuckoohash_fns));
 
 TEST_P(GenericTestFixture, InitNoError) {
     ASSERT_EQ(0, init_err);
@@ -53,7 +54,8 @@ TEST_P(GenericTestFixture, InsertPersistCheckEach) {
             ASSERT_LE(1, r) << "\"" << strerror(-r) << "\" on lblk " << l 
                                             << " after insertion of " << lblk;
             ASSERT_LE(ret, npages - l);
-            ASSERT_TRUE(mapping[l] == p);
+            ASSERT_TRUE(mapping[l] == p) << l << " != " << p << ", is " 
+                << mapping[l] << " [lblk=" << lblk << "]";
         }
     }
 
@@ -99,7 +101,54 @@ TEST_P(GenericTestFixture, InsertPersistCheckEnd) {
                        &idx_other, inum, l, npages - l, &p);
 
         ASSERT_LE(1, r) << strerror(-r) << " on lblk " << l;
+        ASSERT_TRUE(mapping[l] == p) << l << " != " << p;
+    }
+
+    device.deallocate();
+}
+
+TEST_P(GenericTestFixture, InsertPersistFragmentedCheckEnd) {
+    inum_t inum = 17;
+    size_t npages = 4096;
+
+    map<laddr_t, paddr_t> mapping;
+
+    for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+        paddr_t pblk;
+        ssize_t ret = FN(&idx_struct, im_create,
+                         &idx_struct, inum, lblk, 1, &pblk);
+
+        mapping[lblk] = pblk;
+        ASSERT_EQ(1, ret) << "Insert: " << lblk << ": " << pblk;
+
+        device.allocate(1);
+
+    }
+
+    for (laddr_t l = 0; l < (laddr_t)npages; ++l) {
+        ASSERT_EQ(1, mapping.count(l)) << "This should never happen";
+
+        paddr_t p;
+        ssize_t r = FN(&idx_struct, im_lookup,
+                       &idx_struct, inum, l, npages - l, &p);
+
+        ASSERT_LE(1, r) << strerror(-r) << " on lblk " << l;
         ASSERT_TRUE(mapping[l] == p);
+    }
+
+    if (idx_struct.idx_fns->im_clear_metadata) {
+        FN(&idx_other, im_clear_metadata, &idx_other);
+    }
+
+    for (laddr_t l = 0; l < (laddr_t)npages; ++l) {
+        ASSERT_EQ(1, mapping.count(l)) << "This should never happen";
+
+        paddr_t p;
+        ssize_t r = FN(&idx_other, im_lookup,
+                       &idx_other, inum, l, npages - l, &p);
+
+        ASSERT_LE(1, r) << strerror(-r) << " on lblk " << l;
+        ASSERT_TRUE(mapping[l] == p) << l << " != " << p;
     }
 
     device.deallocate();
@@ -148,8 +197,115 @@ TEST_P(GenericTestFixture, InsertPersistThenRemoveAll) {
         ssize_t ret = FN(&idx_other, im_lookup,
                          &idx_other, inum, lblk, 1, &pblk);
 
-        ASSERT_LE(ret, 0);
+        ASSERT_LE(ret, 0) << "lblk == " << lblk;
         ASSERT_EQ(0, pblk);
+    }
+
+    device.deallocate();
+}
+
+TEST_P(GenericTestFixture, InsertPersistThenRemoveAllRepeat) {
+    inum_t inum = 17;
+    size_t npages = 100;
+
+    map<laddr_t, paddr_t> mapping;
+
+    for (int rep = 0; rep < 5; ++rep) {
+        for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+            paddr_t pblk;
+            ssize_t ret = FN(&idx_struct, im_create,
+                             &idx_struct, inum, lblk, 1, &pblk);
+
+            mapping[lblk] = pblk;
+            ASSERT_EQ(1, ret) << "Insert: " << lblk << "->" << pblk << 
+                " (rep==" << rep << ")";
+        }
+
+        if (idx_struct.idx_fns->im_clear_metadata) {
+            FN(&idx_other, im_clear_metadata, &idx_other);
+        }
+
+        for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+            paddr_t pblk;
+            ssize_t ret = FN(&idx_other, im_lookup,
+                             &idx_other, inum, lblk, npages - lblk, &pblk);
+
+            ASSERT_LE(1, ret) << strerror(-ret) << " on lblk " << lblk;
+            ASSERT_LE(ret, npages - lblk);
+            ASSERT_EQ(mapping[lblk], pblk);
+        }
+
+        ssize_t ret = FN(&idx_struct, im_remove,
+                         &idx_struct, inum, 0, npages);
+        ASSERT_EQ(ret, npages);
+
+        if (idx_struct.idx_fns->im_clear_metadata) {
+            FN(&idx_other, im_clear_metadata, &idx_other);
+        }
+
+        // Do another lookup, make sure they are all gone.
+        for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+            paddr_t pblk;
+            ssize_t ret = FN(&idx_other, im_lookup,
+                             &idx_other, inum, lblk, 1, &pblk);
+
+            ASSERT_LE(ret, 0) << "lblk == " << lblk << ", rep == " << rep;
+            ASSERT_EQ(0, pblk);
+        }
+    }
+
+    device.deallocate();
+}
+
+TEST_P(GenericTestFixture, InsertPersistThenRemoveAllRepeatDeep) {
+    inum_t inum = 17;
+    size_t npages = 1000;
+
+    map<laddr_t, paddr_t> mapping;
+
+    for (int rep = 0; rep < 5; ++rep) {
+        for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+            paddr_t pblk;
+            ssize_t ret = FN(&idx_struct, im_create,
+                             &idx_struct, inum, lblk, 1, &pblk);
+
+            mapping[lblk] = pblk;
+            ASSERT_EQ(1, ret) << "Insert: " << lblk << "->" << pblk << 
+                " (rep==" << rep << ")";
+        }
+
+        if (idx_struct.idx_fns->im_clear_metadata) {
+            FN(&idx_other, im_clear_metadata, &idx_other);
+        }
+
+        for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+            paddr_t pblk;
+            ssize_t ret = FN(&idx_other, im_lookup,
+                             &idx_other, inum, lblk, npages - lblk, &pblk);
+
+            ASSERT_LE(1, ret) << strerror(-ret) << " on lblk " << lblk <<
+                ", rep == " << rep;
+            ASSERT_LE(ret, npages - lblk);
+            ASSERT_EQ(mapping[lblk], pblk);
+        }
+
+        ssize_t ret = FN(&idx_struct, im_remove,
+                         &idx_struct, inum, 0, npages);
+        ASSERT_EQ(ret, npages);
+
+        if (idx_struct.idx_fns->im_clear_metadata) {
+            FN(&idx_other, im_clear_metadata, &idx_other);
+        }
+
+        // Do another lookup, make sure they are all gone.
+        for (laddr_t lblk = 0; lblk < (laddr_t)npages; ++lblk) {
+            paddr_t pblk;
+            ssize_t ret = FN(&idx_other, im_lookup,
+                             &idx_other, inum, lblk, 1, &pblk);
+
+            ASSERT_LE(ret, 0) << "lblk == " << lblk << ", rep == " << rep;
+            ASSERT_EQ(0, pblk);
+        }
     }
 
     device.deallocate();

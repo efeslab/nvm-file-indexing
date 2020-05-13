@@ -13,8 +13,14 @@ idx_fns_t levelhash_fns = {
     .im_clear_metadata     = levelhash_clear_metadata,
 
     .im_set_stats          = levelhash_set_stats,
-    .im_print_global_stats = levelhash_print_global_stats
+    .im_print_global_stats = levelhash_print_global_stats,
+    .im_add_global_to_json = levelhash_add_global_to_json,
 };
+
+void levelhash_add_global_to_json(json_object *root) {
+   js_add_int64(root, "compute_tsc", level_stats.compute_hash_tsc); 
+   js_add_int64(root, "compute_nr", level_stats.compute_hash_nr); 
+}
 
 int levelhash_init(const idx_spec_t* idx_spec, const paddr_range_t* direct_ents, 
                    idx_struct_t* level_idx) {
@@ -71,8 +77,6 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
         if (ret) {
             // Trying to resize.
             level_expand(lh);
-            int err = write_metadata(lh);
-            if (err) return -EIO;
 
             ret = level_insert(lh, laddr + blk, (*paddr) + blk, 
                                blk, nalloc - blk);
@@ -80,13 +84,9 @@ ssize_t levelhash_create(idx_struct_t* level_idx, inum_t inum,
         }
     }
 
-    int err = write_metadata(lh);
-    if (err) return -EIO;
-
     return (ssize_t) nalloc;
 }
 
-// TODO also free the data!
 ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum, 
                          laddr_t laddr, size_t nblk) {
     LEVELMETA(level_idx, lh);
@@ -101,8 +101,14 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
         uint8_t ret = level_delete(lh, cur_laddr, &paddr, &idx, &full_range);
         if (ret) {
             printf("remove failed: laddr = %u\n", cur_laddr);
-            (void)write_metadata(lh);
-            return -EIO;
+        }
+
+        ssize_t ndealloc = CB(level_idx, cb_dealloc_data, 1, paddr);
+
+        if (ndealloc < 0) {
+            return -EINVAL;
+        } else if (ndealloc == 0) {
+            return -ENOMEM;
         }
 
         // 1) Change the sizes of earlier entries in the range.
@@ -115,7 +121,6 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
                 if (r) {
                     printf("index update failed: laddr = %u, %lu/%lu\n", 
                             lblk, blk + 1, nblk);
-                    (void)write_metadata(lh);
                     return -EIO;
                 }
             }
@@ -132,7 +137,6 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
                 if (r) {
                     printf("range update failed: laddr = %u, %lu/%lu\n", 
                             lblk, blk + 1, nblk);
-                    (void)write_metadata(lh);
                     return -EIO;
                 }
             }
@@ -140,9 +144,6 @@ ssize_t levelhash_remove(idx_struct_t* level_idx, inum_t inum,
 
         level_shrink(lh);
     }
-
-    int err = write_metadata(lh);
-    if (err) return -EIO;
 
     return (ssize_t) nblk;
 }
@@ -173,7 +174,5 @@ void levelhash_print_global_stats() {
 }
 
 void levelhash_clear_metadata(idx_struct_t* level_idx) {
-    LEVELMETA(level_idx, lh);
-    lh->reread_meta = true;
-    if_then_panic(reread_metadata(lh), "could not reread metadata!");
+    return;
 }

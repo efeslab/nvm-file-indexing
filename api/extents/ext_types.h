@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include "common/common.h"
+#include <pthread.h>
 
 /*******************************************************************************
  * Section: Regular extent tree data types.
@@ -68,7 +69,8 @@ typedef struct nvm_api_extent_header {
     uint16_t eh_entries;    /* number of valid entries */
     uint16_t eh_max;        /* capacity of store in entries */
     uint16_t eh_depth;      /* has tree real underlying blocks? */
-    uint32_t eh_generation; /* generation of the tree */
+    //uint32_t eh_generation; /* generation of the tree */
+    pmlock_t eh_lock;
 } extent_header_t;
 
 typedef struct nvm_api_extent_tree_cache_node {
@@ -110,6 +112,8 @@ typedef struct extent_stats {
     uint64_t ncachelines_written;
     uint64_t nblocks_inserted;
     uint64_t nwrites;
+    uint64_t depth_total;
+    uint64_t depth_nr;
 } ext_stats_t;
 
 extern ext_stats_t estats;
@@ -125,11 +129,13 @@ static void print_ext_stats(ext_stats_t *s) {
     printf("\tInserts: %.1f cachelines per op (%lu / %lu)\n",
         (float)estats.ncachelines_written / (float)estats.nwrites, 
         estats.ncachelines_written, estats.nwrites);
+    printf("\tAverage depth: %.1f\n",
+        (float)estats.depth_total / (float)estats.depth_nr);
 }
 
 #define MAX_DEPTH 10
-#define DO_MEMOIZATION
-//#undef DO_MEMOIZATION
+#define EXT_MEMOIZATION
+//#undef EXT_MEMOIZATION
 
 #define METADATA_CACHING
 //#undef METADATA_CACHING

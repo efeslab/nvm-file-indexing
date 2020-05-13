@@ -1,5 +1,7 @@
 #include "cuckoohash_test.hpp"
 
+#include <map>
+
 using namespace std;
 
 /*******************************************************************************
@@ -33,7 +35,7 @@ TEST_F(CuckooHashFixture, InsertSingle) {
     size_t npages = 1;
 
     ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
-    ASSERT_EQ(npages, ret);
+    ASSERT_EQ(npages, ret) << strerror(-ret);
     ASSERT_GT(pblk, 0);
 }
 
@@ -95,6 +97,48 @@ TEST_F(CuckooHashFixture, LookupMulti) {
         ssize_t check_size = cuckoohash_lookup(&cht, inum, lblk + p, npages - p, &check_paddr);
         ASSERT_EQ(pblk + p, check_paddr);
         ASSERT_EQ(npages - p, check_size);
+    }
+}
+
+TEST_F(CuckooHashFixture, LookupMultiSIMD) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 8;
+
+    ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    for (size_t p = 0; p < npages; p += 8) {
+        paddr_t check_paddr[8];
+        ssize_t check_size = cuckoohash_lookup_parallel(&cht, inum, lblk + p, 8, check_paddr);
+        ASSERT_EQ(8, check_size);
+
+        for (int i = 0; i < 8; ++i) {
+            ASSERT_EQ(pblk + p + i, check_paddr[i]);
+        }
+    }
+}
+
+TEST_F(CuckooHashFixture, LookupMultiSIMDMany) {
+    inum_t inum   = 0;
+    laddr_t lblk  = 0;
+    paddr_t pblk  = 0;
+    size_t npages = 80;
+
+    ssize_t ret = cuckoohash_create(&cht, inum, lblk, npages, &pblk);
+    ASSERT_EQ(npages, ret);
+    ASSERT_GT(pblk, 0);
+
+    for (size_t p = 0; p < npages; p += 8) {
+        paddr_t check_paddr[8];
+        ssize_t check_size = cuckoohash_lookup_parallel(&cht, inum, lblk + p, 8, check_paddr);
+        ASSERT_EQ(8, check_size);
+
+        for (int i = 0; i < 8; ++i) {
+            ASSERT_EQ(pblk + p + i, check_paddr[i]);
+        }
     }
 }
 

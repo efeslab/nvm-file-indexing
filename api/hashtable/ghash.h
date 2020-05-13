@@ -116,6 +116,7 @@ typedef struct hashtable_stats {
     uint64_t n_max_ents_per_lookup;
     uint64_t n_ents;
     STAT_FIELD(loop_time);
+    STAT_FIELD(compute_hash);
 } hash_stats_t;
 
 static void print_hashtable_stats(hash_stats_t *s) {
@@ -154,6 +155,9 @@ typedef struct nvm_hashtable_index {
     // concurrency
     pthread_rwlock_t *locks;
     pthread_mutex_t *metalock;
+
+    // compact setting
+    bool compact;
 
     // -- CACHING
     bool do_lock;

@@ -5,7 +5,8 @@
 #include "extents/ext_util.h"
 #include "extents/extents.h"
 
-class ExtentTreeFixture : public TestFixture {
+class ExtentTreeFixture : public TestFixture,
+                          public ::testing::WithParamInterface<bool>  {
     protected:
         void SetUp() override {
             TestFixture::SetUp();
@@ -21,6 +22,8 @@ class ExtentTreeFixture : public TestFixture {
             // could also be an error condition, we will go ahead and allocate a
             // dummy block here.
             device.allocate(1);
+
+            extent_tree_set_caching(&ext_idx, GetParam());
         }
 
         void TearDown() override {
