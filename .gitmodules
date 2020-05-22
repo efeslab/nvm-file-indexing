@@ -25,3 +25,6 @@
 [submodule "benchmarks/FlameGraph"]
 	path = benchmarks/FlameGraph
 	url = https://github.com/brendangregg/FlameGraph
+[submodule "other/RECIPE"]
+	path = other/RECIPE
+	url = https://github.com/utsaslab/RECIPE.git

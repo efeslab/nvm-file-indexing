@@ -8,7 +8,6 @@ INSTANTIATE_TEST_CASE_P(AllStructures,
                         GenericTestFixture,
                         ::testing::Values(&extent_tree_fns, 
                                           &hash_fns, 
-                                          &cuckoohash_fns,
                                           &levelhash_fns,
                                           &radixtree_fns,
                                           &cuckoohash_fns));

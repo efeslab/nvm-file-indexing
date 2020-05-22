@@ -10,11 +10,16 @@ add_subdirectory("googletest/googletest")
 include_directories("googletest/googletest/include")
 
 include_directories("..")
+link_directories("../p-hot-boost_1_73_0/stage/lib/")
 
 file(GLOB test_src
     "*.hpp"
     "*.cpp"
 )
+
+find_library(JemallocLib jemalloc)
+find_library(TbbLib tbb)
+find_package(Threads)
 
 add_executable(TestSuite
                ${test_src}
@@ -24,5 +29,6 @@ add_executable(TestSuite
                $<TARGET_OBJECTS:ExtentTree>
                $<TARGET_OBJECTS:LevelHashing>
                $<TARGET_OBJECTS:RadixTree>
+               $<TARGET_OBJECTS:P-HOT>
                )
-target_link_libraries(TestSuite gtest pmem json-c)
+target_link_libraries(TestSuite gtest pmem json-c boost_system boost_thread atomic ${TbbLib} ${JemallocLib} ${CMAKE_THREAD_LIBS_INIT})
