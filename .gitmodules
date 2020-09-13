@@ -28,3 +28,6 @@
 [submodule "other/RECIPE"]
 	path = other/RECIPE
 	url = https://github.com/utsaslab/RECIPE.git
+[submodule "api/levelhash/Clevel-Hashing"]
+	path = api/levelhash/Clevel-Hashing
+	url = https://github.com/chenzhangyu/Clevel-Hashing.git

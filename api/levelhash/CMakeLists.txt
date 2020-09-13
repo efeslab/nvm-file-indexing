@@ -7,9 +7,13 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -g -O0 -mno-avx512vpopcntdq -mno-avx512f -mno-avx5124fmaps -mno-avx5124vnniw")
 include_directories("..")
 
+#add_subdirectory("Clevel-Hashing")
+
 file(GLOB levelhashing_src
     "*.h"
+    #"*.hpp"
     "*.c"
+    #"*.cpp"
 )
 
 add_library(LevelHashing OBJECT ${levelhashing_src})

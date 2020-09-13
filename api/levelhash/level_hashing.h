@@ -29,7 +29,9 @@ typedef struct entry {                    // A slot storing a key-value item
     paddr_t e_val;
 } entry_t;
 
-#define LH_MAX_SIZE UINT8_MAX
+//#define LH_MAX_SIZE UINT8_MAX
+// iangneal: XXX more like how it actually works
+#define LH_MAX_SIZE 1
 
 typedef struct on_device_level_hash {  //
     paddr_t  dev_levels[2];            // API: Device location for the blocks.

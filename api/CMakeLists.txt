@@ -31,4 +31,4 @@ add_library(NVMIndexingAPI SHARED
             $<TARGET_OBJECTS:RadixTree>
             $<TARGET_OBJECTS:P-HOT>
             )
-target_link_libraries(NVMIndexingAPI m pmem json-c pthread boost_thread boost_system)
+target_link_libraries(NVMIndexingAPI m pmem json-c pthread boost_thread boost_system pmemobj)
