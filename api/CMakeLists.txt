@@ -12,6 +12,8 @@ add_subdirectory(cuckoohash)
 add_subdirectory(extents)
 add_subdirectory(levelhash)
 add_subdirectory(radixtree)
+add_subdirectory(p-hot)
+link_directories(p-hot/boost_1_73_0/stage/lib)
 add_subdirectory(test)
 
 file(GLOB api_src
@@ -27,5 +29,6 @@ add_library(NVMIndexingAPI SHARED
             $<TARGET_OBJECTS:ExtentTree>
             $<TARGET_OBJECTS:LevelHashing>
             $<TARGET_OBJECTS:RadixTree>
+            $<TARGET_OBJECTS:P-HOT>
             )
-target_link_libraries(NVMIndexingAPI m pmem json-c pthread)
+target_link_libraries(NVMIndexingAPI m pmem json-c pthread boost_thread boost_system)
