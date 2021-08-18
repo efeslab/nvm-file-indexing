@@ -1,21 +1,12 @@
 [submodule "benchmarks/py-tpcc"]
 	path = benchmarks/py-tpcc
 	url = https://github.com/apavlo/py-tpcc.git
-[submodule "filesystems/strata"]
-	path = filesystems/strata
-	url = https://github.com/Dahca/strata.git
-[submodule "filesystems/linux-nova"]
-	path = filesystems/linux-nova
-	url = https://github.com/efeslab/linux-nova.git
 [submodule "api/test/googletest"]
 	path = api/test/googletest
 	url = https://github.com/google/googletest.git
 [submodule "benchmarks/ldap/lb"]
 	path = benchmarks/ldap/lb
 	url = https://github.com/hamano/lb
-[submodule "benchmarks/sqlite/--force"]
-	path = benchmarks/sqlite/--force
-	url = git@github.com:efeslab/py-tpcc.git
 [submodule "benchmarks/sqlite/py-tpcc"]
 	path = benchmarks/sqlite/py-tpcc
 	url = git@github.com:efeslab/py-tpcc.git

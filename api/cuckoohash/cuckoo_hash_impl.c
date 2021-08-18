@@ -214,7 +214,6 @@ void
 lookup_parallel(const struct cuckoo_hash *hash, u512i_64_t *keys,
                 u512i_64_t *h1, u512i_64_t *h2, u512i_64_t *ret)
 {
-    printf("lookup_parallel\n");
     uint64_t mod = (uint64_t)hash->meta->max_size;
 
     u256i_32_t idx1, idx2;

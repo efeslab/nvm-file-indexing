@@ -29,6 +29,6 @@ add_executable(TestSuite
                $<TARGET_OBJECTS:ExtentTree>
                $<TARGET_OBJECTS:LevelHashing>
                $<TARGET_OBJECTS:RadixTree>
-               $<TARGET_OBJECTS:P-HOT>
+               #$<TARGET_OBJECTS:P-HOT>
                )
 target_link_libraries(TestSuite gtest pmem json-c boost_system boost_thread atomic ${TbbLib} ${JemallocLib} ${CMAKE_THREAD_LIBS_INIT} pmemobj)
